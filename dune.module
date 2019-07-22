@@ -1,0 +1,10 @@
+################################
+# Dune module information file #
+################################
+
+#Name of the module
+Module: dune-structures
+Version: 0.1
+Maintainer: dominic.kempf@iwr.uni-heidelberg.de
+#depending on
+Depends: dune-codegen
