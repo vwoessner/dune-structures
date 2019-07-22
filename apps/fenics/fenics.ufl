@@ -1,0 +1,32 @@
+# This is a reimplementation of the FEniCS tutorial on linear elasticity
+# available here: https://fenicsproject.org/pub/tutorial/html/._ftut1008.html
+
+def sym(expr):
+    return 0.5 * (expr + expr.T)
+
+# Physical parameters
+lame1 = 1.25
+lame2 = 1.0
+density = 1.0
+gravity = 0.016
+
+
+class BCType:
+    NEUMANN = 0
+    DIRICHLET = 1
+
+
+cell = hexahedron
+element = VectorElement("CG", cell, 1)
+u = TrialFunction(element)
+v = TestFunction(element)
+
+f = as_vector([0, 0, -density*gravity])
+
+r = inner(lame1 * div(u) * Identity(3) + 2.0 * lame2 * sym(grad(u)), sym(grad(v))) * dx \
+  - inner(f, v) * dx
+
+x = SpatialCoordinate(cell)
+bctype = conditional(abs(x[0]) < 1e-8, BCType.DIRICHLET, BCType.NEUMANN)
+interpolate_expression = 0.0, 0.0, 0.0
+is_dirichlet = bctype, bctype, bctype
