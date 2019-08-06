@@ -14,6 +14,8 @@ find_package(dune-common REQUIRED)
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules"
   ${dune-common_MODULE_PATH})
 
+set(DUNE_PYTHON_INSTALL_EDITABLE 1)
+
 #include the dune macros
 include(DuneMacros)
 
@@ -22,6 +24,7 @@ dune_project()
 
 dune_enable_all_packages()
 
+add_subdirectory(apps)
 add_subdirectory(cmake/modules)
 add_subdirectory(dune/structures)
 add_subdirectory(python)
