@@ -25,7 +25,8 @@ def generate_cell_mesh(config, mshfile):
         lowerleft = list(-0.5 * i for i in size)
         cyto = geo.add_box(lowerleft, size)
     elif shape == "sphere":
-        raise NotImplementedError
+        radius = cytoconfig.get("radius", 1.0)
+        cyto = geo.add_ball([0.0, 0.0, 0.0], radius)
     elif shape == "round":
         raise NotImplementedError
     else:
@@ -60,6 +61,9 @@ def generate_cell_mesh(config, mshfile):
         geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{{}}}; }} }} = {};".format(fibre.id, fibreconfig[i].get("meshwidth", 0.02)))
 
     # Finalize the grid generation
+    if shape != "box":
+        # The default meshing algorithm creates spurious elements on the sphere surface
+        geo.add_raw_code("Mesh.Algorithm = 5;")
     mesh = pygmsh.generate_mesh(geo)
 
     # Export this mesh into several formats as requested

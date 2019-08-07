@@ -1,11 +1,11 @@
 cytoplasm:
-  model: box
+  shape: box
   size: 1.0 1.0 1.0
   meshwidth: 0.2
 fibres:
 - radius: 0.1
-  orientation: 2.0 0.0 0.0
-  offset: -1.0 0.0 0.0
+  orientation: 3.0 0.0 0.0
+  offset: -1.5 0.0 0.0
   meshwidth: 0.02
 - radius: 0.05
   orientation: 2.0 0.0 0.0
