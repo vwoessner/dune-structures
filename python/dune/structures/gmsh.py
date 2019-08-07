@@ -1,6 +1,7 @@
 """ Create idealized cell geometries for meshing with GMSH - through a convenient Python interface """
 
 import meshio
+import os.path
 import pygmsh
 import sys
 import yaml
@@ -57,13 +58,28 @@ def generate_cell_mesh(config, mshfile):
     geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{:}}; }} }} = {};".format(cytoconfig.get("meshwidth", 0.1)))
     for i, fibre in enumerate(fibres):
         geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{{}}}; }} }} = {};".format(fibre.id, fibreconfig[i].get("meshwidth", 0.02)))
-    
-    print(geo.get_code())
 
     # Finalize the grid generation
     mesh = pygmsh.generate_mesh(geo)
+
+    # Export this mesh into several formats as requested
+    exportconfig = config.get("export", {})
+
+    mshconfig = exportconfig.get("msh", {})
     meshio.write(mshfile, mesh, write_binary=False)
-    meshio.write(mshfile + ".vtk", mesh)
+
+    vtkconfig = exportconfig.get("vtk", {})
+    if vtkconfig.get("enabled", False):
+        filename = vtkconfig.get("filename", mshfile)
+        filename = "{}.vtk".format(os.path.splitext(mshfile)[0])
+        meshio.write(filename, mesh)
+
+    geoconfig = exportconfig.get("geo", {})
+    if geoconfig.get("enabled", False):
+        filename = geoconfig.get("filename", mshfile)
+        filename = "{}.geo".format(os.path.splitext(mshfile)[0])
+        with open(filename, 'w') as f:
+            f.write(geo.get_code() + "\n")
 
 
 def entrypoint_generate_mesh():
