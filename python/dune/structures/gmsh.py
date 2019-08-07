@@ -40,7 +40,7 @@ def generate_cell_mesh(config, mshfile):
     # Maybe add some fibres
     fibres = []
     fibreconfig = config.get("fibres", [])
-    for fconfig in fibreconfig:
+    for i, fconfig in enumerate(fibreconfig):
         # Parse fiber data
         offset = _parse_vec(fconfig.get("offset", [-1.0, 0.0, 0.0]))
         orientation = _parse_vec(fconfig.get("orientation", [2.0, 0.0, 0.0]))
@@ -50,20 +50,34 @@ def generate_cell_mesh(config, mshfile):
         fibre = geo.add_cylinder(offset, orientation, radius)
 
         # And intersect it with the cytoplasma
-        fibres.append(geo.boolean_intersection([cyto, fibre], delete_first=False, delete_other=True))
+        fibre = geo.boolean_intersection([cyto, fibre], delete_first=False, delete_other=True)
+
+        # Add physical information to this fibre
+        fibre_physical = fconfig.get("physical", None)
+        if fibre_physical is not None:
+            geo.add_physical([fibre], fibre_physical)
+
+        # Store the fibre object for later
+        fibres.append(fibre)
 
     # Post process fibre generation
-    geo.boolean_fragments([cyto], fibres, delete_other=False)
+    frags = geo.boolean_fragments([cyto], fibres, delete_other=False)
 
     # Implement mesh widths
     geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{:}}; }} }} = {};".format(cytoconfig.get("meshwidth", 0.1)))
     for i, fibre in enumerate(fibres):
         geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{{}}}; }} }} = {};".format(fibre.id, fibreconfig[i].get("meshwidth", 0.02)))
 
-    # Finalize the grid generation
+    # Maybe add physical group information to the cytoplasma
+    cyto_physical = cytoconfig.get('physical', None)
+    if cyto_physical is not None:
+        geo.add_physical([frags], cyto_physical)
+
+    # The default meshing algorithm creates spurious elements on the sphere surface
     if shape != "box":
-        # The default meshing algorithm creates spurious elements on the sphere surface
         geo.add_raw_code("Mesh.Algorithm = 5;")
+
+    # Finalize the grid generation
     mesh = pygmsh.generate_mesh(geo)
 
     # Export this mesh into several formats as requested
@@ -76,7 +90,8 @@ def generate_cell_mesh(config, mshfile):
     if vtkconfig.get("enabled", False):
         filename = vtkconfig.get("filename", mshfile)
         filename = "{}.vtk".format(os.path.splitext(mshfile)[0])
-        meshio.write(filename, mesh)
+        # This throws a warning, but the physical groups only work in ASCII mode
+        meshio.write(filename, mesh, write_binary=False)
 
     geoconfig = exportconfig.get("geo", {})
     if geoconfig.get("enabled", False):
