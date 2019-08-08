@@ -28,6 +28,7 @@ add_subdirectory(apps)
 add_subdirectory(cmake/modules)
 add_subdirectory(dune/structures)
 add_subdirectory(python)
+add_subdirectory(test)
 
 # finalize the dune project, e.g. generating config.h etc.
 finalize_dune_project(GENERATE_CONFIG_H_CMAKE)
