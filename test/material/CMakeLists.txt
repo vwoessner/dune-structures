@@ -1,6 +1,7 @@
-dune_add_test(SOURCES testmaterial.cc)
+dune_add_formcompiler_system_test(SOURCE testmaterial.cc
+                                  INIFILE material.ini
+                                  UFLFILE dummy.ufl
+                                  BASENAME testmaterial)
 
 dune_structures_mesh_generation(TARGET testmaterial
                                 CONFIG materialgrid.yml)
-
-dune_symlink_to_source_files(FILES material.ini)
