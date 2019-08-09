@@ -40,6 +40,7 @@ def generate_cell_mesh(config, mshfile):
     # Maybe add some fibres
     fibres = []
     fibreconfig = config.get("fibres", [])
+    physical_to_fibre = {}
     for i, fconfig in enumerate(fibreconfig):
         # Parse fiber data
         offset = _parse_vec(fconfig.get("offset", [-1.0, 0.0, 0.0]))
@@ -55,7 +56,8 @@ def generate_cell_mesh(config, mshfile):
         # Add physical information to this fibre
         fibre_physical = fconfig.get("physical", None)
         if fibre_physical is not None:
-            geo.add_physical([fibre], fibre_physical)
+            physical_to_fibre.setdefault(fibre_physical, [])
+            physical_to_fibre[fibre_physical].append(fibre)
 
         # Store the fibre object for later
         fibres.append(fibre)
@@ -68,7 +70,10 @@ def generate_cell_mesh(config, mshfile):
     for i, fibre in enumerate(fibres):
         geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{{}}}; }} }} = {};".format(fibre.id, fibreconfig[i].get("meshwidth", 0.02)))
 
-    # Maybe add physical group information to the cytoplasma
+    # Maybe add physical group information
+    for physical, fibres in physical_to_fibre.items():
+        geo.add_physical(fibres, physical)
+
     cyto_physical = cytoconfig.get('physical', None)
     if cyto_physical is not None:
         geo.add_physical([frags], cyto_physical)

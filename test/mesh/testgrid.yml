@@ -13,7 +13,7 @@ fibres:
   orientation: 2.0 0.0 0.0
   offset: -1.0 0.3 0.0
   meshwidth: 0.005
-  physical: 2
+  physical: 1
 export:
   geo:
     enabled: true
