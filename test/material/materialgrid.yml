@@ -1,0 +1,5 @@
+cytoplasm:
+  shape: box
+  size: 1.0 1.0 1.0
+  meshwidth: 0.2
+  physical: 0
