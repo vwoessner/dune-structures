@@ -3,9 +3,11 @@
 
 #include<dune/common/shared_ptr.hh>
 #include<dune/common/parametertree.hh>
+#include<dune/structures/utilities.hh>
 
 #include<map>
 #include<memory>
+#include<string>
 #include<vector>
 
 
@@ -104,5 +106,26 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
   std::map<int, std::shared_ptr<ElasticMaterialBase<GV, T>>> materials;
 };
 
+
+template<typename T,typename GV>
+MaterialCollection<GV, T> parse_material(const GV& gv,
+		                                 std::vector<int>& physical_groups,
+										 const Dune::ParameterTree& params)
+{
+  MaterialCollection<GV, T> coll(gv, physical_groups);
+
+  // Get the list of materials and iterate over them
+  auto material_groups = params.get<std::string>("materials");
+  auto groups = str_split(material_groups);
+  for (auto group : groups)
+  {
+	str_trim(group);
+    const auto& groupconf = params.sub(group);
+    auto material = std::make_shared<HomogeneousElasticMaterial<GV, T>>(groupconf);
+    coll.add_material(groupconf.get<int>("group"), material);
+  }
+
+  return coll;
+}
 
 #endif

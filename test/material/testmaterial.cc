@@ -1,5 +1,7 @@
 #include"config.h"
 
+#include<dune/common/parametertree.hh>
+#include<dune/common/parametertreeparser.hh>
 #include<dune/common/parallel/mpihelper.hh>
 #include<dune/grid/io/file/gmshreader.hh>
 #include<dune/grid/uggrid.hh>
@@ -11,6 +13,10 @@
 int main(int argc, char** argv)
 {
   Dune::MPIHelper& helper = Dune::MPIHelper::instance(argc, argv);
+
+  // Parse the ini file
+  Dune::ParameterTree config;
+  Dune::ParameterTreeParser::readINITree("material.ini", config);
 
   // Construct the grid on rank 0 to later distribute it
   using GridType = Dune::UGGrid<3>;
@@ -29,12 +35,9 @@ int main(int argc, char** argv)
   using GV = GridType::LeafGridView;
   const GV& gv = grid->leafGridView();
 
-  HomogeneousElasticMaterial<GV, double> mat1(1.0, 1.0);
+  auto material = parse_material<double>(gv, entity, config);
 
-  MaterialCollection<GV, double> coll(gv, entity);
-  coll.add_material(0, mat1);
-  coll.add_material(1, std::make_shared<HomogeneousElasticMaterial<GV, double>>(2.0, 2.0));
-
-  std::cout << coll.first_lame(*gv.begin<0>(), Dune::FieldVector<double, 3>(0.0)) << std::endl;
-  std::cout << coll.second_lame(*gv.begin<0>(), Dune::FieldVector<double, 3>(0.0)) << std::endl;
+  for (auto e : Dune::elements(gv))
+    std::cout << material.first_lame(e, Dune::FieldVector<double, 3>(0.0)) << " "
+              << material.second_lame(e, Dune::FieldVector<double, 3>(0.0)) << std::endl;
 }
