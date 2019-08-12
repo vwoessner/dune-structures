@@ -43,8 +43,20 @@ int main(int argc, char** argv)
   using VB = Dune::PDELab::ISTL::VectorBackend<Dune::PDELab::ISTL::Blocking::none>;
   using GFS = Dune::PDELab::GridFunctionSpace<GV, FEM, CASS, VB>;
   using LOP = MaterialTestOperator<GFS, GFS, decltype(material)>;
-
   FEM fem(gv);
   GFS gfs(gv, fem);
   LOP lop(gfs, gfs, config, material);
+
+  // Build a grid operator from that
+  using MB = Dune::PDELab::ISTL::BCRSMatrixBackend<>;
+  using CC = GFS::ConstraintsContainer<double>::Type;
+  using GO = Dune::PDELab::GridOperator<GFS, GFS, LOP, MB, double, double, double, CC, CC>;
+  MB mb(25);
+  CC cc;
+  GO go(gfs, cc, gfs, cc, lop, mb);
+
+  // Calculate a residual
+  using V = Dune::PDELab::Backend::Vector<GFS, double>;
+  V x(gfs, 0.0), r(gfs, 0.0);
+  go.residual(x, r);
 }

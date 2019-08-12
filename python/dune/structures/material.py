@@ -5,10 +5,17 @@ from dune.codegen.generation import (class_member,
                                      initializer_list,
                                      function_mangler,
                                      template_parameter,
+                                     globalarg,
                                      )
+from dune.codegen.pdelab.geometry import (enforce_boundary_restriction,
+                                          name_cell,
+                                          world_dimension,
+                                          )
 from dune.codegen.loopy.target import dtype_floatingpoint
+from dune.codegen.tools import maybe_wrap_subscript
 import pymbolic.primitives as prim
 import loopy as lp
+import numpy as np
 import ufl
 
 
@@ -51,7 +58,15 @@ class UFLPhysicalParameter(ufl.coefficient.Coefficient):
         return UFLPhysicalParameter(self.param)
 
     def visit(self, visitor):
-        return prim.Call(LoopyPhysicalParameter(self.param), ())
+        restriction = enforce_boundary_restriction(visitor)
+        cell = name_cell(restriction)
+        globalarg(cell, dtype=lp.types.to_loopy_type(np.dtype(str)))
+        cell = prim.Variable(cell)
+        # The following is a terrible hack until we get the function interface
+        # in loopy: We need to pass the quadrature points coordinate by coordinate
+        # and piece the information back together on the receiving side.
+        qp = tuple(maybe_wrap_subscript(visitor.to_cell(visitor.quadrature_position()), i) for i in range(world_dimension()))
+        return prim.Call(LoopyPhysicalParameter(self.param), (cell,) + qp)
 
 
 class LoopyPhysicalParameter(lp.symbolic.FunctionIdentifier):
@@ -70,7 +85,11 @@ class LoopyPhysicalParameter(lp.symbolic.FunctionIdentifier):
 @function_mangler
 def lame_parameter_function_mangler(knl, func, arg_dtypes):
     if isinstance(func, LoopyPhysicalParameter):
-        return lp.CallMangleInfo(func.name, (lp.types.to_loopy_type(dtype_floatingpoint()),), ())
+        return lp.CallMangleInfo(func.name,
+                                 (lp.types.to_loopy_type(dtype_floatingpoint()),),
+                                 (lp.types.to_loopy_type(np.dtype(str)),) +
+                                 (lp.types.to_loopy_type(dtype_floatingpoint()),) * world_dimension()
+                                )
 
 def name_material_class():
     name = "material"

@@ -1,6 +1,7 @@
 #ifndef DUNE_STRUCTURES_MATERIAL_HH
 #define DUNE_STRUCTURES_MATERIAL_HH
 
+#include<dune/common/fvector.hh>
 #include<dune/common/shared_ptr.hh>
 #include<dune/common/parametertree.hh>
 #include<dune/structures/utilities.hh>
@@ -22,6 +23,17 @@ class ElasticMaterialBase
 
   virtual T first_lame(const Entity& e, const Coord& x) const = 0;
   virtual T second_lame(const Entity& e, const Coord& x) const = 0;
+
+  // These are part of a hack that is soon to go away
+  virtual T first_lame(const Entity& e, T x0, T x1, T x2) const
+  {
+    return this->first_lame(e, Dune::FieldVector<T, 3>{x0, x1, x2});
+  }
+
+  virtual T second_lame(const Entity& e, T x0, T x1, T x2) const
+  {
+    return this->second_lame(e, Dune::FieldVector<T, 3>{x0, x1, x2});
+  }
 };
 
 
@@ -64,6 +76,11 @@ template<typename GV, typename T>
 class MaterialCollection : public ElasticMaterialBase<GV, T>
 {
   public:
+  // I need these weirdos here for the moment.
+  // Godbolt experiment: https://godbolt.org/z/xBB7zC
+  using ElasticMaterialBase<GV, T>::first_lame;
+  using ElasticMaterialBase<GV, T>::second_lame;
+
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
 
