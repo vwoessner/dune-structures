@@ -41,6 +41,11 @@ template<typename GV, typename T>
 class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
 {
   public:
+  // I need these weirdos here for the moment.
+  // Godbolt experiment: https://godbolt.org/z/xBB7zC
+  using ElasticMaterialBase<GV, T>::first_lame;
+  using ElasticMaterialBase<GV, T>::second_lame;
+
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
 
