@@ -12,6 +12,9 @@
 #include<vector>
 
 
+class MaterialError : public Dune::IOError {};
+
+
 template<typename GV, typename T>
 class ElasticMaterialBase
 {
@@ -51,9 +54,29 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
 
   // Construct from a parameter tree
   HomogeneousElasticMaterial(const Dune::ParameterTree& params)
-	: lame1(params.get<T>("lame1", T(1.0))),
-	  lame2(params.get<T>("lame2", T(1.0)))
-  {}
+  {
+    // The parameters of linear elasticity are ambiguous.
+    // We only accept some combinations. They can be taken
+    // from here:
+    // https://en.wikipedia.org/wiki/Lam%C3%A9_parameters
+    if (params.hasKey("lame1") && params.hasKey("lame2"))
+    {
+      lame1 = params.get<T>("lame1");
+      lame2 = params.get<T>("lame2");
+    }
+    else if (params.hasKey("youngs_modulus") && params.hasKey("poisson_ratio"))
+    {
+      T young = params.get<T>("youngs_modulus");
+      T pr = params.get<T>("poisson_ratio");
+
+      lame1 = (pr * young) / ((1.0 + pr) * (1.0 - 2.0 * pr));
+      lame2 = young / (2.0 * (1.0 + pr));
+    }
+    else
+    {
+      DUNE_THROW(MaterialError, "Your material specification is not supported!");
+    }
+  }
 
   // Construct given expicit parameters
   HomogeneousElasticMaterial(T lame1, T lame2)
@@ -130,11 +153,13 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
 
 
 template<typename T,typename GV>
-MaterialCollection<GV, T> parse_material(const GV& gv,
-		                                 std::vector<int>& physical_groups,
-										 const Dune::ParameterTree& params)
+std::shared_ptr<MaterialCollection<GV, T>> parse_material(
+    const GV& gv,
+    std::vector<int>& physical_groups,
+    const Dune::ParameterTree& params
+    )
 {
-  MaterialCollection<GV, T> coll(gv, physical_groups);
+  auto coll = std::make_shared<MaterialCollection<GV, T>>(gv, physical_groups);
 
   // Get the list of materials and iterate over them
   auto material_groups = params.get<std::string>("materials");
@@ -144,7 +169,7 @@ MaterialCollection<GV, T> parse_material(const GV& gv,
 	str_trim(group);
     const auto& groupconf = params.sub(group);
     auto material = std::make_shared<HomogeneousElasticMaterial<GV, T>>(groupconf);
-    coll.add_material(groupconf.get<int>("group"), material);
+    coll->add_material(groupconf.get<int>("group"), material);
   }
 
   return coll;

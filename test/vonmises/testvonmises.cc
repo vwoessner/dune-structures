@@ -27,7 +27,7 @@ int main(int argc, char** argv)
   GV gv = grid->leafGridView();
 
   // Set up finite element maps...
-  using FEM = Dune::PDELab::PkLocalFiniteElementMap<GV, DF, RangeType, 1>;
+  using FEM = Dune::PDELab::QkLocalFiniteElementMap<GV, DF, RangeType, 1>;
   FEM fem(gv);
 
   // Set up grid function spaces...

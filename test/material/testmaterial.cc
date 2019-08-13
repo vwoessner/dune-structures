@@ -19,7 +19,7 @@ int main(int argc, char** argv)
 
   // Parse the ini file
   Dune::ParameterTree config;
-  Dune::ParameterTreeParser::readINITree("material.ini", config);
+  Dune::ParameterTreeParser::readINITree("testmaterial.ini", config);
 
   // Construct the grid
   using GridType = Dune::UGGrid<3>;
@@ -42,7 +42,7 @@ int main(int argc, char** argv)
   using CASS = Dune::PDELab::NoConstraints;
   using VB = Dune::PDELab::ISTL::VectorBackend<Dune::PDELab::ISTL::Blocking::none>;
   using GFS = Dune::PDELab::GridFunctionSpace<GV, FEM, CASS, VB>;
-  using LOP = MaterialTestOperator<GFS, GFS, decltype(material)>;
+  using LOP = MaterialTestOperator<GFS, GFS>;
   FEM fem(gv);
   GFS gfs(gv, fem);
   LOP lop(gfs, gfs, config, material);

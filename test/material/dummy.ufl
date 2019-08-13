@@ -4,5 +4,5 @@ FE = FiniteElement("CG", tetrahedron, 1)
 u = TrialFunction(FE)
 v = TestFunction(FE)
 
-material = HeterogeneousMaterial()
+material = HeterogeneousMaterial(tetrahedron)
 r = material.first_lame() * u * v * dx
