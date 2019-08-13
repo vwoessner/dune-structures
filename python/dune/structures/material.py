@@ -23,10 +23,16 @@ import ufl
 
 class ElasticMaterialBase(object):
     def first_lame(self):
+        """ Return the first lame coefficient (often lambda) """
         raise NotImplementedError
     
     def second_lame(self):
+        """ Return the second lame coeffcient (often mu) """
         raise NotImplementedError
+
+    def with_cell(self, cell):
+        """ Bind this material to a given cell - default is no op """
+        return self
 
 
 class HomogeneousMaterial(ElasticMaterialBase):
@@ -42,21 +48,28 @@ class HomogeneousMaterial(ElasticMaterialBase):
 
 
 class HeterogeneousMaterial(ElasticMaterialBase):
+    def __init__(self, cell=None):
+        self.cell = cell
+
+    def with_cell(self, cell):
+        return HeterogeneousMaterial(cell)
+
     def first_lame(self):
-        return UFLPhysicalParameter("first_lame")
+        return UFLPhysicalParameter("first_lame", self.cell)
 
     def second_lame(self):
-        return UFLPhysicalParameter("second_lame")
+        return UFLPhysicalParameter("second_lame", self.cell)
 
 
 class UFLPhysicalParameter(ufl.coefficient.Coefficient):
-    def __init__(self, param):
+    def __init__(self, param, cell):
         self.param = param
-        FE = ufl.FiniteElement("DG", 'tetrahedron', 0)
+        self.cell = cell
+        FE = ufl.FiniteElement("DG", cell, 0)
         ufl.coefficient.Coefficient.__init__(self, FE)
     
     def _ufl_expr_reconstruct_(self):
-        return UFLPhysicalParameter(self.param)
+        return UFLPhysicalParameter(self.param, self.cell)
 
     def visit(self, visitor):
         restriction = enforce_boundary_restriction(visitor)
