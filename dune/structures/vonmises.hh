@@ -59,10 +59,10 @@ class VonMisesStressGridFunction
 
     // Calculate divergence
     typename Traits::RangeType div = 0.0;
-    for (int i=0; i<2; ++i)
+    for (int i=0; i<3; ++i)
       div += displacement_grad[i][i];
 
-    std::array<typename Traits::RangeType, 2> sig;
+    std::array<typename Traits::RangeType, 3> sig;
     for(int i=0; i<3; ++i)
       sig[i] = lame1 * div + 2.0 * lame2 * displacement_grad[i][i];
 
