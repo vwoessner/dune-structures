@@ -66,13 +66,14 @@ class VonMisesStressGridFunction
   	for(int i=0; i<2; ++i)
   	  sig[i] = lame1 * div + 2.0 * lame2 * displacement_grad[i][i];
 
-  	// Diagonal part of the deviatoric stress tensor
-  	for (int i=0; i<2; ++i)
-  		for (int j=0; j<2; ++j)
-  		{
-  			auto entry = (i == j ? 2./3. : -1./3.) * sig[j];
-  			sum += entry * entry;
-  		}
+    // Diagonal part of the deviatoric stress tensor
+    for (int i=0; i<2; ++i)
+    {
+      typename Traits::RangeType entry = 0.0;
+      for (int j=0; j<2; ++j)
+        entry += (i == j ? 2./3. : -1./3.) * sig[j];
+      sum += entry * entry;
+    }
 
   	using std::sqrt;
   	y = std::sqrt(1.5 * sum);

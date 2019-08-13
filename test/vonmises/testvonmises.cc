@@ -19,15 +19,15 @@ int main(int argc, char** argv)
   using RangeType = double;
 
   // Setup grid (view)...
-  using Grid = Dune::YaspGrid<3, Dune::EquidistantCoordinates<RangeType, 3>>;
+  using Grid = Dune::UGGrid<3>;
   using GV = Grid::LeafGridView;
   using DF = Grid::ctype;
-  IniGridFactory<Grid> factory(params);
+  IniGridFactory<Grid> factory(params.sub("grid"));
   std::shared_ptr<Grid> grid = factory.getGrid();
   GV gv = grid->leafGridView();
 
   // Set up finite element maps...
-  using FEM = Dune::PDELab::QkLocalFiniteElementMap<GV, DF, RangeType, 1>;
+  using FEM = Dune::PDELab::PkLocalFiniteElementMap<GV, DF, RangeType, 1>;
   FEM fem(gv);
 
   // Set up grid function spaces...
@@ -36,6 +36,8 @@ int main(int argc, char** argv)
   using GFS = Dune::PDELab::VectorGridFunctionSpace<GV, FEM, 3, VB, VB, CASS>;
   GFS gfs(gv, fem);
   gfs.name("displacement");
+  gfs.update();
+  std::cout << "Set up a grid function space with " << gfs.size() << " dofs!" << std::endl;
 
   // Setting up constraints container
   using CC = GFS::ConstraintsContainer<RangeType>::Type;
@@ -48,7 +50,7 @@ int main(int argc, char** argv)
   Dune::PDELab::constraints(comp_bctype, gfs, cc);
 
   // Instantiate the material class
-  auto material = std::make_shared<HomogeneousElasticMaterial<GV, double>>(1.0, 1.0);
+  auto material = std::make_shared<HomogeneousElasticMaterial<GV, double>>(1.25, 1.0);
 
   // Setting up grid operator
   using LOP = LinearElasticityOperator<GFS, GFS>;
@@ -67,7 +69,7 @@ int main(int argc, char** argv)
   Dune::PDELab::interpolate(comp_dirichlet, gfs, x);
 
   // Set up the solver...
-  using LS = Dune::PDELab::ISTLBackend_SEQ_SuperLU;
+  using LS = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
   using SLP = Dune::PDELab::StationaryLinearProblemSolver<GO, LS, V>;
   LS ls(false);
   SLP slp(go, ls, x, 1e-12);
@@ -86,6 +88,7 @@ int main(int argc, char** argv)
 
   // Visualize the stress grid function
   Dune::SubsamplingVTKWriter vtkwriter(gv, Dune::refinementLevels(0));
+  Dune::PDELab::addSolutionToVTKWriter(vtkwriter, gfs, x);
   Dune::PDELab::addSolutionToVTKWriter(vtkwriter, sgfs, stress_container);
   vtkwriter.write("vonmises", Dune::VTK::ascii);
 
