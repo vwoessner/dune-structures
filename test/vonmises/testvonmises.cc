@@ -37,12 +37,43 @@ int main(int argc, char** argv)
   GFS gfs(gv, fem);
   gfs.name("displacement");
 
+  // Setting up constraints container
+  using CC = GFS::ConstraintsContainer<RangeType>::Type;
+  CC cc;
+  cc.clear();
+  auto bctype = [&](const auto& is, const auto& xl){ auto x=is.geometry().global(xl); return (abs(x[0]) < 1e-08 ? 1 : 0.0); };
+  auto bctype_f = Dune::PDELab::makeBoundaryConditionFromCallable(gv, bctype);
+  Dune::PDELab::CompositeConstraintsParameters comp_bctype(bctype_f, bctype_f, bctype_f);
+  //Dune::PDELab::CompositeConstraintsParameters<decltype(bctype_f), decltype(bctype_f), decltype(bctype_f)> comp_bctype(bctype_f, bctype_f, bctype_f);
+  Dune::PDELab::constraints(comp_bctype, gfs, cc);
+
+  // Instantiate the material class
+  auto material = std::make_shared<HomogeneousElasticMaterial<GV, double>>(1.0, 1.0);
+
+  // Setting up grid operator
+  using LOP = LinearElasticityOperator<GFS, GFS>;
+  using MB = Dune::PDELab::ISTL::BCRSMatrixBackend<>;
+  using GO = Dune::PDELab::GridOperator<GFS, GFS, LOP, MB, DF, RangeType, RangeType, CC, CC>;
+  LOP lop(gfs, gfs, params, material);
+  MB mb(25);
+  GO go(gfs, cc, gfs, cc, lop, mb);
+
   // Setting up container
   using V = Dune::PDELab::Backend::Vector<GFS, DF>;
   V x(gfs);
+  auto dirichlet = [&](const auto& x){ return 0.0; };
+  auto dirichlet_f = Dune::PDELab::makeGridFunctionFromCallable(gv, dirichlet);
+  Dune::PDELab::CompositeGridFunction comp_dirichlet(dirichlet_f, dirichlet_f, dirichlet_f);
+  Dune::PDELab::interpolate(comp_dirichlet, gfs, x);
+
+  // Set up the solver...
+  using LS = Dune::PDELab::ISTLBackend_SEQ_SuperLU;
+  using SLP = Dune::PDELab::StationaryLinearProblemSolver<GO, LS, V>;
+  LS ls(false);
+  SLP slp(go, ls, x, 1e-12);
+  slp.apply();
 
   // A grid function for the stress
-  auto material = std::make_shared<HomogeneousElasticMaterial<GV, double>>(1.0, 1.0);
   VonMisesStressGridFunction stress(x, material);
 
   // Interpolate the stress into a grid function
