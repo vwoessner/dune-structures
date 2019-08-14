@@ -52,6 +52,8 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
 
+  virtual ~HomogeneousElasticMaterial() {}
+
   // Construct from a parameter tree
   HomogeneousElasticMaterial(const Dune::ParameterTree& params)
   {
@@ -111,6 +113,8 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
 
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
+
+  virtual ~MaterialCollection() {}
 
   MaterialCollection(const GV& gv, std::shared_ptr<std::vector<int>> physical_groups)
     : is(gv.indexSet()), physical_entity_mapping(physical_groups)

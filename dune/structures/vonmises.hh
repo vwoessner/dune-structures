@@ -4,6 +4,7 @@
 #include<dune/pdelab.hh>
 #include<dune/structures/material.hh>
 
+#include<array>
 #include<memory>
 
 /** Calculate von Mises Stress */
