@@ -13,42 +13,53 @@ def _parse_vec(x):
     return list(float(i) for i in x)
 
 
-def add_shape(geo, config):
-    shape = config.get("shape", "box")
-    if shape == "box":
-        size = _parse_vec(config.get("size", [1.0, 1.0, 1.0]))
-        lowerleft = list(-0.5 * i for i in size)
-        return geo.add_box(lowerleft, size)
-    elif shape == "sphere":
-        radius = config.get("radius", 1.0)
-        return geo.add_ball([0.0, 0.0, 0.0], radius)
-    elif shape == "round":
-        raise NotImplementedError
-    else:
-        raise NotImplementedError
+class GMSHError(Exception):
+    pass
 
 
 def generate_cell_mesh(config, mshfile):
     """ The entry point for the creation of a cell mesh """
     geo = pygmsh.opencascade.Geometry()
 
+    # A dictionary with material information
+    material_to_geo = {}
+
+    def add_shape(config):
+        shape = config.get("shape", "box")
+        if shape == "box":
+            size = _parse_vec(config.get("size", [1.0, 1.0, 1.0]))
+            lowerleft = list(-0.5 * i for i in size)
+            return geo.add_box(lowerleft, size)
+        elif shape == "sphere":
+            radius = config.get("radius", 1.0)
+            return geo.add_ball([0.0, 0.0, 0.0], radius)
+        elif shape == "round":
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
+
+    def add_material(geoobj, config):
+        physical = config.get("physical", None)
+        if physical is not None:
+            material_to_geo.setdefault(physical, [])
+            material_to_geo[physical].append(geoobj)
+
     # Add the cytoplasma
     cytoconfig = config.get("cytoplasm", {})
-    cyto = add_shape(geo, cytoconfig)
+    cyto = add_shape(cytoconfig)
 
     # Maybe add a nucleus
     nucleusconfig = config.get("nucleus", {"enabled": False})
     if nucleusconfig.get("enabled", True):
-        # Add the nucleus shape
-        nucleus = add_shape(geo, nucleusconfig)
-
-        #TODO Physical data
+        # Add the nucleus shape and intersect it with the cytoplasma
+        nucleus = add_shape(nucleusconfig)
         nucleus = geo.boolean_intersection([cyto, nucleus], delete_first=False, delete_other=True)
+
+        add_material(nucleus, nucleusconfig)
 
     # Maybe add some fibres
     fibres = []
     fibreconfig = config.get("fibres", [])
-    physical_to_fibre = {}
     for i, fconfig in enumerate(fibreconfig):
         # Parse fiber data
         offset = _parse_vec(fconfig.get("offset", [-1.0, 0.0, 0.0]))
@@ -62,40 +73,36 @@ def generate_cell_mesh(config, mshfile):
         fibre = geo.boolean_intersection([cyto, fibre], delete_first=False, delete_other=True)
 
         # Add physical information to this fibre
-        fibre_physical = fconfig.get("physical", None)
-        if fibre_physical is not None:
-            physical_to_fibre.setdefault(fibre_physical, [])
-            physical_to_fibre[fibre_physical].append(fibre)
+        add_material(fibre, fconfig)
 
         # Store the fibre object for later
         fibres.append(fibre)
 
-    # Post process fibre generation
-    frags = geo.boolean_fragments([cyto, nucleus], fibres, delete_other=False)
-
     # Implement mesh widths
     geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{:}}; }} }} = {};".format(cytoconfig.get("meshwidth", 0.1)))
+    if nucleusconfig.get("enabled", True):
+        meshwidth = nucleusconfig.get("meshwidth", cytoconfig.get("meshwidth", 0.1))
+        geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{{}}}; }} }} = {};".format(nucleus.id, meshwidth))
     for i, fibre in enumerate(fibres):
         geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{{}}}; }} }} = {};".format(fibre.id, fibreconfig[i].get("meshwidth", 0.02)))
 
-    # Maybe add physical group information
-    for physical, fibres in physical_to_fibre.items():
-        geo.add_physical(fibres, physical)
+    # The cytoplasma is defined by the outer shape minus all inclusions
+    cyto = geo.boolean_fragments([cyto, nucleus], fibres, delete_other=False)
+    add_material(cyto, cytoconfig)
 
-    nucleus_physical = nucleusconfig.get("physical", None)
-    if nucleusconfig.get("enabled", True) and nucleus_physical is not None:
-        geo.add_physical([nucleus], nucleus_physical)
-
-    cyto_physical = cytoconfig.get('physical', None)
-    if cyto_physical is not None:
-        geo.add_physical([frags], cyto_physical)
+    # Add the collected physical group information
+    for physical, geos in material_to_geo.items():
+        geo.add_physical(geos, physical)
 
     # The default meshing algorithm creates spurious elements on the sphere surface
     if cytoconfig.get("shape", "box") != "box":
         geo.add_raw_code("Mesh.Algorithm = 5;")
 
     # Finalize the grid generation
-    mesh = pygmsh.generate_mesh(geo)
+    try:
+        mesh = pygmsh.generate_mesh(geo)
+    except AssertionError:
+        raise GMSHError("Gmsh failed. Check if nucleus intersects fibres (which is not supported)!")
 
     # Export this mesh into several formats as requested
     exportconfig = config.get("export", {})

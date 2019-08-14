@@ -7,8 +7,19 @@ nucleus:
   shape: box
   center: 0.0 0.0 0.0
   size: 0.3 0.3 0.3
-  meshwidth: 0.1
+  meshwidth: 0.01
   physical: 1
+fibres:
+- radius: 0.03
+  orientation: 3.0 0.0 0.0
+  offset: -1.5 0.4 0.0
+  meshwidth: 0.02
+  physical: 2
+- radius: 0.05
+  orientation: 2.0 0.0 0.0
+  offset: -1.0 0.3 0.0
+  meshwidth: 0.005
+  physical: 3
 export:
   geo:
     enabled: true
