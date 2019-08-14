@@ -1,29 +1,40 @@
 #include"config.h"
 
 #include<dune/common/parallel/mpihelper.hh>
+#include<dune/grid/uggrid.hh>
 #include<dune/pdelab.hh>
 #include<dune/structures/material.hh>
 #include<dune/structures/vonmises.hh>
 #include<dune/testtools/gridconstruction.hh>
 
+#include<vector>
+
 #include"linear_elasticity_operator.hh"
 
 int main(int argc, char** argv)
 {
-	Dune::MPIHelper& mpihelper = Dune::MPIHelper::instance(argc, argv);
+  Dune::MPIHelper& helper = Dune::MPIHelper::instance(argc, argv);
 
   // Parse the ini file
   Dune::ParameterTree params;
-  Dune::ParameterTreeParser::readINITree("vonmises.ini", params);
+  Dune::ParameterTreeParser::readINITree("simplecell.ini", params);
 
   using RangeType = double;
 
-  // Setup grid (view)...
-  using Grid = Dune::UGGrid<3>;
-  using GV = Grid::LeafGridView;
-  using DF = Grid::ctype;
-  IniGridFactory<Grid> factory(params.sub("grid"));
-  std::shared_ptr<Grid> grid = factory.getGrid();
+  // Construct the grid on rank 0 to later distribute it
+  using GridType = Dune::UGGrid<3>;
+  using GV = GridType::LeafGridView;
+  using DF = GridType::ctype;
+  Dune::GridFactory<GridType> factory;
+
+  // Physical entity information container
+  std::vector<int> boundary, entity;
+
+  if (helper.rank() == 0)
+  {
+    Dune::GmshReader<GridType>::read(factory, "simplecell.msh", boundary, entity, true, false);
+  }
+  auto grid = std::shared_ptr<GridType>(factory.createGrid());
   GV gv = grid->leafGridView();
 
   // Set up finite element maps...
@@ -43,14 +54,15 @@ int main(int argc, char** argv)
   using CC = GFS::ConstraintsContainer<RangeType>::Type;
   CC cc;
   cc.clear();
-  auto bctype = [&](const auto& is, const auto& xl){ auto x=is.geometry().global(xl); return (abs(x[0]) < 1e-08 ? 1 : 0.0); };
+  auto bctype = [&](const auto& x){ return (x[0] < -0.5 + 1e-08 ? 1 : 0); };
   auto bctype_f = Dune::PDELab::makeBoundaryConditionFromCallable(gv, bctype);
   Dune::PDELab::CompositeConstraintsParameters comp_bctype(bctype_f, bctype_f, bctype_f);
-  //Dune::PDELab::CompositeConstraintsParameters<decltype(bctype_f), decltype(bctype_f), decltype(bctype_f)> comp_bctype(bctype_f, bctype_f, bctype_f);
   Dune::PDELab::constraints(comp_bctype, gfs, cc);
+  std::cout << "Set up a constraints container with " << cc.size() << " dofs!" << std::endl;
 
   // Instantiate the material class
-  auto material = std::make_shared<HomogeneousElasticMaterial<GV, double>>(1.25, 1.0);
+  auto material = parse_material<RangeType>(gv, entity, params.sub("material"));
+//  auto material = std::make_shared<HomogeneousElasticMaterial<GV, double>>(1.25, 1.0);
 
   // Setting up grid operator
   using LOP = LinearElasticityOperator<GFS, GFS>;
