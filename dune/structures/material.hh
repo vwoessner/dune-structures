@@ -80,7 +80,7 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
     }
   }
 
-  // Construct given expicit parameters
+  // Construct given explicit Lame parameters
   HomogeneousElasticMaterial(T lame1, T lame2)
     : lame1(lame1),
 	  lame2(lame2)

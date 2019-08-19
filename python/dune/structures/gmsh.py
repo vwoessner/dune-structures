@@ -5,6 +5,8 @@ import os.path
 import pygmsh
 import sys
 import yaml
+import numpy as np
+import subprocess
 
 
 def _parse_vec(x):
@@ -15,6 +17,20 @@ def _parse_vec(x):
 
 class GMSHError(Exception):
     pass
+
+
+def get_gmsh_version():
+    out = subprocess.check_output(["gmsh", "--version"], stderr=subprocess.STDOUT).strip().decode("utf8")
+
+    def mysplit(s, delims):
+        if len(delims) == 0:
+            yield s
+            return
+
+        for part in s.split(delims[0]):
+            yield from mysplit(part, delims[1:])
+
+    return mysplit(out, [".", "-"])
 
 
 def generate_cell_mesh(config, mshfile):
@@ -34,7 +50,47 @@ def generate_cell_mesh(config, mshfile):
             radius = config.get("radius", 1.0)
             return geo.add_ball([0.0, 0.0, 0.0], radius)
         elif shape == "round":
-            raise NotImplementedError
+            radius = config.get("radius", 1.0)
+            cutoff = config.get("cutoff", -0.7)
+
+            ball = geo.add_ball([0.0, 0.0, 0.0], radius)
+            box = geo.add_box([-radius, -radius, -2.0 * radius + cutoff], [2.0 * radius] * 3)
+            return geo.boolean_difference([ball], [box])
+        elif shape == "spread":
+            radius = config.get("radius", 1.0)
+            height = config.get("height", 1.0)
+            # The slope parameter is from (0,1) and describes the position of the third control point of the BSpline
+            slope = config.get("slope", 0.5)
+
+            # Necessary points
+            b0 = geo.add_point([0.0, 0.0, height])
+            b1 = geo.add_point([0.5 * radius, 0.0, height])
+            b2 = geo.add_point([radius, 0.0, 0.0])
+            b3 = geo.add_point([0.0, 0.0, 0.0])
+
+            # Construct a planar surface that can be rotated
+            spline = geo.add_bspline([b0, b1, b2])
+            loop = geo.add_line_loop([spline, geo.add_line(b2, b3), geo.add_line(b3, b0)])
+            surf = geo.add_plane_surface(loop)
+
+            cell = geo.extrude(surf,
+                               rotation_axis=[0.0, 0.0, 1.0],
+                               point_on_axis=[0.0, 0.0, 0.0],
+                               angle=2.0*np.pi
+                               )
+
+            # Only return the volume ID
+            return cell[1]
+        elif shape == "polarized":
+            gmsh_version = get_gmsh_version()
+            if gmsh_version[3] != "git":
+                raise GMSHError("The polarized cell only works with gmsh built from git")
+
+            radii = _parse_vec(config.get("radii", [2.0, 1.0, 1.0]))
+            ellipsoid = geo.add_ellipsoid([0.0, 0.0, 0.0], radii)
+
+            box = geo.add_box(list(-1.0 * r for r in radii), radii)
+            return geo.boolean_difference([ellipsoid], [box])
         else:
             raise NotImplementedError
 
@@ -87,7 +143,10 @@ def generate_cell_mesh(config, mshfile):
         geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{{}}}; }} }} = {};".format(fibre.id, fibreconfig[i].get("meshwidth", 0.02)))
 
     # The cytoplasma is defined by the outer shape minus all inclusions
-    cyto = geo.boolean_fragments([cyto, nucleus], fibres, delete_other=False)
+    cytogeos = [cyto]
+    if nucleusconfig.get("enabled", True):
+        cytogeos.append(nucleus)
+    cyto = geo.boolean_fragments(cytogeos, fibres, delete_other=False)
     add_material(cyto, cytoconfig)
 
     # Add the collected physical group information
