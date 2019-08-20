@@ -32,7 +32,7 @@ int main(int argc, char** argv)
 
   if (helper.rank() == 0)
   {
-    Dune::GmshReader<GridType>::read(factory, "simplecell.msh", boundary, entity, true, false);
+    Dune::GmshReader<GridType>::read(factory, std::string(argv[1]), boundary, entity, true, false);
   }
   auto grid = std::shared_ptr<GridType>(factory.createGrid());
   GV gv = grid->leafGridView();

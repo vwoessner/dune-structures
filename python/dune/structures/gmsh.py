@@ -7,20 +7,22 @@ import sys
 import yaml
 import numpy as np
 import subprocess
+import pytools as pt
 
 
 def _parse_vec(x):
     if isinstance(x, str):
         x = x.split()
-    return list(float(i) for i in x)
+    return np.array(list(float(i) for i in x))
 
 
 class GMSHError(Exception):
     pass
 
 
-def get_gmsh_version():
-    out = subprocess.check_output(["gmsh", "--version"], stderr=subprocess.STDOUT).strip().decode("utf8")
+@pt.memoize
+def get_gmsh_version(gmshexec):
+    out = subprocess.check_output([gmshexec, "--version"], stderr=subprocess.STDOUT).strip().decode("utf8")
 
     def mysplit(s, delims):
         if len(delims) == 0:
@@ -33,7 +35,23 @@ def get_gmsh_version():
     return mysplit(out, [".", "-"])
 
 
-def generate_cell_mesh(config, mshfile):
+@pt.memoize
+def get_gmsh_build_flags(gmshexec):
+    out = subprocess.check_output([gmshexec, "-info"], stderr=subprocess.STDOUT).strip().decode("utf8")
+    out = out.split("\n")
+    for line in out:
+        if line.startswith("Build options"):
+            line = line[line.find(":") + 1:]
+            return [o.strip() for o in line.split()]
+
+    raise GMSHError("The output format of 'gmsh -info' was unexpected!")
+
+
+def check_gmsh_build_flag(gmshexec, flag):
+    return flag in get_gmsh_build_flags(gmshexec)
+
+
+def generate_cell_mesh(config, mshfile, gmshexec="gmsh"):
     """ The entry point for the creation of a cell mesh """
     geo = pygmsh.opencascade.Geometry()
 
@@ -44,17 +62,21 @@ def generate_cell_mesh(config, mshfile):
         shape = config.get("shape", "box")
         if shape == "box":
             size = _parse_vec(config.get("size", [1.0, 1.0, 1.0]))
-            lowerleft = list(-0.5 * i for i in size)
+            lowerleft = _parse_vec(config.get("lowerleft", -0.5 * size))
             return geo.add_box(lowerleft, size)
         elif shape == "sphere":
             radius = config.get("radius", 1.0)
-            return geo.add_ball([0.0, 0.0, 0.0], radius)
+            center = _parse_vec(config.get("center", [0.0, 0.0, 0.0]))
+            return geo.add_ball(center, radius)
         elif shape == "round":
             radius = config.get("radius", 1.0)
-            cutoff = config.get("cutoff", -0.7)
+            center = _parse_vec(config.get("center", [0.0, 0.0, 0.6]))
+            cutoff = config.get("cutoff", 0.0)
 
-            ball = geo.add_ball([0.0, 0.0, 0.0], radius)
-            box = geo.add_box([-radius, -radius, -2.0 * radius + cutoff], [2.0 * radius] * 3)
+            ball = geo.add_ball(center, radius)
+            lowerleft = center + _parse_vec([-radius] * 3)
+            lowerleft[2] -= cutoff - radius
+            box = geo.add_box(lowerleft, 2 * _parse_vec([radius] * 3))
             return geo.boolean_difference([ball], [box])
         elif shape == "spread":
             radius = config.get("radius", 1.0)
@@ -81,16 +103,20 @@ def generate_cell_mesh(config, mshfile):
 
             # Only return the volume ID
             return cell[1]
-        elif shape == "polarized":
-            gmsh_version = get_gmsh_version()
-            if gmsh_version[3] != "git":
-                raise GMSHError("The polarized cell only works with gmsh built from git")
+        elif shape == "ellipsoid":
+            if not check_gmsh_build_flag(gmshexec, "Hxt"):
+                raise GMSHError("The ellipsoid shape needs the Gmsh Hxt extension - whatever that is")
 
+            center = _parse_vec(config.get("center", [0.0, 0.0, 0.0]))
             radii = _parse_vec(config.get("radii", [2.0, 1.0, 1.0]))
-            ellipsoid = geo.add_ellipsoid([0.0, 0.0, 0.0], radii)
+            ellipsoid = geo.add_ellipsoid(center, radii)
+            ellipsoid = ellipsoid.volume
 
-            box = geo.add_box(list(-1.0 * r for r in radii), radii)
-            return geo.boolean_difference([ellipsoid], [box])
+            if config.get("cutoff", False):
+                box = geo.add_box(-radii, radii)
+                return geo.boolean_difference([ellipsoid], [box])
+            else:
+                return ellipsoid
         else:
             raise NotImplementedError
 
@@ -157,15 +183,22 @@ def generate_cell_mesh(config, mshfile):
     if cytoconfig.get("shape", "box") != "box":
         geo.add_raw_code("Mesh.Algorithm = 5;")
 
+    # Maybe output a geofile. We do so before calling gmsh to use it for debugging
+    exportconfig = config.get("export", {})
+    geoconfig = exportconfig.get("geo", {})
+    if geoconfig.get("enabled", False):
+        filename = geoconfig.get("filename", mshfile)
+        filename = "{}.geo".format(os.path.splitext(mshfile)[0])
+        with open(filename, 'w') as f:
+            f.write(geo.get_code() + "\n")
+
     # Finalize the grid generation
     try:
-        mesh = pygmsh.generate_mesh(geo)
+        mesh = pygmsh.generate_mesh(geo, gmsh_path=gmshexec)
     except AssertionError:
         raise GMSHError("Gmsh failed. Check if nucleus intersects fibres (which is not supported)!")
 
     # Export this mesh into several formats as requested
-    exportconfig = config.get("export", {})
-
     mshconfig = exportconfig.get("msh", {})
     meshio.write(mshfile, mesh, write_binary=False)
 
@@ -176,17 +209,13 @@ def generate_cell_mesh(config, mshfile):
         # This throws a warning, but the physical groups only work in ASCII mode
         meshio.write(filename, mesh, write_binary=False)
 
-    geoconfig = exportconfig.get("geo", {})
-    if geoconfig.get("enabled", False):
-        filename = geoconfig.get("filename", mshfile)
-        filename = "{}.geo".format(os.path.splitext(mshfile)[0])
-        with open(filename, 'w') as f:
-            f.write(geo.get_code() + "\n")
-
 
 def entrypoint_generate_mesh():
     # Read the command line arguments to this script
     config = yaml.safe_load(open(sys.argv[1], 'r'))
     mshfile = sys.argv[2]
-
-    generate_cell_mesh(config, mshfile)
+    gmshexec = "gmsh"
+    if len(sys.argv) > 3:
+        gmshexec = sys.argv[3]
+    print(gmshexec)
+    generate_cell_mesh(config, mshfile, gmshexec)

@@ -1,0 +1,18 @@
+cytoplasm:
+  shape: spread
+  radius: 1.0
+  height: 0.7
+  slope: 0.5
+  meshwidth: 0.1
+  physical: 0
+nucleus:
+  shape: ellipsoid
+  center: 0.0 0.0 0.35
+  radii: 0.4 0.4 0.2
+  physical: 1
+  meshwidth: 0.05
+export:
+  geo:
+    enabled: true
+  vtk:
+    enabled: true

@@ -4,6 +4,9 @@ dune_add_generated_executable(SOURCE simplecell.cc
                               TARGET simplecell)
 
 dune_structures_mesh_generation(TARGET simplecell
-                                CONFIG simplecell.yml)
+                                CONFIG polarised.yml
+                                       round.yml
+                                       spread.yml
+                                )
 
 dune_symlink_to_source_files(FILES simplecell.ini)

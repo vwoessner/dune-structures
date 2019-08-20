@@ -1,9 +1,10 @@
 cytoplasm:
-  shape: box
+  shape: spread
   size: 1.0 1.0 1.0
   meshwidth: 0.2
   physical: 0
 nucleus:
+  enabled: false
   shape: box
   center: 0.0 0.0 0.0
   size: 0.3 0.3 0.3

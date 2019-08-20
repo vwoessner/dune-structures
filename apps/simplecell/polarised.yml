@@ -1,0 +1,17 @@
+cytoplasm:
+  shape: ellipsoid
+  radii: 1.0 1.0 1.0
+  meshwidth: 0.1
+  physical: 0
+nucleus:
+  enabled: false
+  shape: sphere
+  center: 0.0 0.0 0.35
+  radius: 0.25
+  physical: 1
+  meshwidth: 0.05
+export:
+  geo:
+    enabled: true
+  vtk:
+    enabled: true
