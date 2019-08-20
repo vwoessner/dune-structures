@@ -1,13 +1,15 @@
 cytoplasm:
   shape: round
-  meshwidth: 0.1
+  radius: 7.88
+  center: 0.0 0.0 5.12
+  meshwidth: 0.5
   physical: 0
 nucleus:
   shape: sphere
-  center: 0.0 0.0 0.35
-  radius: 0.2
+  center: 0.0 0.0 6.5
+  radius: 3.5
   physical: 1
-  meshwidth: 0.05
+  meshwidth: 0.5
 export:
   geo:
     enabled: true

@@ -75,8 +75,9 @@ def generate_cell_mesh(config, mshfile, gmshexec="gmsh"):
 
             ball = geo.add_ball(center, radius)
             lowerleft = center + _parse_vec([-radius] * 3)
-            lowerleft[2] -= cutoff - radius
-            box = geo.add_box(lowerleft, 2 * _parse_vec([radius] * 3))
+            cutoffext = 2 * _parse_vec([radius] * 3)
+            cutoffext[2] = cutoff - lowerleft[2]
+            box = geo.add_box(lowerleft, cutoffext)
             return geo.boolean_difference([ball], [box])
         elif shape == "spread":
             radius = config.get("radius", 1.0)
@@ -110,10 +111,11 @@ def generate_cell_mesh(config, mshfile, gmshexec="gmsh"):
             center = _parse_vec(config.get("center", [0.0, 0.0, 0.0]))
             radii = _parse_vec(config.get("radii", [2.0, 1.0, 1.0]))
             ellipsoid = geo.add_ellipsoid(center, radii)
-            ellipsoid = ellipsoid.volume
 
             if config.get("cutoff", False):
-                box = geo.add_box(-radii, radii)
+                cutoffrad = 2.0 * radii
+                cutoffrad[2] = radii[2]
+                box = geo.add_box(-radii, cutoffrad)
                 return geo.boolean_difference([ellipsoid], [box])
             else:
                 return ellipsoid
@@ -181,7 +183,7 @@ def generate_cell_mesh(config, mshfile, gmshexec="gmsh"):
 
     # The default meshing algorithm creates spurious elements on the sphere surface
     if cytoconfig.get("shape", "box") != "box":
-        geo.add_raw_code("Mesh.Algorithm = 5;")
+        geo.add_raw_code("Mesh.Algorithm = 6;")
 
     # Maybe output a geofile. We do so before calling gmsh to use it for debugging
     exportconfig = config.get("export", {})
@@ -217,5 +219,5 @@ def entrypoint_generate_mesh():
     gmshexec = "gmsh"
     if len(sys.argv) > 3:
         gmshexec = sys.argv[3]
-    print(gmshexec)
+
     generate_cell_mesh(config, mshfile, gmshexec)
