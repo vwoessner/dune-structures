@@ -105,9 +105,6 @@ def generate_cell_mesh(config, mshfile, gmshexec="gmsh"):
             # Only return the volume ID
             return cell[1]
         elif shape == "ellipsoid":
-            if not check_gmsh_build_flag(gmshexec, "Hxt"):
-                raise GMSHError("The ellipsoid shape needs the Gmsh Hxt extension - whatever that is")
-
             center = _parse_vec(config.get("center", [0.0, 0.0, 0.0]))
             radii = _parse_vec(config.get("radii", [2.0, 1.0, 1.0]))
             ellipsoid = geo.add_ellipsoid(center, radii)
