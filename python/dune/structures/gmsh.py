@@ -1,11 +1,13 @@
 """ Create idealized cell geometries for meshing with GMSH - through a convenient Python interface """
 
+import hashlib
 import meshio
 import os.path
 import pygmsh
 import sys
 import yaml
 import numpy as np
+import shutil
 import subprocess
 import pytools as pt
 
@@ -54,6 +56,8 @@ def check_gmsh_build_flag(gmshexec, flag):
 def generate_cell_mesh(config, mshfile, gmshexec="gmsh"):
     """ The entry point for the creation of a cell mesh """
     geo = pygmsh.opencascade.Geometry()
+
+    geo.add_comment("Generated for gmsh version {}".format(".".join(get_gmsh_version(gmshexec))))
 
     # A dictionary with material information
     material_to_geo = {}
@@ -182,6 +186,13 @@ def generate_cell_mesh(config, mshfile, gmshexec="gmsh"):
     if cytoconfig.get("shape", "box") != "box":
         geo.add_raw_code("Mesh.Algorithm = 6;")
 
+    # Maybe skip mesh generation if we have a cache hit
+    cachefile = "{}.msh".format(hashlib.sha256("\n".join(geo.get_code()).encode()).hexdigest())
+    if os.path.exists(cachefile):
+        print("A cached version of this mesh was found!")
+        shutil.copyfile(cachefile, mshfile)
+        return
+
     # Maybe output a geofile. We do so before calling gmsh to use it for debugging
     exportconfig = config.get("export", {})
     geoconfig = exportconfig.get("geo", {})
@@ -200,6 +211,7 @@ def generate_cell_mesh(config, mshfile, gmshexec="gmsh"):
     # Export this mesh into several formats as requested
     mshconfig = exportconfig.get("msh", {})
     meshio.write(mshfile, mesh, write_binary=False)
+    shutil.copyfile(mshfile, cachefile)
 
     vtkconfig = exportconfig.get("vtk", {})
     if vtkconfig.get("enabled", False):
