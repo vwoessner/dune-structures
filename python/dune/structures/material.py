@@ -131,7 +131,7 @@ def name_material_class():
 @class_member(classtag="operator")
 def define_material_class(name):
     include_file("dune/structures/material.hh", filetag="operator")
-    _type = "std::shared_ptr<ElasticMaterialBase<typename {}::Traits::GridViewType, {}>>".format(lop_template_ansatz_gfs(), type_floatingpoint())
+    _type = "std::shared_ptr<ElasticMaterialBase<typename {}::Traits::EntitySet, {}>>".format(lop_template_ansatz_gfs(), type_floatingpoint())
     constructor_parameter(_type, name, classtag="operator")
     initializer_list(name, [name], classtag="operator")
     return "{} {};".format(_type, name)

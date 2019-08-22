@@ -3,6 +3,7 @@
 #include<dune/common/parallel/mpihelper.hh>
 #include<dune/grid/uggrid.hh>
 #include<dune/pdelab.hh>
+#include<dune/structures/gmshfactory.hh>
 #include<dune/structures/material.hh>
 #include<dune/structures/vonmises.hh>
 #include<dune/testtools/gridconstruction.hh>
@@ -21,31 +22,26 @@ int main(int argc, char** argv)
 
   using RangeType = double;
 
-  // Construct the grid on rank 0 to later distribute it
+  // Construct the grid and loadbalance it
   using GridType = Dune::UGGrid<3>;
   using GV = GridType::LeafGridView;
+  using ES = Dune::PDELab::NonOverlappingEntitySet<GV>;
   using DF = GridType::ctype;
-  Dune::GridFactory<GridType> factory;
-
-  // Physical entity information container
-  std::vector<int> boundary, entity;
-
-  if (helper.rank() == 0)
-  {
-    Dune::GmshReader<GridType>::read(factory, std::string(argv[1]), boundary, entity, true, false);
-  }
-  auto grid = std::shared_ptr<GridType>(factory.createGrid());
+  PhysicalEntityGmshFactory<GridType> factory(helper, params.sub("grid"));
+  auto grid = factory.getGrid();
+  auto physical = factory.getPhysical();
   GV gv = grid->leafGridView();
+  ES es(grid->leafGridView());
 
   // Set up finite element maps...
-  using FEM = Dune::PDELab::PkLocalFiniteElementMap<GV, DF, RangeType, 1>;
-  FEM fem(gv);
+  using FEM = Dune::PDELab::PkLocalFiniteElementMap<ES, DF, RangeType, 1>;
+  FEM fem(es);
 
   // Set up grid function spaces...
   using VB = Dune::PDELab::ISTL::VectorBackend<Dune::PDELab::ISTL::Blocking::none>;
   using CASS = Dune::PDELab::ConformingDirichletConstraints;
-  using GFS = Dune::PDELab::VectorGridFunctionSpace<GV, FEM, 3, VB, VB, CASS>;
-  GFS gfs(gv, fem);
+  using GFS = Dune::PDELab::VectorGridFunctionSpace<ES, FEM, 3, VB, VB, CASS>;
+  GFS gfs(es, fem);
   gfs.name("displacement");
   gfs.update();
   std::cout << "Set up a grid function space with " << gfs.size() << " dofs!" << std::endl;
@@ -54,15 +50,15 @@ int main(int argc, char** argv)
   using CC = GFS::ConstraintsContainer<RangeType>::Type;
   CC cc;
   cc.clear();
-  auto bctype = [&](const auto& x){ return (x[0] < -0.5 + 1e-08 ? 1 : 0); };
-  auto bctype_f = Dune::PDELab::makeBoundaryConditionFromCallable(gv, bctype);
+  auto bctype = [&](const auto& x){ return (x[2] < 1e-08 ? 1 : 0); };
+  auto bctype_f = Dune::PDELab::makeBoundaryConditionFromCallable(es, bctype);
   Dune::PDELab::CompositeConstraintsParameters comp_bctype(bctype_f, bctype_f, bctype_f);
   Dune::PDELab::constraints(comp_bctype, gfs, cc);
   std::cout << "Set up a constraints container with " << cc.size() << " dofs!" << std::endl;
 
   // Instantiate the material class
-  auto material = parse_material<RangeType>(gv, entity, params.sub("material"));
-//  auto material = std::make_shared<HomogeneousElasticMaterial<GV, double>>(1.25, 1.0);
+  auto material = parse_material<RangeType>(es, physical, params.sub("material"));
+//  auto material = std::make_shared<HomogeneousElasticMaterial<ES, double>>(1.25, 1.0);
 
   // Setting up grid operator
   using LOP = LinearElasticityOperator<GFS, GFS>;
@@ -76,14 +72,18 @@ int main(int argc, char** argv)
   using V = Dune::PDELab::Backend::Vector<GFS, DF>;
   V x(gfs);
   auto dirichlet = [&](const auto& x){ return 0.0; };
-  auto dirichlet_f = Dune::PDELab::makeGridFunctionFromCallable(gv, dirichlet);
+  auto dirichlet_f = Dune::PDELab::makeGridFunctionFromCallable(es, dirichlet);
   Dune::PDELab::CompositeGridFunction comp_dirichlet(dirichlet_f, dirichlet_f, dirichlet_f);
   Dune::PDELab::interpolate(comp_dirichlet, gfs, x);
+  Dune::PDELab::set_nonconstrained_dofs(cc, 0.0, x);
+
 
   // Set up the solver...
-  using LS = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
+//  using LS = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
+//  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_AMG_SSOR<GO>;
+  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_SSORk<GO>;
   using SLP = Dune::PDELab::StationaryLinearProblemSolver<GO, LS, V>;
-  LS ls(false);
+  LS ls(go);
   SLP slp(go, ls, x, 1e-12);
   slp.apply();
 
@@ -91,18 +91,19 @@ int main(int argc, char** argv)
   VonMisesStressGridFunction stress(x, material);
 
   // Interpolate the stress into a grid function
-  using SGFS = Dune::PDELab::GridFunctionSpace<GV, FEM, CASS, VB>;
-  SGFS sgfs(gv, fem);
+  using SGFS = Dune::PDELab::GridFunctionSpace<ES, FEM, CASS, VB>;
+  SGFS sgfs(es, fem);
   sgfs.name("vonmises");
   using SV = Dune::PDELab::Backend::Vector<SGFS, DF>;
   SV stress_container(sgfs);
   Dune::PDELab::interpolate(stress, sgfs, stress_container);
 
   // Visualize the stress grid function
-  Dune::SubsamplingVTKWriter vtkwriter(gv, Dune::refinementLevels(0));
+  Dune::VTKWriter vtkwriter(es.gridView());
   Dune::PDELab::addSolutionToVTKWriter(vtkwriter, gfs, x);
   Dune::PDELab::addSolutionToVTKWriter(vtkwriter, sgfs, stress_container);
-  vtkwriter.write("vonmises", Dune::VTK::ascii);
+  vtkwriter.addCellData(*physical, "gmshPhysical");
+  vtkwriter.write("output", Dune::VTK::ascii);
 
   return 0;
 }

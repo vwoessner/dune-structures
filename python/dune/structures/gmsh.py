@@ -210,7 +210,7 @@ def generate_cell_mesh(config, mshfile, gmshexec="gmsh"):
 
     # Export this mesh into several formats as requested
     mshconfig = exportconfig.get("msh", {})
-    meshio.write(mshfile, mesh, write_binary=False)
+    meshio.write(mshfile, mesh, file_format="gmsh2-ascii")
     shutil.copyfile(mshfile, cachefile)
 
     vtkconfig = exportconfig.get("vtk", {})

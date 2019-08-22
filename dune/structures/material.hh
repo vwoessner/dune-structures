@@ -159,7 +159,7 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
 template<typename T,typename GV>
 std::shared_ptr<MaterialCollection<GV, T>> parse_material(
     const GV& gv,
-    std::vector<int>& physical_groups,
+    std::shared_ptr<std::vector<int>> physical_groups,
     const Dune::ParameterTree& params
     )
 {
