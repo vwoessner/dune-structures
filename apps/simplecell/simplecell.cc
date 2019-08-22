@@ -6,6 +6,7 @@
 #include<dune/structures/gmshfactory.hh>
 #include<dune/structures/material.hh>
 #include<dune/structures/vonmises.hh>
+#include<dune/structures/visualization.hh>
 #include<dune/testtools/gridconstruction.hh>
 
 #include<vector>
@@ -80,10 +81,10 @@ int main(int argc, char** argv)
 
   // Set up the solver...
 //  using LS = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
-//  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_AMG_SSOR<GO>;
-  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_SSORk<GO>;
+  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_AMG_SSOR<GO>;
+//  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_SSORk<GO>;
   using SLP = Dune::PDELab::StationaryLinearProblemSolver<GO, LS, V>;
-  LS ls(go);
+  LS ls(go, 5000, 3);
   SLP slp(go, ls, x, 1e-12);
   slp.apply();
 
@@ -103,6 +104,7 @@ int main(int argc, char** argv)
   Dune::PDELab::addSolutionToVTKWriter(vtkwriter, gfs, x);
   Dune::PDELab::addSolutionToVTKWriter(vtkwriter, sgfs, stress_container);
   vtkwriter.addCellData(*physical, "gmshPhysical");
+  write_rankdata(vtkwriter, helper, es.gridView());
   vtkwriter.write("output", Dune::VTK::ascii);
 
   return 0;

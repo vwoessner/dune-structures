@@ -25,7 +25,7 @@ class VonMisesStressGridFunction
 
   public:
   using Traits = Dune::PDELab::GridFunctionTraits<
-      typename Container::GridFunctionSpace::Traits::GridViewType,
+      typename Container::GridFunctionSpace::Traits::EntitySet,
       typename Container::field_type,
       1,
       Dune::FieldVector<typename Container::field_type,1>
