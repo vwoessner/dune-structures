@@ -59,8 +59,6 @@ int main(int argc, char** argv)
 
   // Instantiate the material class
   auto material = parse_material<RangeType>(es, physical, params.sub("material"));
-//  auto material = std::make_shared<HomogeneousElasticMaterial<ES, double>>(1.25, 1.0);
-
   // Setting up grid operator
   using LOP = LinearElasticityOperator<GFS, GFS>;
   using MB = Dune::PDELab::ISTL::BCRSMatrixBackend<>;

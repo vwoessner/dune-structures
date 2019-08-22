@@ -75,14 +75,8 @@ def generate_cell_mesh(config, mshfile, gmshexec="gmsh"):
         elif shape == "round":
             radius = config.get("radius", 1.0)
             center = _parse_vec(config.get("center", [0.0, 0.0, 0.6]))
-            cutoff = config.get("cutoff", 0.0)
-
-            ball = geo.add_ball(center, radius)
-            lowerleft = center + _parse_vec([-radius] * 3)
-            cutoffext = 2 * _parse_vec([radius] * 3)
-            cutoffext[2] = cutoff - lowerleft[2]
-            box = geo.add_box(lowerleft, cutoffext)
-            return geo.boolean_difference([ball], [box])
+            cutoff = config.get("cutoff", None)
+            return geo.add_ball(center, radius, x0=cutoff)
         elif shape == "spread":
             radius = config.get("radius", 1.0)
             height = config.get("height", 1.0)
@@ -111,15 +105,8 @@ def generate_cell_mesh(config, mshfile, gmshexec="gmsh"):
         elif shape == "ellipsoid":
             center = _parse_vec(config.get("center", [0.0, 0.0, 0.0]))
             radii = _parse_vec(config.get("radii", [2.0, 1.0, 1.0]))
-            ellipsoid = geo.add_ellipsoid(center, radii)
-
-            if config.get("cutoff", False):
-                cutoffrad = 2.0 * radii
-                cutoffrad[2] = radii[2]
-                box = geo.add_box(-radii, cutoffrad)
-                return geo.boolean_difference([ellipsoid], [box])
-            else:
-                return ellipsoid
+            cutoff = config.get("cutoff", None)
+            return geo.add_ellipsoid(center, radii, x0=cutoff)
         else:
             raise NotImplementedError
 

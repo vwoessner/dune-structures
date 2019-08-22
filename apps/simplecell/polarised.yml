@@ -2,7 +2,7 @@ cytoplasm:
   shape: ellipsoid
   radii: 12.5 6.0 12.5
   meshwidth: 0.5
-  cutoff: true
+  cutoff: 0.0
   physical: 0
 nucleus:
   enabled: true

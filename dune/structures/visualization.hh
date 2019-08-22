@@ -6,7 +6,7 @@
 template<typename GV>
 struct RankDummyContainer
 {
-  DummyContainer(Dune::MPIHelper& helper, GV gv) : rank(helper.rank()), size_(gv.size(0))
+  RankDummyContainer(Dune::MPIHelper& helper, GV gv) : rank(helper.rank()), size_(gv.size(0))
   {}
 
   double operator[](std::size_t i) const
