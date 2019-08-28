@@ -76,6 +76,8 @@ def generate_cell_mesh(config, mshfile, gmshexec="gmsh"):
             radius = config.get("radius", 1.0)
             center = _parse_vec(config.get("center", [0.0, 0.0, 0.6]))
             cutoff = config.get("cutoff", None)
+            if cutoff is not None:
+                cutoff = (cutoff - center[2]) / radius
             return geo.add_ball(center, radius, x0=cutoff)
         elif shape == "spread":
             radius = config.get("radius", 1.0)
