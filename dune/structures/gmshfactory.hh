@@ -69,9 +69,8 @@ class PhysicalEntityGmshFactory
     std::vector<int> boundary;
     physical = std::make_shared<std::vector<int>>();
 
-    // Read the grid on Rank 0
-    if (helper.rank() == 0)
-      Dune::GmshReader<Grid>::read(factory, mshfile, boundary, *physical, true, false);
+    // Read the grid (only operative on Rank 0)
+    Dune::GmshReader<Grid>::read(factory, mshfile, boundary, *physical, true, false);
 
     // Create the grid
     grid = std::shared_ptr<Grid>(factory.createGrid());
