@@ -64,7 +64,7 @@ int main(int argc, char** argv)
   using MB = Dune::PDELab::ISTL::BCRSMatrixBackend<>;
   using GO = Dune::PDELab::GridOperator<GFS, GFS, LOP, MB, DF, RangeType, RangeType, CC, CC>;
   LOP lop(gfs, gfs, params, material);
-  MB mb(25);
+  MB mb(7);
   GO go(gfs, cc, gfs, cc, lop, mb);
 
   // Setting up container

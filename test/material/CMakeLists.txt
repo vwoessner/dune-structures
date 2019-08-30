@@ -4,4 +4,4 @@ dune_add_formcompiler_system_test(SOURCE testmaterial.cc
                                   BASENAME testmaterial)
 
 dune_structures_mesh_generation(TARGET testmaterial
-                                CONFIG materialgrid.yml)
+                                CONFIG material.ini)

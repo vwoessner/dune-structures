@@ -6,6 +6,7 @@
 #include<dune/grid/io/file/gmshreader.hh>
 #include<dune/grid/uggrid.hh>
 #include<dune/pdelab.hh>
+#include<dune/structures/gmshfactory.hh>
 #include<dune/structures/material.hh>
 
 #include<iostream>
@@ -23,28 +24,24 @@ int main(int argc, char** argv)
 
   // Construct the grid
   using GridType = Dune::UGGrid<3>;
-  Dune::GridFactory<GridType> factory;
-  std::vector<int> boundary, entity;
-  if (helper.rank() == 0)
-  {
-    Dune::GmshReader<GridType>::read(factory, "testmaterial.msh", boundary, entity, true, false);
-  }
-  auto grid = std::shared_ptr<GridType>(factory.createGrid());
-  grid->loadBalance();
+  PhysicalEntityGmshFactory<GridType> factory(helper, config.sub("grid"));
+  auto grid = factory.getGrid();
+  auto physical = factory.getPhysical();
 
   // Parse material information
   using GV = GridType::LeafGridView;
-  const GV& gv = grid->leafGridView();
-  auto material = parse_material<double>(gv, entity, config);
+  using ES = Dune::PDELab::NonOverlappingEntitySet<GV>;
+  ES es(grid->leafGridView());
+  auto material = parse_material<double>(es, physical, config.sub("material"));
 
   // Build a local operator
-  using FEM = Dune::PDELab::PkLocalFiniteElementMap<GV, double, double, 1>;
+  using FEM = Dune::PDELab::PkLocalFiniteElementMap<ES, double, double, 1>;
   using CASS = Dune::PDELab::NoConstraints;
   using VB = Dune::PDELab::ISTL::VectorBackend<Dune::PDELab::ISTL::Blocking::none>;
-  using GFS = Dune::PDELab::GridFunctionSpace<GV, FEM, CASS, VB>;
+  using GFS = Dune::PDELab::GridFunctionSpace<ES, FEM, CASS, VB>;
   using LOP = MaterialTestOperator<GFS, GFS>;
-  FEM fem(gv);
-  GFS gfs(gv, fem);
+  FEM fem(es);
+  GFS gfs(es, fem);
   LOP lop(gfs, gfs, config, material);
 
   // Build a grid operator from that

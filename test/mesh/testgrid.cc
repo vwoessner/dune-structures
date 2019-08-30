@@ -19,10 +19,7 @@ int main(int argc, char** argv)
   // Physical entity information container
   std::vector<int> boundary, entity;
 
-  if (helper.rank() == 0)
-  {
-    Dune::GmshReader<GridType>::read(factory, "testgrid.msh", boundary, entity, true, false);
-  }
+  Dune::GmshReader<GridType>::read(factory, "testgrid.msh", boundary, entity, true, false);
   auto grid = std::shared_ptr<GridType>(factory.createGrid());
 
   // Print a summary of encountered physical entity groups

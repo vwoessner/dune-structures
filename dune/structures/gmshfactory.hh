@@ -64,7 +64,7 @@ class PhysicalEntityGmshFactory
   PhysicalEntityGmshFactory(const Dune::MPIHelper& helper, const Dune::ParameterTree& config)
   {
     // Set up data for grid factory
-    auto mshfile = config.get<std::string>("gmshfile");
+    auto mshfile = config.get<std::string>("filename");
     Dune::GridFactory<Grid> factory;
     std::vector<int> boundary;
     physical = std::make_shared<std::vector<int>>();
