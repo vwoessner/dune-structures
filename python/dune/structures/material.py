@@ -30,21 +30,29 @@ class ElasticMaterialBase(object):
         """ Return the second lame coeffcient (often mu) """
         raise NotImplementedError
 
+    def pretension(self):
+        """ Return the pretension constant """
+        raise NotImplementedError
+
     def with_cell(self, cell):
         """ Bind this material to a given cell - default is no op """
         return self
 
 
 class HomogeneousMaterial(ElasticMaterialBase):
-    def __init__(self, lame1, lame2):
+    def __init__(self, lame1, lame2, pretension=0.0):
         self.lame1 = lame1
         self.lame2 = lame2
+        self.pretens = pretension
 
     def first_lame(self):
         return self.lame1
-    
+
     def second_lame(self):
         return self.lame2
+
+    def pretension(self):
+        return self.pretens
 
 
 class HeterogeneousMaterial(ElasticMaterialBase):
@@ -59,6 +67,9 @@ class HeterogeneousMaterial(ElasticMaterialBase):
 
     def second_lame(self):
         return UFLPhysicalParameter("second_lame", self.cell)
+
+    def pretension(self):
+        return UFLPhysicalParameter("pretension", self.cell)
 
 
 class UFLPhysicalParameter(ufl.coefficient.Coefficient):

@@ -212,6 +212,9 @@ def generate_cell_mesh(config, gmshexec="gmsh"):
     if cytoconfig.get("shape", "box") != "box":
         geo.add_raw_code("Mesh.Algorithm = 5;")
 
+    # Apply a global scaling to the resulting mesh
+    geo.add_raw_code("Mesh.ScalingFactor = {};".format(as_float(config.get("scaling", 1.0))))
+
     # Maybe skip mesh generation if we have a cache hit
     cachefile = "{}.msh".format(hashlib.sha256("\n".join(geo.get_code()).encode()).hexdigest())
     if os.path.exists(cachefile):

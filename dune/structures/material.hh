@@ -27,6 +27,11 @@ class ElasticMaterialBase
   virtual T first_lame(const Entity& e, const Coord& x) const = 0;
   virtual T second_lame(const Entity& e, const Coord& x) const = 0;
 
+  virtual T pretension(const Entity& e, const Coord& x) const
+  {
+	return T(0.0);
+  }
+
   // These are part of a hack that is soon to go away
   virtual T first_lame(const Entity& e, T x0, T x1, T x2) const
   {
@@ -36,6 +41,11 @@ class ElasticMaterialBase
   virtual T second_lame(const Entity& e, T x0, T x1, T x2) const
   {
     return this->second_lame(e, Dune::FieldVector<T, 3>{x0, x1, x2});
+  }
+
+  virtual T pretension(const Entity& e, T x0, T x1, T x2) const
+  {
+    return this->pretension(e, Dune::FieldVector<T, 3>{x0, x1, x2});
   }
 };
 
@@ -48,6 +58,7 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
   // Godbolt experiment: https://godbolt.org/z/xBB7zC
   using ElasticMaterialBase<GV, T>::first_lame;
   using ElasticMaterialBase<GV, T>::second_lame;
+  using ElasticMaterialBase<GV, T>::pretension;
 
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
@@ -57,6 +68,7 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
   // Construct from a parameter tree
   HomogeneousElasticMaterial(const Dune::ParameterTree& params)
   {
+    pretens = params.get<T>("pretension", T(0.0));
     // The parameters of linear elasticity are ambiguous.
     // We only accept some combinations. They can be taken
     // from here:
@@ -96,9 +108,15 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
     return lame2;
   }
 
+  virtual T pretension(const Entity& e, const Coord& x) const override
+  {
+    return pretens;
+  }
+
   private:
   T lame1;
   T lame2;
+  T pretens;
 };
 
 
@@ -142,6 +160,11 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
   virtual T second_lame(const Entity& e, const Coord& x) const override
   {
     return get_material(e)->second_lame(e, x);
+  }
+
+  virtual T pretension(const Entity& e, const Coord& x) const override
+  {
+    return get_material(e)->pretension(e, x);
   }
 
   private:

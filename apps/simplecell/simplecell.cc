@@ -64,7 +64,7 @@ int main(int argc, char** argv)
   using MB = Dune::PDELab::ISTL::BCRSMatrixBackend<>;
   using GO = Dune::PDELab::GridOperator<GFS, GFS, LOP, MB, DF, RangeType, RangeType, CC, CC>;
   LOP lop(gfs, gfs, params, material);
-  MB mb(7);
+  MB mb(21);
   GO go(gfs, cc, gfs, cc, lop, mb);
 
   // Setting up container
@@ -78,11 +78,12 @@ int main(int argc, char** argv)
 
 
   // Set up the solver...
-//  using LS = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
-  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_AMG_SSOR<GO>;
+  using LS = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
+//  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_AMG_SSOR<GO>;
 //  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_SSORk<GO>;
   using SLP = Dune::PDELab::StationaryLinearProblemSolver<GO, LS, V>;
-  LS ls(go, 5000, 3);
+//  LS ls(go, 5000, 3);
+  LS ls;
   SLP slp(go, ls, x, 1e-12);
   slp.apply();
 
@@ -90,17 +91,19 @@ int main(int argc, char** argv)
   VonMisesStressGridFunction stress(x, material);
 
   // Interpolate the stress into a grid function
-  using SGFS = Dune::PDELab::GridFunctionSpace<ES, FEM, CASS, VB>;
-  SGFS sgfs(es, fem);
-  sgfs.name("vonmises");
-  using SV = Dune::PDELab::Backend::Vector<SGFS, DF>;
-  SV stress_container(sgfs);
-  Dune::PDELab::interpolate(stress, sgfs, stress_container);
+  using P0FEM = Dune::PDELab::P0LocalFiniteElementMap<DF, RangeType, 3>;
+  P0FEM p0fem(Dune::GeometryTypes::simplex(3));
+  using P0GFS = Dune::PDELab::GridFunctionSpace<ES, P0FEM, CASS, VB>;
+  P0GFS p0gfs(es, p0fem);
+  p0gfs.name("vonmises");
+  using SV = Dune::PDELab::Backend::Vector<P0GFS, DF>;
+  SV stress_container(p0gfs);
+  Dune::PDELab::interpolate(stress, p0gfs, stress_container);
 
   // Visualize the stress grid function
   Dune::VTKWriter vtkwriter(es.gridView());
   Dune::PDELab::addSolutionToVTKWriter(vtkwriter, gfs, x);
-  Dune::PDELab::addSolutionToVTKWriter(vtkwriter, sgfs, stress_container);
+  Dune::PDELab::addSolutionToVTKWriter(vtkwriter, p0gfs, stress_container);
   vtkwriter.addCellData(*physical, "gmshPhysical");
   write_rankdata(vtkwriter, helper, es.gridView());
   vtkwriter.write("output", Dune::VTK::ascii);

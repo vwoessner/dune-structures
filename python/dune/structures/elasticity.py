@@ -23,6 +23,8 @@ def linear_elasticity_form(material,
 
     stress = material.first_lame() * div(u) * Identity(3) + 2.0 * material.second_lame() * sym(grad(u))
 
+    # Add pretension
+    stress = stress + material.pretension() * Identity(3)
+
     # The linear elasticity form
-    form = (inner(stress, sym(grad(v))) - inner(force, v)) * dx
-    return form
+    return (inner(stress, sym(grad(v))) - inner(force, v)) * dx
