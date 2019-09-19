@@ -171,15 +171,52 @@ def generate_cell_mesh(config, gmshexec="gmsh"):
     fibres = []
     fibreconfig = config.get("fibres", [])
     for i, fconfig in enumerate(ini_list(fibreconfig, "fibres")):
-        # Parse fiber data
-        offset = as_vec(fconfig.get("offset", [-1.0, 0.0, 0.0]))
-        orientation = as_vec(fconfig.get("orientation", [2.0, 0.0, 0.0]))
-        radius = as_float(fconfig.get("radius", 0.1))
-        
-        # Add a raw cylinder
-        fibre = geo.add_cylinder(offset, orientation, radius)
+        fibre = None
+        shape = fconfig.get("shape", "cylinder")
+        if shape == "cylinder":
+            offset = as_vec(fconfig.get("offset", [-1.0, 0.0, 0.0]))
+            orientation = as_vec(fconfig.get("orientation", [2.0, 0.0, 0.0]))
+            radius = as_float(fconfig.get("radius", 0.1))
+
+            # Add the cylinder
+            fibre = geo.add_cylinder(offset, orientation, radius)
+        elif shape == "overnucleus":
+            start = as_vec(fconfig.get("start", [-1.0, 0.0, 0.0]))
+            middle = as_vec(fconfig.get("middle", [0.0, 0.0, 1.0]))
+            end = as_vec(fconfig.get("end", [1.0, 0.0, 0.0]))
+            radius = as_float(fconfig.get("radius", 0.1))
+            slope = as_float(fconfig.get("slope", 0.5))
+
+            # Add the necessary points
+            p_s = geo.add_point(start)
+            p_m = geo.add_point(middle)
+            p_e = geo.add_point(end)
+            p_c0 = geo.add_point([(1.0 - slope) * start[0] + slope * middle[0], (1.0 - slope) * start[1] + slope * middle[1], middle[2]])
+            p_c1 = geo.add_point([(1.0 - slope) * middle[0] + slope * end[0], (1.0 - slope) * middle[1] + slope * end[1], middle[2]])
+
+            # Connect them with BSpline
+            s0 = geo.add_bspline([p_s, p_c0, p_m])
+            s1 = geo.add_bspline([p_m, p_c1, p_e])
+
+            # Make a 'wire' from these two splines
+            geo.add_raw_code("w0 = newl;")
+            geo.add_raw_code("Wire(w0) = {{{},{}}};".format(s0.id, s1.id))
+
+            # Build a (rotated!) disk that we later extrude
+            disk = geo.add_disk(start, radius)
+            angle = np.pi / 2.0 - np.arctan((middle[2] - start[2])/(slope * (middle[0] - start[0])))
+            geo.add_raw_code("rdisk = Rotate {{ {{ 0.0, 1.0, 0.0 }}, {{ {} }}, {} }} {{ Surface{{{}}}; }};".format(", ".join(str(x) for x in start), angle, disk.id))
+
+            # Do the extrusion
+            geo.add_raw_code("bla[] = Extrude { Surface{rdisk}; } Using Wire {w0};")
+
+            from pygmsh.opencascade.volume_base import VolumeBase
+            fibre = VolumeBase(id0="bla[]")
+        else:
+            raise NotImplementedError("Fibre shape '{}' not known".format(shape))
 
         # And intersect it with the cytoplasma
+        assert fibre is not None
         fibre = geo.boolean_intersection([cyto, fibre], delete_first=False, delete_other=True)
 
         # Add physical information to this fibre
