@@ -108,5 +108,23 @@ int main(int argc, char** argv)
   write_rankdata(vtkwriter, helper, es.gridView());
   vtkwriter.write("output", Dune::VTK::ascii);
 
+  if(params.hasSub("probe"))
+  {
+    auto probes = str_split(params.get<std::string>("probe.probes"));
+    using DGF = Dune::PDELab::VectorDiscreteGridFunction<GFS, V>;
+    DGF dgf(gfs, x);
+    for (auto probe : probes)
+    {
+      str_trim(probe);
+      auto pconfig = params.sub("probe").sub(probe);
+      auto position = pconfig.get<Dune::FieldVector<double, 3>>("position");
+      for (auto& v : position)
+        v = params.get<double>("grid.scaling") * v;
+      Dune::PDELab::GridFunctionProbe<DGF> probef(dgf, position);
+      DGF::Traits::DomainType eval(0.0);
+      probef.eval(eval);
+      std::cout << "Probe " << probe <<": " << eval << std::endl;
+    }
+  }
   return 0;
 }

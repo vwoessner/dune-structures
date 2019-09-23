@@ -27,7 +27,10 @@ def ini_list(d, key):
 
     This function will return a list of dict-objects that correspond to the content of sections a, b and c.
     """
-    for skey in d[key].split(","):
+    keys = d.get(key, None)
+    if keys is None:
+        return
+    for skey in keys.split(","):
         yield d[skey.strip()]
 
 
@@ -169,7 +172,7 @@ def generate_cell_mesh(config, gmshexec="gmsh"):
 
     # Maybe add some fibres
     fibres = []
-    fibreconfig = config.get("fibres", [])
+    fibreconfig = config.get("fibres", {})
     for i, fconfig in enumerate(ini_list(fibreconfig, "fibres")):
         fibre = None
         shape = fconfig.get("shape", "cylinder")
