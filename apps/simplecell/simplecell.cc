@@ -81,11 +81,12 @@ int main(int argc, char** argv)
   using LS = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
 //  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_AMG_SSOR<GO>;
 //  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_SSORk<GO>;
-  using SLP = Dune::PDELab::StationaryLinearProblemSolver<GO, LS, V>;
+
+  using NLP = Dune::PDELab::Newton<GO, LS, V>;
 //  LS ls(go, 5000, 3);
   LS ls;
-  SLP slp(go, ls, x, 1e-12);
-  slp.apply();
+  NLP nlp(go, x, ls);
+  nlp.apply();
 
   // A grid function for the stress
   VonMisesStressGridFunction stress(x, material);
