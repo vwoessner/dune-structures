@@ -152,7 +152,7 @@ def generate_cell_mesh(config, gmshexec="gmsh"):
             raise NotImplementedError
 
     def add_material(geoobj, config):
-        physical = as_int(config.get("physical", None))
+        physical = as_int(config.get("physical", 0))
         if physical is not None:
             material_to_geo.setdefault(physical, [])
             material_to_geo[physical].append(geoobj)

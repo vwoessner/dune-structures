@@ -1,8 +1,9 @@
-from dune.structures import HeterogeneousMaterial
+from dune.structures.codegen import UFLPhysicalParameter
 
-FE = FiniteElement("CG", tetrahedron, 1)
+cell = tetrahedron
+FE = FiniteElement("CG", cell, 1)
 u = TrialFunction(FE)
 v = TestFunction(FE)
 
-material = HeterogeneousMaterial(tetrahedron)
-r = material.first_lame() * u * v * dx
+p = UFLPhysicalParameter("first_lame", cell)
+r = p * u * v * dx

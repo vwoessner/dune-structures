@@ -2,7 +2,11 @@ from dune.codegen.ufl.execution import *
 from dune.structures.codegen import UFLPhysicalParameter
 
 
-def elasticity_form(material):
+def elasticity_form(material, force=None):
+    # Apply defaults
+    if force is None:
+        force = as_vector([0.0, 0.0, 0.0])
+
     # Define cell
     cell = tetrahedron
 
@@ -16,4 +20,4 @@ def elasticity_form(material):
     # Add active prestressed (isotropic) material
     stress = piola + UFLPhysicalParameter("pretension", cell) * Identity(3)
 
-    return inner(stress, grad(v)) * dx
+    return (inner(stress, grad(v)) - inner(force, v)) * dx
