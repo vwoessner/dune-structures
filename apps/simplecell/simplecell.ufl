@@ -1,5 +1,5 @@
 from dune.structures import *
 
-material = HeterogeneousMaterial()
+material = LinearMaterial()
 
-r = linear_elasticity_form(material)
+r = elasticity_form(material)

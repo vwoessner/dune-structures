@@ -1,30 +1,19 @@
 from dune.codegen.ufl.execution import *
-import ufl.classes
+from dune.structures.codegen import UFLPhysicalParameter
 
 
-def sym(expr):
-    return 0.5 * (expr + expr.T)
-
-
-def linear_elasticity_form(material,
-                           force=None):
-    # Apply defaults
-    if force is None:
-        force = as_vector([0.0, 0.0, 0.0])
-
-    # Define cell and set it in the material class
+def elasticity_form(material):
+    # Define cell
     cell = tetrahedron
-    material = material.with_cell(cell)
 
     # Setup finite elements
     element = VectorElement("CG", cell, 1)
     u = TrialFunction(element)
     v = TestFunction(element)
 
-    stress = material.first_lame() * div(u) * Identity(3) + 2.0 * material.second_lame() * sym(grad(u))
+    piola = material.first_piola(u)
 
-    # Add pretension
-    stress = stress + material.pretension() * Identity(3)
+    # Add active prestressed (isotropic) material
+    stress = piola + UFLPhysicalParameter("pretension", cell) * Identity(3)
 
-    # The linear elasticity form
-    return (inner(stress, sym(grad(v))) - inner(force, v)) * dx
+    return inner(stress, grad(v)) * dx
