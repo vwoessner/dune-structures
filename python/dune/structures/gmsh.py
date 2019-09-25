@@ -5,7 +5,6 @@ import meshio
 import os.path
 import pygmsh
 import sys
-import yaml
 import numpy as np
 import shutil
 import subprocess

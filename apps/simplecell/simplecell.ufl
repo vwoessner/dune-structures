@@ -2,4 +2,4 @@ from dune.structures import *
 
 material = LinearMaterial()
 
-r = elasticity_form(material)
+r = elasticity_form([material])

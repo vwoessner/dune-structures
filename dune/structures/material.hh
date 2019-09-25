@@ -15,6 +15,15 @@
 class MaterialError : public Dune::IOError {};
 
 
+/* This mapping has to agree with the mapping in Python.
+ * In theory we could code-generate this in order to specify
+ * it exactly once, but I do not see much value in that right now.
+ */
+std::map<std::string, int> law_to_index = {
+    {"linear", 0}
+};
+
+
 template<typename GV, typename T>
 class ElasticMaterialBase
 {
@@ -26,6 +35,7 @@ class ElasticMaterialBase
 
   virtual T first_lame(const Entity& e, const Coord& x) const = 0;
   virtual T second_lame(const Entity& e, const Coord& x) const = 0;
+  virtual int material_law_index(const Entity& e) const = 0;
 
   virtual T pretension(const Entity& e, const Coord& x) const
   {
@@ -68,6 +78,7 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
   // Construct from a parameter tree
   HomogeneousElasticMaterial(const Dune::ParameterTree& params)
   {
+    law = law_to_index[params.get<std::string>("model", "linear")];
     pretens = params.get<T>("pretension", T(0.0));
     // The parameters of linear elasticity are ambiguous.
     // We only accept some combinations. They can be taken
@@ -113,10 +124,16 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
     return pretens;
   }
 
+  virtual int material_law_index(const Entity& e) const override
+  {
+    return law;
+  }
+
   private:
   T lame1;
   T lame2;
   T pretens;
+  int law;
 };
 
 
@@ -165,6 +182,11 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
   virtual T pretension(const Entity& e, const Coord& x) const override
   {
     return get_material(e)->pretension(e, x);
+  }
+
+  virtual int material_law_index(const Entity& e) const override
+  {
+    return get_material(e)->material_law_index(e);
   }
 
   private:

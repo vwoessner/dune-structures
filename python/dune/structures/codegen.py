@@ -43,6 +43,24 @@ class UFLPhysicalParameter(ufl.coefficient.Coefficient):
         return prim.Call(LoopyPhysicalParameter(self.param), (cell,) + qp)
 
 
+class UFLMaterialLawIndex(ufl.coefficient.Coefficient):
+    def __init__(self, cell):
+        self.cell = cell
+        FE = ufl.FiniteElement("DG", cell, 0)
+        ufl.coefficient.Coefficient.__init__(self, FE)
+
+    def _ufl_expr_reconstruct_(self):
+        return UFLMaterialLawIndex(self.cell)
+
+    def visit(self, visitor):
+        restriction = enforce_boundary_restriction(visitor)
+        cell = prim.Call(LoopyEntity(restriction), ())
+        # The following is a terrible hack until we get the function interface
+        # in loopy: We need to pass the quadrature points coordinate by coordinate
+        # and piece the information back together on the receiving side.
+        return prim.Call(LoopyMaterialLawIndex(), (cell,))
+
+
 class LoopyEntity(lp.symbolic.FunctionIdentifier):
     def __init__(self, restriction):
         # Too lazy to implement this for skeletons, given that we do not need it
@@ -71,6 +89,16 @@ class LoopyPhysicalParameter(lp.symbolic.FunctionIdentifier):
         return "{}->{}".format(material_class, self.param)
 
 
+class LoopyMaterialLawIndex(lp.symbolic.FunctionIdentifier):
+    def __getinitargs__(self):
+        return ()
+
+    @property
+    def name(self):
+        material_class = name_material_class()
+        return "{}->material_law_index".format(material_class)
+
+
 @function_mangler
 def dune_structures_function_mangler(knl, func, arg_dtypes):
     if isinstance(func, LoopyPhysicalParameter):
@@ -79,6 +107,12 @@ def dune_structures_function_mangler(knl, func, arg_dtypes):
                                  (lp.types.to_loopy_type(np.dtype(str)),) +
                                  (lp.types.to_loopy_type(dtype_floatingpoint()),) * world_dimension()
                                 )
+
+    if isinstance(func, LoopyMaterialLawIndex):
+        return lp.CallMangleInfo(func.name,
+                                 (lp.types.to_loopy_type(np.int32),),
+                                 (lp.types.to_loopy_type(np.dtype(str)),)
+                                 )
 
     if isinstance(func, LoopyEntity):
         return lp.CallMangleInfo(func.name, (lp.types.to_loopy_type(np.dtype(str)),), ())

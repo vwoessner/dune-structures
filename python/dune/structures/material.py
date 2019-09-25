@@ -21,6 +21,10 @@ class MaterialLawBase(object):
     def param_names(self):
         raise NotImplementedError
 
+    @property
+    def id(self):
+        raise NotImplementedError
+
     #
     # Mapping physical parameters to UFL objects. Right now this defaults to an
     # implementation that supports runtime heterogeneity.
@@ -52,6 +56,10 @@ class LinearMaterial(MaterialLawBase):
     @property
     def param_names(self):
         return ["first_lame", "second_lame"]
+
+    @property
+    def id(self):
+        return 0
 
     def deformation_gradient(self, u):
         return Identity(3)
