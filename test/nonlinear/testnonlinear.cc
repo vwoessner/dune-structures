@@ -4,6 +4,7 @@
 #include<dune/grid/uggrid.hh>
 #include<dune/pdelab.hh>
 #include<dune/structures/material.hh>
+#include<dune/structures/onetoone.hh>
 #include<dune/structures/vonmises.hh>
 #include<dune/structures/visualization.hh>
 #include<dune/testtools/gridconstruction.hh>
@@ -83,6 +84,11 @@ int main(int argc, char** argv)
   Dune::PDELab::CompositeGridFunction comp_dirichlet(zero_f, zero_f, dirichlet_f);
   Dune::PDELab::interpolate(comp_dirichlet, gfs, x);
 
+  // Assert sanity of the initial condition
+  Dune::PDELab::VectorDiscreteGridFunction<GFS, V> gf(gfs, x);
+  if (!is_onetoone(gf))
+    DUNE_THROW(Dune::Exception, "Self-intersecting displacement field detected");
+
   // Set up the solver...
   using LS = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
 //  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_AMG_SSOR<GO>;
@@ -93,7 +99,22 @@ int main(int argc, char** argv)
   LS ls;
   NLP nlp(go, x, ls);
   nlp.setParameters(params.sub("newton"));
-  nlp.apply();
+
+  try {
+    nlp.apply();
+  }
+  catch (Dune::PDELab::NewtonError& e)
+  {
+    std::cout << "Encountered a fatal Newton error. Diagnosing..." << std::endl;
+    if(!is_onetoone(gf))
+    {
+      is_onetoone(gf, true);
+      std::cout << "Self-intersecting displacement field detected!" << std::endl;
+    }
+    else
+      std::cout << "Self-intersecting was not the problem!" << std::endl;
+    return 1;
+  }
 
   // A grid function for the stress
   VonMisesStressGridFunction stress(x, material);
