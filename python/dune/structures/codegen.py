@@ -2,6 +2,7 @@
 These do the interfacing to our C++ abstraction of heterogeneous materials.
 """
 
+from dune.codegen.ufl.execution import Coefficient
 from dune.codegen.ufl.modified_terminals import Restriction
 from dune.codegen.generation import (class_member,
                                      constructor_parameter,
@@ -23,12 +24,12 @@ import numpy as np
 import ufl
 
 
-class UFLPhysicalParameter(ufl.coefficient.Coefficient):
+class UFLPhysicalParameter(Coefficient):
     def __init__(self, param, cell):
         self.param = param
         self.cell = cell
         FE = ufl.FiniteElement("DG", cell, 0)
-        ufl.coefficient.Coefficient.__init__(self, FE)
+        Coefficient.__init__(self, FE)
     
     def _ufl_expr_reconstruct_(self):
         return UFLPhysicalParameter(self.param, self.cell)
@@ -43,11 +44,11 @@ class UFLPhysicalParameter(ufl.coefficient.Coefficient):
         return prim.Call(LoopyPhysicalParameter(self.param), (cell,) + qp)
 
 
-class UFLMaterialLawIndex(ufl.coefficient.Coefficient):
+class UFLMaterialLawIndex(Coefficient):
     def __init__(self, cell):
         self.cell = cell
         FE = ufl.FiniteElement("DG", cell, 0)
-        ufl.coefficient.Coefficient.__init__(self, FE)
+        Coefficient.__init__(self, FE)
 
     def _ufl_expr_reconstruct_(self):
         return UFLMaterialLawIndex(self.cell)

@@ -17,12 +17,14 @@ def elasticity_form(materials, force=None):
     u = TrialFunction(element)
     v = TestFunction(element)
 
+    law_index = UFLMaterialLawIndex(cell)
+
     def material_form(material):
         piola = material.first_piola(u)
         # Add active prestressed (isotropic) material
         stress = piola + UFLPhysicalParameter("pretension", cell) * Identity(3)
 
-        dxm = dx(subdomain_data=UFLMaterialLawIndex(cell), subdomain_id=material.id)
+        dxm = dx(subdomain_data=law_index, subdomain_id=material.id)
         return inner(stress, grad(v)) * dxm
 
     # The final form is a sum of all possible materials

@@ -20,7 +20,10 @@ class MaterialError : public Dune::IOError {};
  * it exactly once, but I do not see much value in that right now.
  */
 std::map<std::string, int> law_to_index = {
-    {"linear", 0}
+    {"linear", 0},
+    {"stvenantkirchhoff", 1},
+    {"neohookean", 2},
+    {"mooneyrivlin", 3}
 };
 
 
@@ -106,7 +109,8 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
   // Construct given explicit Lame parameters
   HomogeneousElasticMaterial(T lame1, T lame2)
     : lame1(lame1),
-	  lame2(lame2)
+	  lame2(lame2),
+	  law(0)
   {}
 
   virtual T first_lame(const Entity& e, const Coord& x) const override
