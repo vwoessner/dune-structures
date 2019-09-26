@@ -5,6 +5,7 @@
 #include<dune/pdelab.hh>
 #include<dune/structures/gmshfactory.hh>
 #include<dune/structures/material.hh>
+#include<dune/structures/onetoone.hh>
 #include<dune/structures/vonmises.hh>
 #include<dune/structures/visualization.hh>
 #include<dune/testtools/gridconstruction.hh>
@@ -94,6 +95,7 @@ int main(int argc, char** argv)
   catch (Dune::PDELab::NewtonError& e)
   {
     std::cout << "Encountered a fatal Newton error. Diagnosing..." << std::endl;
+    Dune::PDELab::VectorDiscreteGridFunction<GFS, V> gf(gfs, x);
     if(!is_onetoone(gf))
     {
       is_onetoone(gf, true);
