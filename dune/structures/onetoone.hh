@@ -23,9 +23,7 @@ bool below_plane(std::array<Dune::FieldVector<double, 3>, 4> points, int index)
   Dune::FieldVector<double, 3> n;
   Dune::PDELab::crossproduct(y-x, z-x, n);
 
-  double zeval = (n * x - n[0] * p[0] - n[1] * p[1]) / n[2];
-
-  return p[2] < zeval;
+  return n * (p - x) < 0;
 }
 
 
@@ -69,8 +67,15 @@ bool is_onetoone(const GF& gf, bool verbose=false)
     {
       if (verbose)
       {
+        std::cout << std::endl;
         for (int i=0; i<4; ++i)
-          std::cout << "Corner " << i << ": " << ref_corners[i] << " -> " << displ_corners[i] << std::endl;
+          std::cout << "Corner " << i << " position: " << ref_corners[i] << " -> " << displ_corners[i] << std::endl;
+        std::cout << std::endl;
+
+        for(int i=0; i<4; ++i)
+          std::cout << "Corner " << i << " check: "
+                    << (below_plane(ref_corners, i) ? "below" : "above") << " in ref "
+                    << (below_plane(displ_corners, i) ? "below" : "above") << " in displaced "  << std::endl;
         std::cout << std::endl;
       }
       return false;

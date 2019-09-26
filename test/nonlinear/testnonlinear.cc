@@ -91,11 +91,8 @@ int main(int argc, char** argv)
 
   // Set up the solver...
   using LS = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
-//  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_AMG_SSOR<GO>;
-//  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_SSORk<GO>;
-
   using NLP = Dune::PDELab::Newton<GO, LS, V>;
-//  LS ls(go, 5000, 3);
+
   LS ls;
   NLP nlp(go, x, ls);
   nlp.setParameters(params.sub("newton"));
@@ -137,5 +134,10 @@ int main(int argc, char** argv)
   write_rankdata(vtkwriter, helper, es.gridView());
   vtkwriter.write("output", Dune::VTK::ascii);
 
+  if (!is_onetoone(gf))
+  {
+    is_onetoone(gf, true);
+    std::cout << "By the way, your solution is garbage!" << std::endl;
+  }
   return 0;
 }
