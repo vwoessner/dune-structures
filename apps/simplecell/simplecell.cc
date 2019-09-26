@@ -74,19 +74,35 @@ int main(int argc, char** argv)
   auto dirichlet_f = Dune::PDELab::makeGridFunctionFromCallable(es, dirichlet);
   Dune::PDELab::CompositeGridFunction comp_dirichlet(dirichlet_f, dirichlet_f, dirichlet_f);
   Dune::PDELab::interpolate(comp_dirichlet, gfs, x);
-  Dune::PDELab::set_nonconstrained_dofs(cc, 0.0, x);
 
-
-  // Set up the solver...
+  // Set up the linear solver...
   using LS = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
 //  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_AMG_SSOR<GO>;
 //  using LS = Dune::PDELab::ISTLBackend_NOVLP_BCGS_SSORk<GO>;
-
-  using NLP = Dune::PDELab::Newton<GO, LS, V>;
-//  LS ls(go, 5000, 3);
   LS ls;
+//  LS ls(go, 5000, 3);
+
+  // Set up the nonlinear solver...
+  using NLP = Dune::PDELab::Newton<GO, LS, V>;
   NLP nlp(go, x, ls);
-  nlp.apply();
+  nlp.setParameters(params.sub("newton"));
+
+  // Apply Newton!
+  try {
+    nlp.apply();
+  }
+  catch (Dune::PDELab::NewtonError& e)
+  {
+    std::cout << "Encountered a fatal Newton error. Diagnosing..." << std::endl;
+    if(!is_onetoone(gf))
+    {
+      is_onetoone(gf, true);
+      std::cout << "Self-intersecting displacement field detected!" << std::endl;
+    }
+    else
+      std::cout << "Self-intersecting was not the problem!" << std::endl;
+    return 1;
+  }
 
   // A grid function for the stress
   VonMisesStressGridFunction stress(x, material);

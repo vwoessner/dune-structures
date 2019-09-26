@@ -87,7 +87,7 @@ int main(int argc, char** argv)
   // Assert sanity of the initial condition
   Dune::PDELab::VectorDiscreteGridFunction<GFS, V> gf(gfs, x);
   if (!is_onetoone(gf))
-    DUNE_THROW(Dune::Exception, "Self-intersecting displacement field detected");
+    DUNE_THROW(Dune::Exception, "Self-intersecting starting condition!");
 
   // Set up the solver...
   using LS = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
