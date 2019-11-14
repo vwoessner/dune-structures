@@ -55,16 +55,31 @@ class MaterialLawBase(object):
         F = self.deformation_gradient(u)
         return dot(F.T, F)
 
+    def left_cauchy_green(self, u):
+        F = self.deformation_gradient(u)
+        return dot(F, F.T)
+
     def cauchy_green_strain(self, u):
         C = self.right_cauchy_green(u)
         return Variable(0.5 * (C - Identity(3)), label=Label(43))
 
     def cauchy_green_invariants(self, u):
-        C = self.right_cauchy_green(u)
-        return [Variable(tr(C), label=Label(44)),
-                Variable(0.5*(tr(C)**2 - tr(dot(C, C))), label=Label(45)),
-                Variable(det(C), label=Label(46))
+        B = self.left_cauchy_green(u)
+        return [Variable(tr(B), label=Label(44)),
+                Variable(0.5*(tr(B)**2 - tr(dot(B, B))), label=Label(45)),
+                Variable(det(B), label=Label(46))
                 ]
+
+    def isochoric_cauchy_green_invariants(self, u):
+        I1, I2, _ = self.cauchy_green_invariants(u)
+        F = self.deformation_gradient(u)
+        J = Variable(det(F), label=Label(47))
+        return [Variable((J ** (-2.0/3.0)) * I1, label=Label(48)),
+                Variable((J ** (-4.0/3.0)) * I2, label=Label(49)),
+                J]
+
+    def cauchy_stress(self, u):
+        raise NotImplementedError
 
 
 class LinearMaterial(MaterialLawBase):
@@ -128,19 +143,58 @@ class CauchyGreenInvariantBasedMaterialLaw(MaterialLawBase):
         return 2.0 * (gamma1 * Identity(3) + gamma2 * C + gamma3 * inv(C))
 
 
-class NeoHookeanMaterial(CauchyGreenInvariantBasedMaterialLaw):
+class IsochoricCauchyGreenInvariantBasedMaterialLaw(MaterialLawBase):
+    pass
+#     def cauchy_stress(self, u):
+#         I1bar, I2bar, J = self.isochoric_cauchy_green_invariants(u
+#         energy = self.strain_energy(u)
+#         B = self.left_cauchy_green(u)
+#
+#         dI1bar = diff(energy, I1bar)
+#         dI2bar = diff(energy, I2bar)
+#         dJ = diff(energy, J)
+#
+#         t1 = (J ** (-2.0/3.0)) * (dI1bar + I1bar * dI2bar) * B
+#         t2 = -1.0/3.0 * (I1bar * dI1bar + 2.0 * I2bar * dI2bar) * Identity(3)
+#         t3 = -(J ** (-4.0 / 3.0)) * dI2bar * dot(B, B)
+#
+#         return 2.0 / J * (t1 + t2 + t3) + dJ * Identity(3)
+
+
+class NeoHookeanMaterial(IsochoricCauchyGreenInvariantBasedMaterialLaw):
     @property
     def param_names(self):
-        return ["neoconst"]
+        return ["first_lame", "second_lame"]
 
     @property
     def id(self):
         return 2
+#
+#     def strain_energy(self, u):
+#         I1bar = self.isochoric_cauchy_green_invariants(u)[0]
+#         param, = self.ufl_parameters(u)
+#         return 0.5 * param * (I1bar - 3)
+#
+#     def first_piola(self, u):
+#         F = self.deformation_gradient(u)
+#         I1 = self.cauchy_green_invariants(u)[0]
+#         J = det(F)
+#         _, mu = self.ufl_parameters(u)
+#         return mu * (J ** (-2.0/3.0)) * (F - 1.0/3.0 * I1 * inv(F).T)
 
-    def strain_energy(self, u):
-        I0 = self.cauchy_green_invariants(u)[0]
-        param, = self.ufl_parameters(u)
-        return param * (I0 - 3)
+    def cauchy_stress(self, u):
+        mu, lmbda = self.ufl_parameters(u)
+        F = self.deformation_gradient(u)
+        B = self.left_cauchy_green(u)
+        J = det(F)
+
+        return lmbda * (J ** (-5.0 / 3.0)) * dev(B) + mu * (J - 1.0) * Identity(3)
+
+    def first_piola(self, u):
+        F = self.deformation_gradient(u)
+        J = det(F)
+
+        return J * self.cauchy_stress(u)
 
 
 class MooneyRivlinMaterial(CauchyGreenInvariantBasedMaterialLaw):

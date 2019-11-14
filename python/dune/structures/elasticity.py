@@ -4,11 +4,7 @@ from dune.structures.codegen import UFLPhysicalParameter, UFLMaterialLawIndex
 from dune.testtools.parametertree.parser import parse_ini_file
 
 
-def elasticity_form(materials, force=None):
-    # Apply defaults
-    if force is None:
-        force = as_vector([0.0, 0.0, 0.0])
-
+def elasticity_form(materials, force=False):
     # Define cell
     cell = tetrahedron
 
@@ -30,8 +26,9 @@ def elasticity_form(materials, force=None):
     # The final form is a sum of all possible materials
     form = sum((material_form(m) for m in materials), Form([]))
 
-    # This works around the stupid zero elimination bug
-    if any(f != 0.0 for f in force):
+    # Maybe add some body force
+    if force:
+        f = Coefficient(element)
         form = form - inner(force, v) * dx
 
     return form

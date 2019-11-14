@@ -131,4 +131,14 @@ def define_material_class(name):
     _type = "std::shared_ptr<ElasticMaterialBase<typename {}::Traits::EntitySet, {}>>".format(lop_template_ansatz_gfs(), type_floatingpoint())
     constructor_parameter(_type, name, classtag="operator")
     initializer_list(name, [name], classtag="operator")
+    setter_material_class(name)
     return "{} {};".format(_type, name)
+
+@class_member(classtag="operator")
+def setter_material_class(name):
+    _type = "std::shared_ptr<ElasticMaterialBase<typename {}::Traits::EntitySet, {}>>".format(lop_template_ansatz_gfs(), type_floatingpoint())
+    return ["void setMaterial({} {}_)".format(_type, name),
+            "{",
+            "  {} = {}_;".format(name, name),
+            "}"
+            ]

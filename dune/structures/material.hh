@@ -42,7 +42,7 @@ class ElasticMaterialBase
 
   virtual T pretension(const Entity& e, const Coord& x) const
   {
-	return T(0.0);
+    return T(0.0);
   }
 
   // These are part of a hack that is soon to go away
@@ -219,7 +219,7 @@ std::shared_ptr<MaterialCollection<GV, T>> parse_material(
   auto groups = str_split(material_groups);
   for (auto group : groups)
   {
-	str_trim(group);
+    str_trim(group);
     const auto& groupconf = params.sub(group);
     auto material = std::make_shared<HomogeneousElasticMaterial<GV, T>>(groupconf);
     coll->add_material(groupconf.get<int>("group"), material);
