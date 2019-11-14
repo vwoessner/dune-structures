@@ -134,10 +134,5 @@ int main(int argc, char** argv)
   write_rankdata(vtkwriter, helper, es.gridView());
   vtkwriter.write("output", Dune::VTK::ascii);
 
-  if (!is_onetoone(gf))
-  {
-    is_onetoone(gf, true);
-    std::cout << "By the way, your solution is garbage!" << std::endl;
-  }
   return 0;
 }

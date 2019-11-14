@@ -5,6 +5,7 @@
 #include<dune/pdelab.hh>
 #include<dune/structures/material.hh>
 #include<dune/structures/onetoone.hh>
+#include<dune/structures/transitionsolver.hh>
 #include<dune/structures/vonmises.hh>
 #include<dune/structures/visualization.hh>
 #include<dune/testtools/gridconstruction.hh>
@@ -75,12 +76,6 @@ int main(int argc, char** argv)
   ConstraintsSolverStep<V> constraints([](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); });
   NewtonSolverStep<V, LOP> newton(lop);
 
-  auto interpolation = std::make_shared<InterpolationTransitionStep<V>>([&](const auto& x){ return (compression - 1.0) * x[2]; },
-                                                 [](auto x) { return 0.0; },
-                                                 [](auto x) { return 0.0; });
-  auto constraints = std::make_shared<ConstraintsSolverStep<V>>([](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); });
-  auto newton = std::make_shared<NewtonSolverStep<V, LOP>>(lop);
-
   TransitionSolver<V> solver;
   solver.add(interpolation);
   solver.add(constraints);
@@ -109,10 +104,5 @@ int main(int argc, char** argv)
   write_rankdata(vtkwriter, helper, es.gridView());
   vtkwriter.write("output", Dune::VTK::ascii);
 
-  if (!is_onetoone(gf))
-  {
-    is_onetoone(gf, true);
-    std::cout << "By the way, your solution is garbage!" << std::endl;
-  }
   return 0;
 }
