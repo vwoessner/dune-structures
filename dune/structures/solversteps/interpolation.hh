@@ -68,8 +68,9 @@ class InterpolationTransitionStep
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
+  using FunctionSignature = typename Base::Range(typename Base::GlobalCoordinate);
 
-  InterpolationTransitionStep(std::function<typename Base::Range(typename Base::GlobalCoordinate)> func)
+  InterpolationTransitionStep(std::function<FunctionSignature> func)
   {
     funcs.fill(func);
   }
@@ -95,7 +96,7 @@ class InterpolationTransitionStep
 
   private:
   // Store the lambdas
-  std::array<std::function<typename Base::Range(typename Base::GlobalCoordinate)>,
+  std::array<std::function<FunctionSignature>,
              Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount
              > funcs;
 };

@@ -56,62 +56,37 @@ int main(int argc, char** argv)
   using CC = GFS::ConstraintsContainer<RangeType>::Type;
   CC cc;
   cc.clear();
-  auto bctype = [&](const auto& x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); };
-  auto bctype_f = Dune::PDELab::makeBoundaryConditionFromCallable(es, bctype);
-  Dune::PDELab::CompositeConstraintsParameters comp_bctype(bctype_f, bctype_f, bctype_f);
-  Dune::PDELab::constraints(comp_bctype, gfs, cc);
-  std::cout << "Set up a constraints container with " << cc.size() << " dofs!" << std::endl;
 
   // Instantiate the material class
   auto material = parse_material<RangeType>(es, physical, params.sub("material"));
 
-  // Setting up grid operator
+//  // Setting up grid operator
   using LOP = ElasticityOperator<GFS, GFS>;
-  using MB = Dune::PDELab::ISTL::BCRSMatrixBackend<>;
-  using GO = Dune::PDELab::GridOperator<GFS, GFS, LOP, MB, DF, RangeType, RangeType, CC, CC>;
   LOP lop(gfs, gfs, params, material);
-  MB mb(21);
-  GO go(gfs, cc, gfs, cc, lop, mb);
 
   // Setting up container
   using V = Dune::PDELab::Backend::Vector<GFS, DF>;
   V x(gfs);
+
   auto compression = params.get<double>("model.compression");
-  auto dirichlet = [&](const auto& x){ return (compression - 1.0) * x[2]; };
-  auto zero = [](const auto& x){ return 0.0; };
-  auto zero_f = Dune::PDELab::makeGridFunctionFromCallable(es, zero);
-  auto dirichlet_f = Dune::PDELab::makeGridFunctionFromCallable(es, dirichlet);
-  Dune::PDELab::CompositeGridFunction comp_dirichlet(zero_f, zero_f, dirichlet_f);
-  Dune::PDELab::interpolate(comp_dirichlet, gfs, x);
+  InterpolationTransitionStep<V> interpolation([&](const auto& x){ return (compression - 1.0) * x[2]; },
+                                               [](auto x) { return 0.0; },
+                                               [](auto x) { return 0.0; });
+  ConstraintsSolverStep<V> constraints([](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); });
+  NewtonSolverStep<V, LOP> newton(lop);
 
-  // Assert sanity of the initial condition
-  Dune::PDELab::VectorDiscreteGridFunction<GFS, V> gf(gfs, x);
-  if (!is_onetoone(gf))
-    DUNE_THROW(Dune::Exception, "Self-intersecting starting condition!");
+  auto interpolation = std::make_shared<InterpolationTransitionStep<V>>([&](const auto& x){ return (compression - 1.0) * x[2]; },
+                                                 [](auto x) { return 0.0; },
+                                                 [](auto x) { return 0.0; });
+  auto constraints = std::make_shared<ConstraintsSolverStep<V>>([](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); });
+  auto newton = std::make_shared<NewtonSolverStep<V, LOP>>(lop);
 
-  // Set up the solver...
-  using LS = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
-  using NLP = Dune::PDELab::Newton<GO, LS, V>;
+  TransitionSolver<V> solver;
+  solver.add(interpolation);
+  solver.add(constraints);
+  solver.add(newton);
 
-  LS ls;
-  NLP nlp(go, x, ls);
-  nlp.setParameters(params.sub("newton"));
-
-  try {
-    nlp.apply();
-  }
-  catch (Dune::PDELab::NewtonError& e)
-  {
-    std::cout << "Encountered a fatal Newton error. Diagnosing..." << std::endl;
-    if(!is_onetoone(gf))
-    {
-      is_onetoone(gf, true);
-      std::cout << "Self-intersecting displacement field detected!" << std::endl;
-    }
-    else
-      std::cout << "Self-intersecting was not the problem!" << std::endl;
-    return 1;
-  }
+  solver.apply(x, cc);
 
   // A grid function for the stress
   VonMisesStressGridFunction stress(x, material);

@@ -20,7 +20,7 @@ int main(int argc, char** argv)
 
   // Parse the ini file
   Dune::ParameterTree params;
-  Dune::ParameterTreeParser::readINITree("nonlinear.ini", params);
+  Dune::ParameterTreeParser::readINITree("cubeapp.ini", params);
 
   using RangeType = double;
 
@@ -70,16 +70,21 @@ int main(int argc, char** argv)
   V x(gfs);
 
   auto compression = params.get<double>("model.compression");
-  InterpolationTransitionStep<V> interpolation([&](const auto& x){ return (compression - 1.0) * x[2]; },
+  InterpolationTransitionStep<V> interpolation([](auto x) { return 0.0; },
                                                [](auto x) { return 0.0; },
-                                               [](auto x) { return 0.0; });
-  ConstraintsSolverStep<V> constraints([](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); });
-  NewtonSolverStep<V, LOP> newton(lop);
+                                               [&](const auto& x){ return (compression - 1.0) * x[2]; });
+  ConstraintsTransitionStep<V> constraints([](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); });
+  NewtonSolverTransitionStep<V, LOP> newton(lop);
+  ParametrizedTransformationTransitionStep<V, double> trafo([](auto u, auto x, double p){ return u; });
+
+  ContinuousVariationTransitionStep<V> test;
+  test.add(trafo);
 
   TransitionSolver<V> solver;
   solver.add(interpolation);
   solver.add(constraints);
-  solver.add(newton);
+//  solver.add(newton);
+  solver.add(test);
 
   solver.apply(x, cc);
 

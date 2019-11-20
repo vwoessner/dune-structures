@@ -7,11 +7,17 @@
  */
 #include<dune/common/shared_ptr.hh>
 #include<dune/pdelab.hh>
+#include<dune/structures/utilities.hh>
+
+// Include all available solver steps in order to have this header serve
+// as a convenience header
 #include<dune/structures/solversteps/base.hh>
 #include<dune/structures/solversteps/constraints.hh>
+#include<dune/structures/solversteps/continuousvariation.hh>
+#include<dune/structures/solversteps/discretevariation.hh>
 #include<dune/structures/solversteps/interpolation.hh>
 #include<dune/structures/solversteps/newton.hh>
-#include<dune/structures/utilities.hh>
+#include<dune/structures/solversteps/transformation.hh>
 
 #include<memory>
 #include<vector>
@@ -39,9 +45,9 @@ class TransitionSolver
 
   template<typename STEP>
   void add(STEP& step)
-    {
-      steps.push_back(stackobject_to_shared_ptr(step));
-    }
+  {
+    steps.push_back(Dune::stackobject_to_shared_ptr(step));
+  }
 
   void apply(Vector& vector, ConstraintsContainer& constraintscontainer)
   {

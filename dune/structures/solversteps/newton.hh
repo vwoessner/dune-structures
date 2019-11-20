@@ -7,7 +7,7 @@
 
 
 template<typename Vector, typename LocalOperator>
-class NewtonSolverStep : public TransitionSolverStepBase<Vector>
+class NewtonSolverTransitionStep : public TransitionSolverStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
@@ -24,7 +24,7 @@ class NewtonSolverStep : public TransitionSolverStepBase<Vector>
 
   using LinearSolver = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
 
-  NewtonSolverStep(LocalOperator& localoperator)
+  NewtonSolverTransitionStep(LocalOperator& localoperator)
     : localoperator(localoperator)
   {}
 

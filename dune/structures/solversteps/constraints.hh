@@ -61,22 +61,23 @@ registerNodeTransformation(GFS* gfs, GFStoConstraintsTransformation<RootGFS>* t,
 
 
 template<typename Vector>
-class ConstraintsSolverStep : public TransitionSolverStepBase<Vector>
+class ConstraintsTransitionStep : public TransitionSolverStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
+  using FunctionSignature = bool(typename Base::GlobalCoordinate);
 
-  ConstraintsSolverStep(std::function<bool(typename Base::GlobalCoordinate)> func)
+  ConstraintsTransitionStep(std::function<FunctionSignature> func)
   {
     funcs.fill(func);
   }
 
   template<typename... FUNCS,
            typename std::enable_if<Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount == sizeof...(FUNCS), int>::type = 0>
-  ConstraintsSolverStep(FUNCS... funcs) : funcs{funcs...}
+  ConstraintsTransitionStep(FUNCS... funcs) : funcs{funcs...}
   {}
 
-  virtual ~ConstraintsSolverStep() {}
+  virtual ~ConstraintsTransitionStep() {}
 
   virtual void apply(Vector& vector, typename Base::ConstraintsContainer& constraintscontainer) override
   {
@@ -91,7 +92,7 @@ class ConstraintsSolverStep : public TransitionSolverStepBase<Vector>
 
   private:
   // Store the lambdas
-  std::array<std::function<bool(typename Base::GlobalCoordinate)>,
+  std::array<std::function<FunctionSignature>,
              Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount
              > funcs;
 };
