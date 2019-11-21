@@ -19,28 +19,28 @@ class ParametrizedLambda<Range(Arguments...), Params...>
 
   template<typename FUNC>
   ParametrizedLambda(const FUNC& func)
-    : func(func)
+    : params(std::make_shared<std::tuple<Params...>>()), func(func)
   {}
 
   Range operator()(const Arguments&... args) const
   {
-      return std::apply(func, std::tuple_cat(std::make_tuple(args...), params));
-    }
+    return std::apply(func, std::tuple_cat(std::make_tuple(args...), *params));
+  }
 
-    void set_parameters(const Params&... p)
-    {
-      params = std::make_tuple(p...);
-    }
+  void set_parameters(const Params&... p)
+  {
+    *params = std::make_tuple(p...);
+  }
 
-    template<std::size_t pos>
-    void set_parameter(typename std::tuple_element<pos, std::tuple<Params...>>::type p)
-    {
-      std::get<pos>(params) = p;
-    }
+  template<std::size_t pos>
+  void set_parameter(typename std::tuple_element<pos, std::tuple<Params...>>::type p)
+  {
+    std::get<pos>(*params) = p;
+  }
 
-    private:
-    std::tuple<Params...> params;
-    std::function<Range(Arguments..., Params...)> func;
+  private:
+  std::shared_ptr<std::tuple<Params...>> params;
+  std::function<Range(Arguments..., Params...)> func;
 };
 
 

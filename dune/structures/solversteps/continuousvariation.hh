@@ -21,7 +21,7 @@ class ContinuousVariationTransitionStep
 
   virtual ~ContinuousVariationTransitionStep() {}
 
-  virtual void apply(typename Base::Vector& vector, typename Base::ConstraintsContainer& cc)
+  virtual void apply(typename Base::Vector& vector, typename Base::ConstraintsContainer& cc) override
   {
     double val = start;
     for (int i=0; i<iterations; ++i)

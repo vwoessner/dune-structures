@@ -14,6 +14,7 @@
 
 #include"elasticity_operator.hh"
 
+
 int main(int argc, char** argv)
 {
   Dune::MPIHelper& helper = Dune::MPIHelper::instance(argc, argv);
@@ -69,22 +70,26 @@ int main(int argc, char** argv)
   using V = Dune::PDELab::Backend::Vector<GFS, DF>;
   V x(gfs);
 
-  auto compression = params.get<double>("model.compression");
-  InterpolationTransitionStep<V> interpolation([](auto x) { return 0.0; },
-                                               [](auto x) { return 0.0; },
-                                               [&](const auto& x){ return (compression - 1.0) * x[2]; });
+  InterpolationTransitionStep<V> interpolation([](auto x) { return 0.0; });
   ConstraintsTransitionStep<V> constraints([](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); });
   NewtonSolverTransitionStep<V, LOP> newton(lop);
-  ParametrizedTransformationTransitionStep<V, double> trafo([](auto u, auto x, double p){ return u; });
 
-  ContinuousVariationTransitionStep<V> test;
-  test.add(trafo);
+  double maxdispl = params.get<double>("model.compression");
+  ParametrizedTransformationTransitionStep<V, double> trafo(
+      [maxdispl](auto u, auto x, double p)
+      {
+        u[2] = - p * (1.0 - maxdispl) * x[2];
+        return u;
+      });
+
+  ContinuousVariationTransitionStep<V> compress(10);
+  compress.add(trafo);
+  compress.add(newton);
 
   TransitionSolver<V> solver;
   solver.add(interpolation);
   solver.add(constraints);
-//  solver.add(newton);
-  solver.add(test);
+  solver.add(compress);
 
   solver.apply(x, cc);
 

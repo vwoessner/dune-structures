@@ -40,7 +40,8 @@ class TransformationGridFunction
   {
     typename Traits::RangeType eval;
     gridfunction.evaluate(e, x, eval);
-    y = func(eval, e.geometry().global(x));
+    auto xg = e.geometry().global(x);
+    y = func(eval, xg);
   }
 
   private:
