@@ -2,6 +2,7 @@
 #define DUNE_STRUCTURES_SOLVERSTEPS_PARAMETRIZEDLAMBDA_HH
 
 #include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/variation.hh>
 
 #include<functional>
 #include<tuple>

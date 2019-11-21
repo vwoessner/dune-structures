@@ -13,11 +13,11 @@
 // as a convenience header
 #include<dune/structures/solversteps/base.hh>
 #include<dune/structures/solversteps/constraints.hh>
-#include<dune/structures/solversteps/continuousvariation.hh>
-#include<dune/structures/solversteps/discretevariation.hh>
+#include<dune/structures/solversteps/construction.hh>
 #include<dune/structures/solversteps/interpolation.hh>
 #include<dune/structures/solversteps/newton.hh>
 #include<dune/structures/solversteps/transformation.hh>
+#include<dune/structures/solversteps/variation.hh>
 
 #include<memory>
 #include<vector>
