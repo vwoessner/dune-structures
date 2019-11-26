@@ -4,7 +4,6 @@
 #include<dune/common/parametertree.hh>
 #include<dune/common/shared_ptr.hh>
 #include<dune/structures/solversteps/base.hh>
-#include<dune/structures/solversteps/construction.hh>
 
 #include<memory>
 #include<vector>
@@ -20,10 +19,6 @@ class NoopParametrizationWrapper
 
   NoopParametrizationWrapper(std::shared_ptr<TransitionSolverStepBase<Vector>> step)
     : step(step)
-  {}
-
-  NoopParametrizationWrapper(const Dune::ParameterTree& params)
-    : step(construct_step<Vector>(params))
   {}
 
   virtual ~NoopParametrizationWrapper() {}
