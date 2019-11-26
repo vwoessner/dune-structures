@@ -17,6 +17,7 @@
 #include<dune/structures/solversteps/interpolation.hh>
 #include<dune/structures/solversteps/material.hh>
 #include<dune/structures/solversteps/newton.hh>
+#include<dune/structures/solversteps/onetoone.hh>
 #include<dune/structures/solversteps/transformation.hh>
 #include<dune/structures/solversteps/variation.hh>
 #include<dune/structures/solversteps/visualization.hh>

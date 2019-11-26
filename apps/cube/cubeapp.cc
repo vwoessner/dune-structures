@@ -50,6 +50,7 @@ int main(int argc, char** argv)
   InterpolationTransitionStep<V> interpolation([](auto x) { return 0.0; });
   ConstraintsTransitionStep<V> constraints([](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); });
   ElasticitySolverStep<V> elasticity(physical, params);
+  OneToOneMappingChecker<V> onetoone;
 
   double maxdispl = params.get<double>("model.compression");
   ParametrizedTransformationTransitionStep<V, double> trafo(
@@ -62,6 +63,7 @@ int main(int argc, char** argv)
   ContinuousVariationTransitionStep<V> compress(10);
   compress.add(trafo);
   compress.add(elasticity);
+  compress.add(onetoone);
 
   VisualizationStep<V> vis;
   SolutionVisualizationStep<V> vissol;
