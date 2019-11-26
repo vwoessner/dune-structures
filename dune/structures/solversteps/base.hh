@@ -16,11 +16,13 @@ class TransitionSolverStepBase
   using GridFunctionSpace = typename Vector::GridFunctionSpace;
   using GridView = typename GridFunctionSpace::Traits::GridViewType;
   using Grid = typename GridView::Traits::Grid;
+  using EntitySet = typename GridFunctionSpace::Traits::EntitySet;
   using ctype = typename Grid::ctype;
   using Entity = typename GridView::template Codim<0>::Entity;
   using GlobalCoordinate = typename Entity::Geometry::GlobalCoordinate;
   using Range = typename Vector::field_type;
   using ConstraintsContainer = typename GridFunctionSpace::template ConstraintsContainer<Range>::Type;
+  using VectorBackend = typename GridFunctionSpace::Traits::Backend;
 
   // The virtual interface - pretty simple
   virtual ~TransitionSolverStepBase() {}

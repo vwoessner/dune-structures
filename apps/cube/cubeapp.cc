@@ -62,17 +62,13 @@ int main(int argc, char** argv)
   // Instantiate the material class
   auto material = parse_material<RangeType>(es, physical, params.sub("material"));
 
-  // Setting up grid operator
-  using LOP = ElasticityOperator<GFS, GFS>;
-  LOP lop(gfs, gfs, params, material);
-
   // Setting up container
   using V = Dune::PDELab::Backend::Vector<GFS, DF>;
   V x(gfs);
 
   InterpolationTransitionStep<V> interpolation([](auto x) { return 0.0; });
   ConstraintsTransitionStep<V> constraints([](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); });
-  NewtonSolverTransitionStep<V, LOP> newton(lop);
+  ElasticitySolverStep<V> elasticity(physical, params);
 
   double maxdispl = params.get<double>("model.compression");
   ParametrizedTransformationTransitionStep<V, double> trafo(
@@ -84,35 +80,26 @@ int main(int argc, char** argv)
 
   ContinuousVariationTransitionStep<V> compress(10);
   compress.add(trafo);
-  compress.add(newton);
+  compress.add(elasticity);
+
+  VisualizationStep<V> vis;
+  SolutionVisualizationStep<V> vissol;
+  MPIRankVisualizationStep<V> visrank(helper);
+  PhysicalEntityVisualizationStep<V> visphys(physical);
+  VonMisesStressVisualizationStep<V> visvm(material);
+
+  vis.add(vissol);
+  vis.add(visrank);
+  vis.add(visphys);
+  vis.add(visvm);
 
   TransitionSolver<V> solver;
   solver.add(interpolation);
   solver.add(constraints);
   solver.add(compress);
+  solver.add(vis);
 
   solver.apply(x, cc);
-
-  // A grid function for the stress
-  VonMisesStressGridFunction stress(x, material);
-
-  // Interpolate the stress into a grid function
-  using P0FEM = Dune::PDELab::P0LocalFiniteElementMap<DF, RangeType, 3>;
-  P0FEM p0fem(Dune::GeometryTypes::simplex(3));
-  using P0GFS = Dune::PDELab::GridFunctionSpace<ES, P0FEM, CASS, VB>;
-  P0GFS p0gfs(es, p0fem);
-  p0gfs.name("vonmises");
-  using SV = Dune::PDELab::Backend::Vector<P0GFS, DF>;
-  SV stress_container(p0gfs);
-  Dune::PDELab::interpolate(stress, p0gfs, stress_container);
-
-  // Visualize the stress grid function
-  Dune::VTKWriter vtkwriter(es.gridView());
-  Dune::PDELab::addSolutionToVTKWriter(vtkwriter, gfs, x);
-  Dune::PDELab::addSolutionToVTKWriter(vtkwriter, p0gfs, stress_container);
-  vtkwriter.addCellData(*physical, "gmshPhysical");
-  write_rankdata(vtkwriter, helper, es.gridView());
-  vtkwriter.write("output", Dune::VTK::ascii);
 
   return 0;
 }

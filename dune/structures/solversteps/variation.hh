@@ -113,13 +113,13 @@ class ContinuousVariationTransitionStep
 
 template<typename Vector, typename ValueType>
 class DiscreteVariationTransitionStep
-  : public VariationTransitionStepBase<Vector>
+  : public VariationTransitionStepBase<Vector, ValueType>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
 
   DiscreteVariationTransitionStep(std::vector<ValueType> values)
-    : VariationTransitionStepBase<Vector>(), values(values)
+    : VariationTransitionStepBase<Vector, ValueType>(), values(values)
   {}
 
   virtual ~DiscreteVariationTransitionStep() {}

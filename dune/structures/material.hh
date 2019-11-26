@@ -34,6 +34,9 @@ class ElasticMaterialBase
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
 
+  ElasticMaterialBase(const GV& gv) : gv(gv)
+  {}
+
   virtual ~ElasticMaterialBase() {}
 
   virtual T first_lame(const Entity& e, const Coord& x) const = 0;
@@ -60,6 +63,19 @@ class ElasticMaterialBase
   {
     return this->pretension(e, Dune::FieldVector<T, 3>{x0, x1, x2});
   }
+
+  GV gridView() const
+  {
+    return gv;
+  }
+
+  virtual std::shared_ptr<std::vector<int>> getPhysicalGroups() const
+  {
+    return std::make_shared<std::vector<int>>();
+  }
+
+  private:
+  GV gv;
 };
 
 
@@ -79,7 +95,8 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
   virtual ~HomogeneousElasticMaterial() {}
 
   // Construct from a parameter tree
-  HomogeneousElasticMaterial(const Dune::ParameterTree& params)
+  HomogeneousElasticMaterial(const GV& gv, const Dune::ParameterTree& params)
+    : ElasticMaterialBase<GV, T>(gv)
   {
     law = law_to_index[params.get<std::string>("model", "linear")];
     pretens = params.get<T>("pretension", T(0.0));
@@ -107,10 +124,11 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
   }
 
   // Construct given explicit Lame parameters
-  HomogeneousElasticMaterial(T lame1, T lame2)
-    : lame1(lame1),
-	  lame2(lame2),
-	  law(0)
+  HomogeneousElasticMaterial(const GV& gv, T lame1, T lame2)
+    : ElasticMaterialBase<GV, T>(gv),
+      lame1(lame1),
+	    lame2(lame2),
+	    law(0)
   {}
 
   virtual T first_lame(const Entity& e, const Coord& x) const override
@@ -156,11 +174,15 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
   virtual ~MaterialCollection() {}
 
   MaterialCollection(const GV& gv, std::shared_ptr<std::vector<int>> physical_groups)
-    : is(gv.indexSet()), physical_entity_mapping(physical_groups)
+    : ElasticMaterialBase<GV, T>(gv),
+      is(gv.indexSet()),
+      physical_entity_mapping(physical_groups)
   {}
 
   MaterialCollection(const GV& gv, std::vector<int>& physical_groups)
-    : is(gv.indexSet()), physical_entity_mapping(Dune::stackobject_to_shared_ptr(physical_groups))
+    : ElasticMaterialBase<GV, T>(gv),
+      is(gv.indexSet()),
+      physical_entity_mapping(Dune::stackobject_to_shared_ptr(physical_groups))
   {}
 
   void add_material(int material_index, std::shared_ptr<ElasticMaterialBase<GV, T>> material)
@@ -193,6 +215,11 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
     return get_material(e)->material_law_index(e);
   }
 
+  virtual std::shared_ptr<std::vector<int>> getPhysicalGroups() const
+  {
+    return physical_entity_mapping;
+  }
+
   private:
   std::shared_ptr<ElasticMaterialBase<GV, T>> get_material(const Entity& e) const
   {
@@ -221,7 +248,7 @@ std::shared_ptr<MaterialCollection<GV, T>> parse_material(
   {
     str_trim(group);
     const auto& groupconf = params.sub(group);
-    auto material = std::make_shared<HomogeneousElasticMaterial<GV, T>>(groupconf);
+    auto material = std::make_shared<HomogeneousElasticMaterial<GV, T>>(gv, groupconf);
     coll->add_material(groupconf.get<int>("group"), material);
   }
 

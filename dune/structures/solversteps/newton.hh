@@ -24,7 +24,15 @@ class NewtonSolverTransitionStep : public TransitionSolverStepBase<Vector>
 
   using LinearSolver = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
 
+  NewtonSolverTransitionStep()
+    : localoperator(0)
+  {}
+
   NewtonSolverTransitionStep(LocalOperator& localoperator)
+    : localoperator(Dune::stackobject_to_shared_ptr(localoperator))
+  {}
+
+  NewtonSolverTransitionStep(std::shared_ptr<LocalOperator> localoperator)
     : localoperator(localoperator)
   {}
 
@@ -35,19 +43,20 @@ class NewtonSolverTransitionStep : public TransitionSolverStepBase<Vector>
 
     // Build a grid operator
     Dune::PDELab::ISTL::BCRSMatrixBackend<> mb(21);
-    GridOperator gridoperator(gfs, constraintscontainer, gfs, constraintscontainer, localoperator, mb);
+    GridOperator gridoperator(gfs, constraintscontainer, gfs, constraintscontainer, *localoperator, mb);
 
     // Build the Newton solver
-    LinearSolver linearsolver;
+    LinearSolver linearsolver(0);
     using Newton = Dune::PDELab::Newton<GridOperator, LinearSolver, Vector>;
     Newton newton(gridoperator, vector, linearsolver);
+    newton.setVerbosityLevel(1);
 
     std::cout << "Applying Newton Solver!" << std::endl;
     newton.apply();
   }
 
-  private:
-  LocalOperator& localoperator;
+  protected:
+  std::shared_ptr<LocalOperator> localoperator;
 };
 
 #endif
