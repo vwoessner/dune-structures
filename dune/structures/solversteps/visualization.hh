@@ -48,10 +48,10 @@ class VisualizationStep
 
   virtual ~VisualizationStep() {}
 
-  virtual void apply(Vector& vector, typename Base::ConstraintsContainer& cc) override
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     // Instantiate a VTKWriter instance
-    auto gv = vector.gridFunctionSpace().gridView();
+    auto gv = vector->gridFunctionSpace().gridView();
     auto writer = std::make_shared<Dune::VTKWriter<typename Base::GridView>>(gv);
 
     // Make it known to all child steps
@@ -97,10 +97,11 @@ class SolutionVisualizationStep
 
   virtual ~SolutionVisualizationStep() {}
 
-  virtual void apply(Vector& vector, typename Base::ConstraintsContainer&) override
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
-    const auto& gfs = vector.gridFunctionSpace();
-    Dune::PDELab::addSolutionToVTKWriter(*(this->vtkwriter), gfs, vector);
+    const auto& gfs = vector->gridFunctionSpace();
+    auto ugly_gfs_pointer = Dune::stackobject_to_shared_ptr(gfs);
+    Dune::PDELab::addSolutionToVTKWriter(*(this->vtkwriter), ugly_gfs_pointer, vector);
   }
 };
 
@@ -137,9 +138,9 @@ class MPIRankVisualizationStep
 
   virtual ~MPIRankVisualizationStep() {}
 
-  virtual void apply(Vector& vector, typename Base::ConstraintsContainer&) override
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
-    RankDummyContainer container(helper, vector.gridFunctionSpace().gridView());
+    RankDummyContainer container(helper, vector->gridFunctionSpace().gridView());
     this->vtkwriter->addCellData(container, "mpirank");
   }
 
@@ -161,7 +162,7 @@ class PhysicalEntityVisualizationStep
 
   virtual ~PhysicalEntityVisualizationStep() {}
 
-  virtual void apply(Vector& vector, typename Base::ConstraintsContainer&) override
+  virtual void apply(std::shared_ptr<Vector>, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
     this->vtkwriter->addCellData(*physical, "gmshPhysical");
   }
@@ -184,12 +185,12 @@ class VonMisesStressVisualizationStep
 
   virtual ~VonMisesStressVisualizationStep() {}
 
-  virtual void apply(Vector& vector, typename Base::ConstraintsContainer&) override
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
-    auto es = vector.gridFunctionSpace().entitySet();
+    auto es = vector->gridFunctionSpace().entitySet();
 
     // A grid function for the stress
-    VonMisesStressGridFunction stress(vector, material);
+    VonMisesStressGridFunction stress(*vector, material);
 
     // Interpolate the stress into a grid function
     using P0FEM = Dune::PDELab::P0LocalFiniteElementMap<typename Base::ctype, typename Base::Range, 3>;

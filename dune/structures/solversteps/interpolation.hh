@@ -82,16 +82,16 @@ class InterpolationTransitionStep
 
   virtual ~InterpolationTransitionStep() {}
 
-  virtual void apply(Vector& vector, typename Base::ConstraintsContainer&) override
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
-    auto gfs = vector.gridFunctionSpace();
+    auto& gfs = vector->gridFunctionSpace();
     using Trafo = GFStoGFTransformation<typename Base::GridFunctionSpace>;
     Trafo trafo(funcs);
 
     auto gf = Dune::TypeTree::TransformTree<typename Base::GridFunctionSpace, Trafo>::transform(gfs, trafo);
 
     std::cout << "Interpolating into solution vector" << std::endl;
-    Dune::PDELab::interpolate(gf, gfs, vector);
+    Dune::PDELab::interpolate(gf, gfs, *vector);
   }
 
   private:

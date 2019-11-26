@@ -28,7 +28,7 @@ class NoopParametrizationWrapper
 
   virtual ~NoopParametrizationWrapper() {}
 
-  virtual void apply(Vector& vector, typename Base::ConstraintsContainer& cc) override
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     step->apply(vector, cc);
   }
@@ -93,7 +93,7 @@ class ContinuousVariationTransitionStep
 
   virtual ~ContinuousVariationTransitionStep() {}
 
-  virtual void apply(typename Base::Vector& vector, typename Base::ConstraintsContainer& cc) override
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     double val = start;
     for (int i=0; i<iterations; ++i)
@@ -124,7 +124,7 @@ class DiscreteVariationTransitionStep
 
   virtual ~DiscreteVariationTransitionStep() {}
 
-  virtual void apply(typename Base::Vector& vector, typename Base::ConstraintsContainer& cc)
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     for (auto val: values)
     {

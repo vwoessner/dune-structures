@@ -51,7 +51,7 @@ class TransitionSolver
     steps.push_back(Dune::stackobject_to_shared_ptr(step));
   }
 
-  void apply(Vector& vector, ConstraintsContainer& constraintscontainer)
+  void apply(std::shared_ptr<Vector> vector, std::shared_ptr<ConstraintsContainer> constraintscontainer)
   {
     for (auto step : steps)
       step->apply(vector, constraintscontainer);

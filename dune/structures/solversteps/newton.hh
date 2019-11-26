@@ -36,19 +36,21 @@ class NewtonSolverTransitionStep : public TransitionSolverStepBase<Vector>
     : localoperator(localoperator)
   {}
 
-  void apply(Vector& vector, typename Base::ConstraintsContainer& constraintscontainer) override
+  virtual ~NewtonSolverTransitionStep() {}
+
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     // Extract stuff
-    auto gfs = vector.gridFunctionSpace();
+    auto& gfs = vector->gridFunctionSpace();
 
     // Build a grid operator
     Dune::PDELab::ISTL::BCRSMatrixBackend<> mb(21);
-    GridOperator gridoperator(gfs, constraintscontainer, gfs, constraintscontainer, *localoperator, mb);
+    GridOperator gridoperator(gfs, *cc, gfs, *cc, *localoperator, mb);
 
     // Build the Newton solver
     LinearSolver linearsolver(0);
     using Newton = Dune::PDELab::Newton<GridOperator, LinearSolver, Vector>;
-    Newton newton(gridoperator, vector, linearsolver);
+    Newton newton(gridoperator, *vector, linearsolver);
     newton.setVerbosityLevel(1);
 
     std::cout << "Applying Newton Solver!" << std::endl;

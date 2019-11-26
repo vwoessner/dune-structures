@@ -66,7 +66,7 @@ class ParametrizedLambdaVariationTransitionStepBase
     pfunc.set_parameters(params...);
   }
 
-  virtual void apply(typename Base::Vector& vector, typename Base::ConstraintsContainer& cc) override
+  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     step->apply(vector, cc);
   }

@@ -79,15 +79,15 @@ class ConstraintsTransitionStep : public TransitionSolverStepBase<Vector>
 
   virtual ~ConstraintsTransitionStep() {}
 
-  virtual void apply(Vector& vector, typename Base::ConstraintsContainer& constraintscontainer) override
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> constraintscontainer) override
   {
-    auto gfs = vector.gridFunctionSpace();
+    auto& gfs = vector->gridFunctionSpace();
     using Trafo = GFStoConstraintsTransformation<typename Base::GridFunctionSpace>;
     Trafo trafo(funcs);
 
     auto bctype = Dune::TypeTree::TransformTree<typename Base::GridFunctionSpace, Trafo>::transform(gfs, trafo);
     std::cout << "Assembling constraints!" << std::endl;
-    Dune::PDELab::constraints(bctype, gfs, constraintscontainer);
+    Dune::PDELab::constraints(bctype, gfs, *constraintscontainer);
   }
 
   private:

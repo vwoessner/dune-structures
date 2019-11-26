@@ -41,30 +41,11 @@ int main(int argc, char** argv)
   GV gv = grid->leafGridView();
   ES es(grid->leafGridView());
 
-  // Set up finite element maps...
-  using FEM = Dune::PDELab::PkLocalFiniteElementMap<ES, DF, RangeType, 1>;
-  FEM fem(es);
-
-  // Set up grid function spaces...
-  using VB = Dune::PDELab::ISTL::VectorBackend<Dune::PDELab::ISTL::Blocking::none>;
-  using CASS = Dune::PDELab::ConformingDirichletConstraints;
-  using GFS = Dune::PDELab::VectorGridFunctionSpace<ES, FEM, 3, VB, VB, CASS>;
-  GFS gfs(es, fem);
-  gfs.name("displacement");
-  gfs.update();
-  std::cout << "Set up a grid function space with " << gfs.size() << " dofs!" << std::endl;
-
-  // Setting up constraints container
-  using CC = GFS::ConstraintsContainer<RangeType>::Type;
-  CC cc;
-  cc.clear();
+  auto [x, cc] = elasticity_setup(es);
+  using V = std::remove_reference<decltype(*x)>::type;
 
   // Instantiate the material class
   auto material = parse_material<RangeType>(es, physical, params.sub("material"));
-
-  // Setting up container
-  using V = Dune::PDELab::Backend::Vector<GFS, DF>;
-  V x(gfs);
 
   InterpolationTransitionStep<V> interpolation([](auto x) { return 0.0; });
   ConstraintsTransitionStep<V> constraints([](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); });
