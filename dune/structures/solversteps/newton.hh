@@ -38,6 +38,11 @@ class NewtonSolverTransitionStep : public TransitionSolverStepBase<Vector>
 
   virtual ~NewtonSolverTransitionStep() {}
 
+  void set_localoperator(std::shared_ptr<LocalOperator> lop)
+  {
+    localoperator = lop;
+  }
+
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     // Extract stuff
@@ -51,7 +56,7 @@ class NewtonSolverTransitionStep : public TransitionSolverStepBase<Vector>
     LinearSolver linearsolver(0);
     using Newton = Dune::PDELab::Newton<GridOperator, LinearSolver, Vector>;
     Newton newton(gridoperator, *vector, linearsolver);
-    newton.setVerbosityLevel(1);
+    newton.setVerbosityLevel(2);
 
     std::cout << "Applying Newton Solver!" << std::endl;
     newton.apply();

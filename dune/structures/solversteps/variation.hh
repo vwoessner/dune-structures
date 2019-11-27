@@ -10,6 +10,14 @@
 #include<type_traits>
 
 
+// Forward declarations
+template<typename Vector, typename ValueType>
+class ParametrizedMaterialStepBase;
+
+template<typename Vector>
+class MaterialDependantStepBase;
+
+
 template<typename Vector, typename... Params>
 class NoopParametrizationWrapper
   : public ParametrizedTransitionStepBase<Vector, Params...>
@@ -57,6 +65,8 @@ class VariationTransitionStepBase
   {
     if constexpr (std::is_convertible<STEP*, ParametrizedTransitionStepBase<Vector, Params...>*>::value)
       steps.push_back(step);
+    else if constexpr (std::is_convertible<STEP*, MaterialDependantStepBase<Vector>*>::value)
+      steps.push_back(std::make_shared<ParametrizedMaterialStepBase<Vector, Params...>>(step, [](auto& c, auto p) { return c; } ));
     else
       steps.push_back(std::make_shared<NoopParametrizationWrapper<Vector, Params...>>(step));
   }

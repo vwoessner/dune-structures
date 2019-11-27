@@ -175,13 +175,13 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
 
   MaterialCollection(const GV& gv, std::shared_ptr<std::vector<int>> physical_groups)
     : ElasticMaterialBase<GV, T>(gv),
-      is(gv.indexSet()),
+      is(&gv.indexSet()),
       physical_entity_mapping(physical_groups)
   {}
 
   MaterialCollection(const GV& gv, std::vector<int>& physical_groups)
     : ElasticMaterialBase<GV, T>(gv),
-      is(gv.indexSet()),
+      is(&gv.indexSet()),
       physical_entity_mapping(Dune::stackobject_to_shared_ptr(physical_groups))
   {}
 
@@ -223,10 +223,10 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
   private:
   std::shared_ptr<ElasticMaterialBase<GV, T>> get_material(const Entity& e) const
   {
-    return materials.find((*physical_entity_mapping)[is.index(e)])->second;
+    return materials.find((*physical_entity_mapping)[is->index(e)])->second;
   }
 
-  const typename GV::IndexSet& is;
+  const typename GV::IndexSet* is;
   std::shared_ptr<std::vector<int>> physical_entity_mapping;
   std::map<int, std::shared_ptr<ElasticMaterialBase<GV, T>>> materials;
 };
