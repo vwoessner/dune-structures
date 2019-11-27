@@ -99,9 +99,8 @@ class SolutionVisualizationStep
 
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
-    const auto& gfs = vector->gridFunctionSpace();
-    auto ugly_gfs_pointer = Dune::stackobject_to_shared_ptr(gfs);
-    Dune::PDELab::addSolutionToVTKWriter(*(this->vtkwriter), ugly_gfs_pointer, vector);
+    auto gfs = vector->gridFunctionSpaceStorage();
+    Dune::PDELab::addSolutionToVTKWriter(*(this->vtkwriter), gfs, vector);
   }
 };
 
