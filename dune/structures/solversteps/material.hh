@@ -31,12 +31,7 @@ class MaterialDependantStepBase
 
   void rebuild_material()
   {
-    auto newmaterial = parse_material<double>(es, physical, params);
-    std::cout << "Checking1: " << newmaterial->material_law_index(*(es.gridView().template begin<0>())) << std::endl;
-    *material = *newmaterial;
-//    std::cout << "Replaced material with" << params.get<std::string>("cube.model")  << std::endl;
-    std::cout << "Checking2: " << material->material_law_index(*(es.gridView().template begin<0>())) << std::endl;
-//    std::cout << "Reference: " << params.get<double>("cube.youngs_modulus") << std::endl;
+    *material = *parse_material<double>(es, physical, params);
   }
 
   Dune::ParameterTree& get_params()
@@ -119,6 +114,41 @@ class DiscreteMaterialVariationTransitionStep
 
   private:
   std::function<void(Dune::ParameterTree&, ValueType)> modificator;
+};
+
+
+template<typename Vector>
+class ContinuousMaterialVariationTransitionStep
+  : public ContinuousVariationTransitionStep<Vector>
+{
+  public:
+  using Base = TransitionSolverStepBase<Vector>;
+
+  ContinuousMaterialVariationTransitionStep(std::function<void(Dune::ParameterTree&, double)> modificator, int iterations=5, double start=0.0, double end=1.0)
+    : ContinuousVariationTransitionStep<Vector>(iterations, start, end)
+    , modificator(modificator)
+  {}
+
+  template<typename STEP>
+  void add(std::shared_ptr<STEP> step)
+  {
+    if constexpr (std::is_convertible<STEP*, MaterialDependantStepBase<Vector>*>::value)
+    {
+      std::cout << "I am adding a thing" << std::endl;
+      this->steps.push_back(std::make_shared<ParametrizedMaterialStepBase<Vector, double>>(step, modificator));
+    }
+    else
+      this->steps.push_back(std::make_shared<NoopParametrizationWrapper<Vector, double>>(step));
+  }
+
+  template<typename STEP>
+  void add(STEP& step)
+  {
+    add(Dune::stackobject_to_shared_ptr(step));
+  }
+
+  private:
+  std::function<void(Dune::ParameterTree&, double)> modificator;
 };
 
 #endif

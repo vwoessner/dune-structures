@@ -6,13 +6,15 @@
 #include<dune/structures/gmshfactory.hh>
 #include<dune/structures/material.hh>
 #include<dune/structures/onetoone.hh>
+#include<dune/structures/solversteps/elasticity.hh>
+#include<dune/structures/transitionsolver.hh>
 #include<dune/structures/vonmises.hh>
 #include<dune/structures/visualization.hh>
 #include<dune/testtools/gridconstruction.hh>
 
 #include<vector>
 
-#include"linear_elasticity_operator.hh"
+#include"elasticity_operator.hh"
 
 int main(int argc, char** argv)
 {
