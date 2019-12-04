@@ -31,7 +31,11 @@ class MaterialLawBase(object):
     # implementation that supports runtime heterogeneity.
     #
     def ufl_parameters(self, u):
-        cell = u.ufl_element().cell()
+        # TODO: Get rid if this non-sense!
+        try:
+            cell = u.ufl_element().cell()
+        except:
+            cell = u.ufl_operands[0].ufl_operands[0].ufl_element().cell()
         return [UFLPhysicalParameter(p, cell) for p in self.param_names]
 
     #

@@ -24,6 +24,7 @@ dune_project()
 
 dune_enable_all_packages()
 
+add_subdirectory(operators)
 add_subdirectory(apps)
 add_subdirectory(cmake/modules)
 add_subdirectory(dune/structures)

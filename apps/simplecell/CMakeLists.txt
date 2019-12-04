@@ -1,7 +1,5 @@
-dune_add_generated_executable(SOURCE simplecell.cc
-                              INIFILE simplecell.ini
-                              UFLFILE simplecell.ufl
-                              TARGET simplecell)
+add_executable(simplecell simplecell.cc)
+add_dependencies(simplecell operators)
 
 dune_structures_mesh_generation(TARGET simplecell
                                 CONFIG simplecell.ini
