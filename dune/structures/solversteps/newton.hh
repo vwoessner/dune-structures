@@ -7,7 +7,8 @@
 
 
 template<typename Vector, typename LocalOperator>
-class NewtonSolverTransitionStep : public TransitionSolverStepBase<Vector>
+class NewtonSolverTransitionStep
+  : public TransitionSolverStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
@@ -23,6 +24,7 @@ class NewtonSolverTransitionStep : public TransitionSolverStepBase<Vector>
                                                   typename Base::ConstraintsContainer>;
 
   using LinearSolver = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
+  using NewtonSolver = Dune::PDELab::Newton<GridOperator, LinearSolver, Vector>;
 
   NewtonSolverTransitionStep()
     : localoperator(0)
@@ -43,27 +45,27 @@ class NewtonSolverTransitionStep : public TransitionSolverStepBase<Vector>
     localoperator = lop;
   }
 
+  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  {
+    auto gfs = vector->gridFunctionSpaceStorage();
+    Dune::PDELab::ISTL::BCRSMatrixBackend<> mb(21);
+    gridoperator = std::make_shared<>(*gfs, *cc, *gfs, *cc, *localoperator, mb);
+    linearsolver = std::make_shared<LinearSolver>(0);
+    newton = std::make_shared<NewtonSolver>(*gridoperator, *vector, *linearsolver);
+    newton->setVerbosityLevel(2);
+  }
+
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
-    // Extract stuff
-    auto& gfs = vector->gridFunctionSpace();
-
-    // Build a grid operator
-    Dune::PDELab::ISTL::BCRSMatrixBackend<> mb(21);
-    GridOperator gridoperator(gfs, *cc, gfs, *cc, *localoperator, mb);
-
-    // Build the Newton solver
-    LinearSolver linearsolver(0);
-    using Newton = Dune::PDELab::Newton<GridOperator, LinearSolver, Vector>;
-    Newton newton(gridoperator, *vector, linearsolver);
-    newton.setVerbosityLevel(2);
-
     std::cout << "Applying Newton Solver!" << std::endl;
     newton.apply();
   }
 
   protected:
   std::shared_ptr<LocalOperator> localoperator;
+  std::shared_ptr<LinearSolver> linearsolver;
+  std::shared_ptr<GridOperator> gridoperator;
+  std::shared_ptr<NewtonSolver> newton;
 };
 
 #endif

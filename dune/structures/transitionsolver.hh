@@ -56,7 +56,13 @@ class TransitionSolver
   void apply(std::shared_ptr<Vector> vector, std::shared_ptr<ConstraintsContainer> constraintscontainer)
   {
     for (auto step : steps)
+      step->pre(vector, constraintscontainer);
+
+    for (auto step : steps)
       step->apply(vector, constraintscontainer);
+
+    for (auto step : steps)
+     step->post(vector, constraintscontainer);
   }
 
   private:

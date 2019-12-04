@@ -45,10 +45,22 @@ int main(int argc, char** argv)
 
   // Instantiate the material class
   auto material = parse_material<RangeType>(es, physical, params.sub("material"));
-//
-//  ConstraintsTransitionStep<V> constraints([](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); });
-//  OneToOneMappingChecker<V> onetoone;
-//
+
+  InterpolationTransitionStep<V> interpolation([](auto x) { return 0.0; });
+
+  auto clamp = [](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); };
+  auto nocon = [](auto x) { return false; };
+  ConstraintsTransitionStep<V> constraints(clamp, clamp, clamp, nocon, nocon, nocon);
+
+  ElastoDynamicsSolverStep<V> elastodyn(es, physical, params);
+
+  TransitionSolver<V> solver;
+  solver.add(interpolation);
+  solver.add(constraints);
+  solver.add(elastodyn);
+
+  solver.apply(x, cc);
+
 //  VisualizationStep<V> vis;
 //  SolutionVisualizationStep<V> vissol;
 //  MPIRankVisualizationStep<V> visrank(helper);

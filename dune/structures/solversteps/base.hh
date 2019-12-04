@@ -27,7 +27,13 @@ class TransitionSolverStepBase
   // The virtual interface - pretty simple
   virtual ~TransitionSolverStepBase() {}
 
+  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<ConstraintsContainer> cc)
+  {}
+
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<ConstraintsContainer> cc)
+  {}
+
+  virtual void post(std::shared_ptr<Vector> vector, std::shared_ptr<ConstraintsContainer> cc)
   {}
 };
 
