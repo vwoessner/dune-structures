@@ -49,51 +49,49 @@ class MaterialDependantStepBase
 };
 
 
-template<typename Vector, typename ValueType>
+template<typename Vector>
 class ParametrizedMaterialStepBase
-  : public ParametrizedTransitionStepBase<Vector, ValueType>
+  : public WrapperStep<Vector, MaterialDependantStepBase>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
 
   ParametrizedMaterialStepBase(std::shared_ptr<MaterialDependantStepBase<Vector>> step,
-                               std::function<void(Dune::ParameterTree&, ValueType)> modificator)
-    : step(step), modificator(modificator)
+                               std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator)
+    : WrapperStep<Vector, MaterialDependantStepBase>(step)
+    , modificator(modificator)
   {}
 
   virtual ~ParametrizedMaterialStepBase() {}
 
-  virtual void update_transition_value(ValueType val) override
+  virtual void update_parameter(std::string name, typename Base::Parameter val) override
   {
-    auto& params = step->get_params();
-    modificator(params, val);
-    step->rebuild_material();
-  }
+    if (name == "material")
+    {
+      auto& params = this->step->get_params();
+      modificator(params, val);
+      this->step->rebuild_material();
+    }
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
-  {
-    step->apply(vector, cc);
+    this->step->update_parameter(name, val);
   }
-
-  protected:
 
   private:
-  std::shared_ptr<MaterialDependantStepBase<Vector>> step;
-  std::function<void(Dune::ParameterTree&, ValueType)> modificator;
+  std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator;
 };
 
 
-template<typename Vector, typename ValueType>
+template<typename Vector>
 class DiscreteMaterialVariationTransitionStep
-  : public DiscreteVariationTransitionStep<Vector, ValueType>
+  : public DiscreteVariationTransitionStep<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
 
   DiscreteMaterialVariationTransitionStep(
-      std::function<void(Dune::ParameterTree&, ValueType)> modificator,
-      std::vector<ValueType> values)
-    : DiscreteVariationTransitionStep<Vector, ValueType>(values)
+      std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator,
+      std::vector<typename Base::Parameter> values)
+    : DiscreteVariationTransitionStep<Vector>("material", values)
     , modificator(modificator)
   {}
 
@@ -101,9 +99,9 @@ class DiscreteMaterialVariationTransitionStep
   void add(std::shared_ptr<STEP> step)
   {
     if constexpr (std::is_convertible<STEP*, MaterialDependantStepBase<Vector>*>::value)
-      this->steps.push_back(std::make_shared<ParametrizedMaterialStepBase<Vector, ValueType>>(step, modificator));
+      this->steps.push_back(std::make_shared<ParametrizedMaterialStepBase<Vector>>(step, modificator));
     else
-      this->steps.push_back(std::make_shared<NoopParametrizationWrapper<Vector, ValueType>>(step));
+      this->steps.push_back(step);
   }
 
   template<typename STEP>
@@ -113,7 +111,7 @@ class DiscreteMaterialVariationTransitionStep
   }
 
   private:
-  std::function<void(Dune::ParameterTree&, ValueType)> modificator;
+  std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator;
 };
 
 
@@ -124,8 +122,12 @@ class ContinuousMaterialVariationTransitionStep
   public:
   using Base = TransitionSolverStepBase<Vector>;
 
-  ContinuousMaterialVariationTransitionStep(std::function<void(Dune::ParameterTree&, double)> modificator, int iterations=5, double start=0.0, double end=1.0)
-    : ContinuousVariationTransitionStep<Vector>(iterations, start, end)
+  ContinuousMaterialVariationTransitionStep(
+      std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator,
+      int iterations=5,
+      double start=0.0,
+      double end=1.0)
+    : ContinuousVariationTransitionStep<Vector>("material", iterations, start, end)
     , modificator(modificator)
   {}
 
@@ -133,12 +135,10 @@ class ContinuousMaterialVariationTransitionStep
   void add(std::shared_ptr<STEP> step)
   {
     if constexpr (std::is_convertible<STEP*, MaterialDependantStepBase<Vector>*>::value)
-    {
-      std::cout << "I am adding a thing" << std::endl;
-      this->steps.push_back(std::make_shared<ParametrizedMaterialStepBase<Vector, double>>(step, modificator));
+    { this->steps.push_back(std::make_shared<ParametrizedMaterialStepBase<Vector>>(step, modificator));
     }
     else
-      this->steps.push_back(std::make_shared<NoopParametrizationWrapper<Vector, double>>(step));
+      this->steps.push_back(step);
   }
 
   template<typename STEP>

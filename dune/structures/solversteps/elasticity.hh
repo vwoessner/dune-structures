@@ -33,8 +33,8 @@ class ElasticitySolverStep
 
   virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
-    auto& gfs = vector->gridFunctionSpace();
-    newton_step->set_localoperator(std::make_shared<LocalOperator>(gfs, gfs, params, this->material));
+    auto gfs = vector->gridFunctionSpaceStorage();
+    newton_step->set_localoperator(std::make_shared<LocalOperator>(*gfs, *gfs, params, this->material));
     newton_step->pre(vector, cc);
   }
 
@@ -99,4 +99,5 @@ class ElastoDynamicsSolverStep
   std::shared_ptr<OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>> onestepmethod_step;
   Dune::ParameterTree params;
 };
+
 #endif

@@ -59,10 +59,10 @@ class TransformationTransitionStep : public TransitionSolverStepBase<Vector>
 
   using FunctionSignature = Dune::FieldVector<double, 3>(Dune::FieldVector<double, 3>, Dune::FieldVector<double, 3>);
 
-  template<typename FUNC>
-  TransformationTransitionStep(const FUNC& func)
+  TransformationTransitionStep(const std::function<FunctionSignature>& func)
     : func(func)
   {}
+
 
   virtual ~TransformationTransitionStep() {}
 
@@ -78,7 +78,7 @@ class TransformationTransitionStep : public TransitionSolverStepBase<Vector>
 };
 
 
-template<typename Vector, typename... P>
-using ParametrizedTransformationTransitionStep = ParametrizedLambdaVariationTransitionStepBase<TransformationTransitionStep<Vector>, P...>;
+template<typename Vector>
+using ParametrizedTransformationTransitionStep = ParametrizedLambdaVariationTransitionStepBase<TransformationTransitionStep<Vector>>;
 
 #endif

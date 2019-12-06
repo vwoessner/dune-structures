@@ -1,8 +1,11 @@
 #ifndef DUNE_STRUCTURES_SOLVERSTEPS_BASE_HH
 #define DUNE_STRUCTURES_SOLVERSTEPS_BASE_HH
 
+
 #include<memory>
+#include<string>
 #include<type_traits>
+#include<variant>
 #include<vector>
 
 
@@ -24,6 +27,9 @@ class TransitionSolverStepBase
   using ConstraintsContainer = typename GridFunctionSpace::template ConstraintsContainer<Range>::Type;
   using VectorBackend = typename GridFunctionSpace::Traits::Backend;
 
+  // The possible types for parametrization of solver steps
+  using Parameter = std::variant<bool, double, int, std::string>;
+
   // The virtual interface - pretty simple
   virtual ~TransitionSolverStepBase() {}
 
@@ -35,21 +41,102 @@ class TransitionSolverStepBase
 
   virtual void post(std::shared_ptr<Vector> vector, std::shared_ptr<ConstraintsContainer> cc)
   {}
+
+  virtual void update_parameter(std::string name, Parameter param)
+  {}
 };
 
 
-template<typename Vector, typename... Params>
-class ParametrizedTransitionStepBase
+template<typename Vector>
+class StepCollectionStep
   : public TransitionSolverStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
 
-  virtual ~ParametrizedTransitionStepBase() {}
-
-  virtual void update_transition_value(Params... val)
+  StepCollectionStep()
+    : steps(0)
   {}
+
+  virtual ~StepCollectionStep() {}
+
+  virtual void update_parameter(std::string name, typename Base::Parameter param) override
+  {
+    for (auto step : steps)
+      step->update_parameter(name, param);
+  }
+
+  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  {
+    for (auto step : steps)
+      step->pre(vector, cc);
+  }
+
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  {
+    for (auto step : steps)
+      step->apply(vector, cc);
+  }
+
+
+  virtual void post(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  {
+    for (auto step : steps)
+      step->post(vector, cc);
+  }
+
+  template<typename STEP>
+  void add(std::shared_ptr<STEP> step)
+  {
+    steps.push_back(step);
+  }
+
+  template<typename STEP>
+  void add(STEP& step)
+  {
+    add(Dune::stackobject_to_shared_ptr(step));
+  }
+
+  protected:
+  std::vector<std::shared_ptr<TransitionSolverStepBase<Vector>>> steps;
 };
 
+
+template<typename Vector, template<typename> typename BaseT=TransitionSolverStepBase>
+class WrapperStep
+  : public TransitionSolverStepBase<Vector>
+{
+  public:
+  using Base = TransitionSolverStepBase<Vector>;
+
+  WrapperStep(std::shared_ptr<BaseT<Vector>> step)
+    : step(step)
+  {}
+
+  virtual ~WrapperStep() {}
+
+  virtual void update_parameter(std::string name, typename Base::Parameter param) override
+  {
+    step->update_parameter(name, param);
+  }
+
+  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  {
+    step->pre(vector, cc);
+  }
+
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  {
+    step->apply(vector, cc);
+  }
+
+  virtual void post(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  {
+    step->post(vector, cc);
+  }
+
+  protected:
+  std::shared_ptr<BaseT<Vector>> step;
+};
 
 #endif

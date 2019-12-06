@@ -13,6 +13,8 @@
 
 #include<vector>
 
+using namespace std::literals;
+
 
 int main(int argc, char** argv)
 {
@@ -68,14 +70,15 @@ int main(int argc, char** argv)
 
     InterpolationTransitionStep<V> interpolation([](auto x) { return 0.0; });
     double maxdispl = params.get<double>("model.compression");
-    ParametrizedTransformationTransitionStep<V, double> trafo(
-            [maxdispl](auto u, auto x, double p)
+    ParametrizedTransformationTransitionStep<V> trafo(
+            "compression",
+            [maxdispl](auto u, auto x, auto p)
             {
-              u[2] = - p * (1.0 - maxdispl) * x[2];
+              u[2] = - std::get<double>(p) * (1.0 - maxdispl) * x[2];
               return u;
             });
 
-    ContinuousVariationTransitionStep<V> compress(10);
+    ContinuousVariationTransitionStep<V> compress("compression", 10);
     compress.add(trafo);
     compress.add(elasticity);
     compress.add(onetoone);
@@ -98,7 +101,8 @@ int main(int argc, char** argv)
                                                  [](auto x) { return 0.0; },
                                                  [maxdispl](auto x) { return - (1.0 - maxdispl) * x[2]; });
 
-    DiscreteMaterialVariationTransitionStep<V, std::string> solve([](auto &c, auto p) { c["cube.model"] = p; }, {"linear", "neohookean"});
+    DiscreteMaterialVariationTransitionStep<V> solve([](auto &c, auto p) { c["cube.model"] = std::get<std::string>(p); },
+                                                     {"linear"s, "neohookean"s});
     solve.add(elasticity);
 
     TransitionSolver<V> solver;

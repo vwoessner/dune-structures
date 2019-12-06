@@ -47,9 +47,10 @@ class NewtonSolverTransitionStep
 
   virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
+    std::cout << "Building Newton" << std::endl;
     auto gfs = vector->gridFunctionSpaceStorage();
     Dune::PDELab::ISTL::BCRSMatrixBackend<> mb(21);
-    gridoperator = std::make_shared<>(*gfs, *cc, *gfs, *cc, *localoperator, mb);
+    gridoperator = std::make_shared<GridOperator>(*gfs, *cc, *gfs, *cc, *localoperator, mb);
     linearsolver = std::make_shared<LinearSolver>(0);
     newton = std::make_shared<NewtonSolver>(*gridoperator, *vector, *linearsolver);
     newton->setVerbosityLevel(2);
@@ -58,7 +59,7 @@ class NewtonSolverTransitionStep
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     std::cout << "Applying Newton Solver!" << std::endl;
-    newton.apply();
+    newton->apply();
   }
 
   protected:

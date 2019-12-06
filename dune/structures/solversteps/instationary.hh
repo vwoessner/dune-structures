@@ -92,7 +92,7 @@ class OneStepMethodStep
 
 template<typename Vector>
 class InstationarySolverStep
-  : public VariationTransitionStepBase<Vector>
+  : public StepCollectionStep<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
@@ -112,7 +112,7 @@ class InstationarySolverStep
     double time = 0.0;
     while (time < Tend)
     {
-      this->update_transition_value(time);
+      this->update_parameter("time", time);
 
       // Apply the solver
       for (auto step : this->steps)

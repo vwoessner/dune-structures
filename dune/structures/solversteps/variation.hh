@@ -11,64 +11,27 @@
 
 
 // Forward declarations
-template<typename Vector, typename ValueType>
+template<typename Vector>
 class ParametrizedMaterialStepBase;
 
 template<typename Vector>
 class MaterialDependantStepBase;
 
 
-template<typename Vector, typename... Params>
-class NoopParametrizationWrapper
-  : public ParametrizedTransitionStepBase<Vector, Params...>
+template<typename Vector>
+class VariationTransitionStepBase
+  : public StepCollectionStep<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
 
-  NoopParametrizationWrapper(std::shared_ptr<TransitionSolverStepBase<Vector>> step)
-    : step(step)
-  {}
-
-  virtual ~NoopParametrizationWrapper() {}
-
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
-  {
-    step->apply(vector, cc);
-  }
-
-  private:
-  std::shared_ptr<TransitionSolverStepBase<Vector>> step;
-};
-
-
-template<typename Vector, typename... Params>
-class VariationTransitionStepBase
-  : public ParametrizedTransitionStepBase<Vector, Params...>
-{
-  public:
-  using Base = ParametrizedTransitionStepBase<Vector, Params...>;
-
-  VariationTransitionStepBase()
-    : steps(0)
-  {}
-
-  virtual ~VariationTransitionStepBase() {}
-
-  virtual void update_transition_value(Params... val) override
-  {
-    for (auto step : steps)
-      step->update_transition_value(val...);
-  }
-
   template<typename STEP>
   void add(std::shared_ptr<STEP> step)
   {
-    if constexpr (std::is_convertible<STEP*, ParametrizedTransitionStepBase<Vector, Params...>*>::value)
-      steps.push_back(step);
-    else if constexpr (std::is_convertible<STEP*, MaterialDependantStepBase<Vector>*>::value)
-      steps.push_back(std::make_shared<ParametrizedMaterialStepBase<Vector, Params...>>(step, [](auto& c, auto p) { return c; } ));
+    if constexpr (std::is_convertible<STEP*, MaterialDependantStepBase<Vector>*>::value)
+      this->steps.push_back(std::make_shared<ParametrizedMaterialStepBase<Vector>>(step, [](auto& c, auto p) { return c; } ));
     else
-      steps.push_back(std::make_shared<NoopParametrizationWrapper<Vector, Params...>>(step));
+      this->steps.push_back(step);
   }
 
   template<typename STEP>
@@ -76,24 +39,21 @@ class VariationTransitionStepBase
   {
     add(Dune::stackobject_to_shared_ptr(step));
   }
-
-  protected:
-  std::vector<std::shared_ptr<ParametrizedTransitionStepBase<Vector, Params...>>> steps;
 };
 
 
 template<typename Vector>
 class ContinuousVariationTransitionStep
-  : public VariationTransitionStepBase<Vector, double>
+  : public VariationTransitionStepBase<Vector>
 {
   public:
-  using Base = VariationTransitionStepBase<Vector, double>;
+  using Base = TransitionSolverStepBase<Vector>;
 
-  ContinuousVariationTransitionStep(int iterations=5, double start=0.0, double end=1.0)
-    : VariationTransitionStepBase<Vector, double>(),
-      iterations(iterations),
-      start(start),
-      end(end)
+  ContinuousVariationTransitionStep(std::string name, int iterations=5, double start=0.0, double end=1.0)
+    : name(name)
+    , iterations(iterations)
+    , start(start)
+    , end(end)
   {}
 
   virtual ~ContinuousVariationTransitionStep() {}
@@ -104,27 +64,29 @@ class ContinuousVariationTransitionStep
     for (int i=0; i<iterations; ++i)
     {
       val += (end - start) / iterations;
-      this->update_transition_value(val);
+      this->update_parameter(name, val);
       for (auto step : this->steps)
         step->apply(vector, cc);
     }
   }
 
   private:
+  std::string name;
   int iterations;
   double start, end;
 };
 
 
-template<typename Vector, typename ValueType>
+template<typename Vector>
 class DiscreteVariationTransitionStep
-  : public VariationTransitionStepBase<Vector, ValueType>
+  : public VariationTransitionStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
 
-  DiscreteVariationTransitionStep(std::vector<ValueType> values)
-    : VariationTransitionStepBase<Vector, ValueType>(), values(values)
+  DiscreteVariationTransitionStep(std::string name, std::vector<typename Base::Parameter> values)
+    : name(name)
+    , values(values)
   {}
 
   virtual ~DiscreteVariationTransitionStep() {}
@@ -133,14 +95,15 @@ class DiscreteVariationTransitionStep
   {
     for (auto val: values)
     {
-      this->update_transition_value(val);
+      this->update_parameter(name, val);
       for (auto step : this->steps)
         step->apply(vector, cc);
     }
   }
 
   private:
-  std::vector<ValueType> values;
+  std::string name;
+  std::vector<typename Base::Parameter> values;
 };
 
 #endif

@@ -286,7 +286,7 @@ def generate_cell_mesh(config, gmshexec="gmsh"):
         filename = vtkconfig.get("filename", config.get("filename"))
         filename = "{}.vtk".format(os.path.splitext(config.get("filename"))[0])
         # This throws a warning, but the physical groups only work in ASCII mode
-        meshio.write(filename, mesh, write_binary=False)
+        meshio.write(filename, mesh, file_format="vtk_ascii")
 
 
 def entrypoint_generate_mesh():

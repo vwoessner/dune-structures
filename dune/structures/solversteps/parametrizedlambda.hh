@@ -8,72 +8,76 @@
 #include<tuple>
 
 
-template<typename Signature, typename... Params>
+template<typename Signature, typename Param>
 class ParametrizedLambda
 {};
 
 
-template<typename Range, typename... Arguments, typename... Params>
-class ParametrizedLambda<Range(Arguments...), Params...>
+template<typename Range, typename... Arguments, typename Param>
+class ParametrizedLambda<Range(Arguments...), Param>
 {
   public:
+//  ParametrizedLambda(const ParametrizedLambda&) = delete;
 
   template<typename FUNC>
   ParametrizedLambda(const FUNC& func)
-    : params(std::make_shared<std::tuple<Params...>>()), func(func)
+    : param(std::make_shared<Param>())
+    , func(func)
   {}
 
   Range operator()(const Arguments&... args) const
   {
-    return std::apply(func, std::tuple_cat(std::make_tuple(args...), *params));
+    return func(args..., *param);
   }
 
-  void set_parameters(const Params&... p)
+  void set_parameter(Param p)
   {
-    *params = std::make_tuple(p...);
-  }
-
-  template<std::size_t pos>
-  void set_parameter(typename std::tuple_element<pos, std::tuple<Params...>>::type p)
-  {
-    std::get<pos>(*params) = p;
+    *param = p;
   }
 
   private:
-  std::shared_ptr<std::tuple<Params...>> params;
-  std::function<Range(Arguments..., Params...)> func;
+  std::shared_ptr<Param> param;
+  std::function<Range(Arguments..., Param)> func;
 };
 
 
-template<typename WrappedStep, typename... Params>
-class ParametrizedLambdaVariationTransitionStepBase
-  : public ParametrizedTransitionStepBase<typename WrappedStep::Base::Vector, Params...>
+template<typename Step>
+struct PFuncMixin
 {
+  using Base = TransitionSolverStepBase<typename Step::Base::Vector>;
+  using FunctionSignature = typename Step::FunctionSignature;
+  std::shared_ptr<ParametrizedLambda<FunctionSignature, typename Base::Parameter>> pfunc;
+};
+
+
+template<typename Step>
+class ParametrizedLambdaVariationTransitionStepBase
+  : public PFuncMixin<Step>,
+    public WrapperStep<typename Step::Base::Vector>
+{
+  using PFuncMixin<Step>::pfunc;
+
   public:
-  using Base = TransitionSolverStepBase<typename WrappedStep::Base::Vector>;
-  using FunctionSignature = typename WrappedStep::FunctionSignature;
+  using Base = TransitionSolverStepBase<typename Step::Base::Vector>;
+  using FunctionSignature = typename Step::FunctionSignature;
 
   template<typename FUNC>
-  ParametrizedLambdaVariationTransitionStepBase(FUNC func)
-    : pfunc(func),
-      step(std::make_shared<WrappedStep>(pfunc))
+  ParametrizedLambdaVariationTransitionStepBase(std::string name, const FUNC& func)
+    : PFuncMixin<Step>{std::make_shared<ParametrizedLambda<FunctionSignature, typename Base::Parameter>>(func)}
+    , WrapperStep<typename Base::Vector>(std::make_shared<Step>(ParametrizedLambda<FunctionSignature, typename Base::Parameter>(*pfunc)))
+    , myname(name)
   {}
 
   virtual ~ParametrizedLambdaVariationTransitionStepBase() {}
 
-  virtual void update_transition_value(Params... params) override
+  virtual void update_parameter(std::string name, typename Base::Parameter param) override
   {
-    pfunc.set_parameters(params...);
-  }
-
-  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
-  {
-    step->apply(vector, cc);
+    if (name == myname)
+      pfunc->set_parameter(param);
   }
 
   private:
-  ParametrizedLambda<FunctionSignature, Params...> pfunc;
-  std::shared_ptr<TransitionSolverStepBase<typename Base::Vector>> step;
+  std::string myname;
 };
 
 #endif

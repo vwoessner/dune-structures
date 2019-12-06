@@ -3,7 +3,7 @@ from dune.structures import *
 material = []
 
 material.append(LinearMaterial())
-#material.append(NeoHookeanMaterial())
+material.append(NeoHookeanMaterial())
 #material = LinearMaterial()
 #material = NeoHookeanMaterial()
 #material = MooneyRivlinMaterial()
