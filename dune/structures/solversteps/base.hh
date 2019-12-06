@@ -102,14 +102,14 @@ class StepCollectionStep
 };
 
 
-template<typename Vector, template<typename> typename BaseT=TransitionSolverStepBase>
+template<typename Vector, typename BaseT=TransitionSolverStepBase<Vector>>
 class WrapperStep
   : public TransitionSolverStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
 
-  WrapperStep(std::shared_ptr<BaseT<Vector>> step)
+  WrapperStep(std::shared_ptr<BaseT> step)
     : step(step)
   {}
 
@@ -136,7 +136,7 @@ class WrapperStep
   }
 
   protected:
-  std::shared_ptr<BaseT<Vector>> step;
+  std::shared_ptr<BaseT> step;
 };
 
 #endif

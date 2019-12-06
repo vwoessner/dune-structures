@@ -43,7 +43,9 @@ class OneStepMethodStep
   using OneStepMethod = Dune::PDELab::OneStepMethod<double, InstationaryGridOperator, NewtonSolver, Vector>;
 
   OneStepMethodStep()
-    : theta(1.0)
+    : theta(std::make_shared<Dune::PDELab::OneStepThetaParameter<double>>(1.0))
+    , time(0.0)
+    , timestep(0.0)
   {}
 
   virtual ~OneStepMethodStep() {}
@@ -54,17 +56,32 @@ class OneStepMethodStep
     Dune::PDELab::ISTL::BCRSMatrixBackend<> mb(21);
     sgo = std::make_shared<SpatialGridOperator>(*gfs, *cc, *gfs, *cc, *slop, mb);
     tgo = std::make_shared<TemporalGridOperator>(*gfs, *cc, *gfs, *cc, *tlop, mb);
+    igo = std::make_shared<InstationaryGridOperator>(*sgo, *tgo);
 
     linearsolver = std::make_shared<LinearSolver>(0);
     newton = std::make_shared<NewtonSolver>(*igo, *vector, *linearsolver);
     newton->setVerbosityLevel(2);
 
-    onestepmethod = std::make_shared<OneStepMethod>(theta, *igo, *newton);
+    swapvector = std::make_shared<Vector>(*vector);
+
+    onestepmethod = std::make_shared<OneStepMethod>(*theta, *igo, *newton);
   }
 
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
-//    onestepmethod->apply(vector);
+    onestepmethod->apply(time, timestep, *vector, *swapvector);
+    vector.swap(swapvector);
+  }
+
+  virtual void update_parameter(std::string name, typename Base::Parameter param) override
+  {
+    if (name == "time")
+    {
+      time = std::get<double>(param);
+      igo->setTime(time);
+    }
+    if (name == "timestep")
+      timestep = std::get<double>(param);
   }
 
   void set_spatial_localoperator(std::shared_ptr<SLOP> lop)
@@ -86,7 +103,12 @@ class OneStepMethodStep
   std::shared_ptr<LinearSolver> linearsolver;
   std::shared_ptr<NewtonSolver> newton;
   std::shared_ptr<OneStepMethod> onestepmethod;
-  Dune::PDELab::OneStepThetaParameter<double> theta;
+  std::shared_ptr<Dune::PDELab::OneStepThetaParameter<double>> theta;
+
+  private:
+  std::shared_ptr<Vector> swapvector;
+  double time;
+  double timestep;
 };
 
 
@@ -109,10 +131,12 @@ class InstationarySolverStep
 
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
+    std::cout << "Starting time stepping loop" << std::endl;
     double time = 0.0;
     while (time < Tend)
     {
       this->update_parameter("time", time);
+      this->update_parameter("timestep", dt);
 
       // Apply the solver
       for (auto step : this->steps)

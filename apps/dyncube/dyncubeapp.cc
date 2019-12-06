@@ -57,7 +57,11 @@ int main(int argc, char** argv)
   TransitionSolver<V> solver;
   solver.add(interpolation);
   solver.add(constraints);
-  solver.add(elastodyn);
+
+  InstationarySolverStep<V> instat(0.1, 1.0);
+  instat.add(elastodyn);
+
+  solver.add(instat);
 
   solver.apply(x, cc);
 

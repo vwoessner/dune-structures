@@ -51,14 +51,14 @@ class MaterialDependantStepBase
 
 template<typename Vector>
 class ParametrizedMaterialStepBase
-  : public WrapperStep<Vector, MaterialDependantStepBase>
+  : public WrapperStep<Vector, MaterialDependantStepBase<Vector>>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
 
   ParametrizedMaterialStepBase(std::shared_ptr<MaterialDependantStepBase<Vector>> step,
                                std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator)
-    : WrapperStep<Vector, MaterialDependantStepBase>(step)
+    : WrapperStep<Vector, MaterialDependantStepBase<Vector>>(step)
     , modificator(modificator)
   {}
 

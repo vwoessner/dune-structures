@@ -14,6 +14,9 @@
 template<typename Vector>
 class ElasticitySolverStep
   : public MaterialDependantStepBase<Vector>
+  , public WrapperStep<Vector,
+                       NewtonSolverTransitionStep<Vector, ElasticityOperator<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
+                                                                             typename TransitionSolverStepBase<Vector>::GridFunctionSpace>>>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
@@ -25,7 +28,7 @@ class ElasticitySolverStep
                        const Dune::ParameterTree& rootparams
                        )
     : MaterialDependantStepBase<Vector>(es, physical, rootparams.sub("material"))
-    , newton_step(std::make_shared<NewtonSolverTransitionStep<Vector, LocalOperator>>())
+    , WrapperStep<Vector, NewtonSolverTransitionStep<Vector, LocalOperator>>(std::make_shared<NewtonSolverTransitionStep<Vector, LocalOperator>>())
     , params(rootparams)
   {}
 
@@ -34,22 +37,11 @@ class ElasticitySolverStep
   virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     auto gfs = vector->gridFunctionSpaceStorage();
-    newton_step->set_localoperator(std::make_shared<LocalOperator>(*gfs, *gfs, params, this->material));
-    newton_step->pre(vector, cc);
-  }
-
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
-  {
-    newton_step->apply(vector, cc);
-  }
-
-  virtual void post(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
-  {
-    newton_step->post(vector, cc);
+    this->step->set_localoperator(std::make_shared<LocalOperator>(*gfs, *gfs, params, this->material));
+    this->step->pre(vector, cc);
   }
 
   private:
-  std::shared_ptr<NewtonSolverTransitionStep<Vector, LocalOperator>> newton_step;
   Dune::ParameterTree params;
 };
 
