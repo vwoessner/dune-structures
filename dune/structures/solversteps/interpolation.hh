@@ -4,6 +4,8 @@
 #include<dune/pdelab.hh>
 #include<dune/pdelab/gridfunctionspace/tags.hh>
 #include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/parametrizedlambda.hh>
+#include<dune/structures/timecapsule.hh>
 #include<dune/typetree/simpletransformationdescriptors.hh>
 #include<dune/typetree/utility.hh>
 
@@ -101,5 +103,70 @@ class InterpolationTransitionStep
              > funcs;
 };
 
+
+template<typename SourceNode, typename Transformation>
+struct InstationaryInterpolationLeafNodeTransformation
+{
+  static const bool recursive = false;
+
+  typedef decltype(Dune::PDELab::makeInstationaryGridFunctionFromCallable(std::declval<SourceNode>().gridView(),
+                                                                          std::declval<typename Transformation::Function>(),
+                                                                          std::declval<TimeCapsule<double>&>()
+                                                                          )
+                   ) transformed_type;
+
+  typedef std::shared_ptr<transformed_type> transformed_storage_type;
+
+  static transformed_type transform(const SourceNode& s, Transformation& t)
+  {
+    return Dune::PDELab::makeInstationaryGridFunctionFromCallable(s.gridView(), t.lambdas[t.offset++], t.tc);
+  }
+
+  static transformed_storage_type transform_storage(std::shared_ptr<const SourceNode> s, Transformation& t)
+  {
+    return std::make_shared<transformed_type>(Dune::PDELab::makeInstationaryGridFunctionFromCallable(s->gridView(), t.lambdas[t.offset++], t.tc));
+  }
+};
+
+
+template<typename RootGFS>
+struct GFStoInstationaryGFTransformation
+{
+  using Function = std::function<double(typename RootGFS::Traits::GridViewType::template Codim<0>::Entity::Geometry::GlobalCoordinate)>;
+  using FunctionArray = std::array<Function, Dune::TypeTree::TreeInfo<RootGFS>::leafCount>;
+
+  GFStoInstationaryGFTransformation(TimeCapsule<double>& tc, FunctionArray lambdas)
+    : tc(tc), offset(0), lambdas(lambdas)
+  {}
+
+  TimeCapsule<double>& tc;
+  int offset;
+  FunctionArray lambdas;
+};
+
+
+template<typename GFS, typename RootGFS>
+InstationaryInterpolationLeafNodeTransformation<GFS, GFStoInstationaryGFTransformation<RootGFS>>
+registerNodeTransformation(GFS* gfs, GFStoInstationaryGFTransformation<RootGFS>* t, Dune::PDELab::LeafGridFunctionSpaceTag* tag);
+
+template<typename GFS, typename RootGFS>
+Dune::TypeTree::SimplePowerNodeTransformation<GFS, GFStoInstationaryGFTransformation<RootGFS>, Dune::PDELab::PowerGridFunction>
+registerNodeTransformation(GFS* gfs, GFStoInstationaryGFTransformation<RootGFS>* t, Dune::PDELab::PowerGridFunctionSpaceTag* tag);
+
+template<typename GFS, typename RootGFS>
+Dune::TypeTree::SimpleCompositeNodeTransformation<GFS, GFStoInstationaryGFTransformation<RootGFS>, Dune::PDELab::CompositeGridFunction>
+registerNodeTransformation(GFS* gfs, GFStoInstationaryGFTransformation<RootGFS>* t, Dune::PDELab::CompositeGridFunctionSpaceTag* tag);
+
+
+template<typename GFS, typename FunctionSignature>
+auto build_instationary_gridfunction(TimeCapsule<double>& tc,
+                                     const GFS& gfs,
+                                     std::array<std::function<FunctionSignature>,
+                                                Dune::TypeTree::TreeInfo<GFS>::leafCount>& funcs)
+{
+  using Trafo = GFStoInstationaryGFTransformation<GFS>;
+  Trafo trafo(tc, funcs);
+  return Dune::TypeTree::TransformTree<GFS, Trafo>::transform(gfs, trafo);
+}
 
 #endif

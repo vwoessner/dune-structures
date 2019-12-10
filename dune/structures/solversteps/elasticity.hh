@@ -49,6 +49,12 @@ class ElasticitySolverStep
 template<typename Vector>
 class ElastoDynamicsSolverStep
   : public MaterialDependantStepBase<Vector>
+  , public WrapperStep<Vector, OneStepMethodStep<Vector,
+                                         ElastoDynamicsSpatialOperator<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
+                                                                       typename TransitionSolverStepBase<Vector>::GridFunctionSpace>,
+                                         ElastoDynamicsTemporalOperator<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
+                                                                        typename TransitionSolverStepBase<Vector>::GridFunctionSpace>
+                                         >>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
@@ -63,8 +69,19 @@ class ElastoDynamicsSolverStep
                            std::shared_ptr<std::vector<int>> physical,
                            const Dune::ParameterTree& rootparams)
     : MaterialDependantStepBase<Vector>(es, physical, rootparams.sub("material"))
-    , onestepmethod_step(std::make_shared<OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>())
+    , WrapperStep<Vector, OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>(std::make_shared<OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>())
     , params(rootparams)
+  {}
+
+  template<typename... FUNCS>
+  ElastoDynamicsSolverStep(typename Base::EntitySet es,
+                           std::shared_ptr<std::vector<int>> physical,
+                           const Dune::ParameterTree& rootparams,
+                           TimeCapsule<double>& tc,
+                           const FUNCS&... funcs)
+      : MaterialDependantStepBase<Vector>(es, physical, rootparams.sub("material"))
+      , WrapperStep<Vector, OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>(std::make_shared<VariableBoundaryOneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>(tc, funcs...))
+      , params(rootparams)
   {}
 
   virtual ~ElastoDynamicsSolverStep() {}
@@ -72,23 +89,17 @@ class ElastoDynamicsSolverStep
   virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     auto& gfs = vector->gridFunctionSpace();
-    onestepmethod_step->set_spatial_localoperator(std::make_shared<SpatialLocalOperator>(gfs, gfs, params, this->material));
-    onestepmethod_step->set_temporal_localoperator(std::make_shared<TemporalLocalOperator>(gfs, gfs, params));
-    onestepmethod_step->pre(vector, cc);
+    this->step->set_spatial_localoperator(std::make_shared<SpatialLocalOperator>(gfs, gfs, params, this->material));
+    this->step->set_temporal_localoperator(std::make_shared<TemporalLocalOperator>(gfs, gfs, params));
+    this->step->pre(vector, cc);
   }
 
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
-    onestepmethod_step->apply(vector, cc);
-  }
-
-  virtual void post(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
-  {
-    onestepmethod_step->post(vector, cc);
+    this->step->apply(vector, cc);
   }
 
   private:
-  std::shared_ptr<OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>> onestepmethod_step;
   Dune::ParameterTree params;
 };
 

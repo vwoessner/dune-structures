@@ -4,6 +4,7 @@
 #include<dune/common/parametertree.hh>
 #include<dune/pdelab.hh>
 #include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/interpolation.hh>
 #include<dune/structures/solversteps/newton.hh>
 #include<dune/structures/solversteps/variation.hh>
 
@@ -69,6 +70,7 @@ class OneStepMethodStep
 
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
+    std::cout << "Applying the one step method" << std::endl;
     onestepmethod->apply(time, timestep, *vector, *swapvector);
     vector.swap(swapvector);
   }
@@ -76,10 +78,7 @@ class OneStepMethodStep
   virtual void update_parameter(std::string name, typename Base::Parameter param) override
   {
     if (name == "time")
-    {
       time = std::get<double>(param);
-      igo->setTime(time);
-    }
     if (name == "timestep")
       timestep = std::get<double>(param);
   }
@@ -104,27 +103,71 @@ class OneStepMethodStep
   std::shared_ptr<NewtonSolver> newton;
   std::shared_ptr<OneStepMethod> onestepmethod;
   std::shared_ptr<Dune::PDELab::OneStepThetaParameter<double>> theta;
-
-  private:
   std::shared_ptr<Vector> swapvector;
   double time;
   double timestep;
 };
 
 
+template<typename Vector, typename SLOP, typename TLOP>
+class VariableBoundaryOneStepMethodStep
+  : public OneStepMethodStep<Vector, SLOP, TLOP>
+{
+  public:
+  using Base = TransitionSolverStepBase<Vector>;
+  using FunctionSignature = typename Base::Range(typename Base::GlobalCoordinate);
+
+  VariableBoundaryOneStepMethodStep(TimeCapsule<double>& tc, std::function<FunctionSignature> singlefunc)
+    : tc(tc)
+  {
+    funcs.fill(singlefunc);
+  }
+
+  template<typename... FUNCS,
+           typename std::enable_if<Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount == sizeof...(FUNCS), int>::type = 0>
+  VariableBoundaryOneStepMethodStep(TimeCapsule<double>& tc, FUNCS... funcs)
+    : tc(tc)
+    , funcs{funcs...}
+  {}
+
+  virtual ~VariableBoundaryOneStepMethodStep() {}
+
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  {
+    auto& gfs = vector->gridFunctionSpace();
+    auto func = build_instationary_gridfunction(tc, gfs, funcs);
+
+    this->onestepmethod->apply(this->time, this->timestep, *vector, func, *this->swapvector);
+    vector.swap(this->swapvector);
+  }
+
+  private:
+  // We need a reference of the time capsule...
+  TimeCapsule<double>& tc;
+
+  // Store the lambdas
+  std::array<std::function<FunctionSignature>,
+             Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount
+             > funcs;
+};
+
+
 template<typename Vector>
 class InstationarySolverStep
-  : public StepCollectionStep<Vector>
+  : public ContinuousVariationTransitionStep<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
 
   InstationarySolverStep(const Dune::ParameterTree& config)
-    : dt(config.get<double>("dt")), Tend(config.get<double>("Tend"))
+    : ContinuousVariationTransitionStep<Vector>("time")
+    , dt(config.get<double>("dt"))
+    , Tend(config.get<double>("Tend"))
   {}
 
   InstationarySolverStep(double dt, double Tend)
-    : dt(dt), Tend(Tend)
+    : ContinuousVariationTransitionStep<Vector>("time")
+    , dt(dt), Tend(Tend - 1e-8)
   {}
 
   virtual ~InstationarySolverStep() {}
@@ -137,6 +180,7 @@ class InstationarySolverStep
     {
       this->update_parameter("time", time);
       this->update_parameter("timestep", dt);
+      std::cout << "Performing time step " << time << " -> " << time + dt  << " with " << this->steps.size() << " steps" << std::endl;
 
       // Apply the solver
       for (auto step : this->steps)

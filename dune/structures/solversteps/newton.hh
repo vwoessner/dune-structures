@@ -2,7 +2,6 @@
 #define DUNE_STRUCTURES_SOLVERSTEPS_NEWTON_HH
 
 #include<dune/pdelab.hh>
-#include<dune/structures/onetoone.hh>
 #include<dune/structures/solversteps/base.hh>
 
 
