@@ -3,6 +3,7 @@
 
 #include<dune/common/parametertree.hh>
 #include<dune/pdelab.hh>
+#include<dune/structures/callableadapters.hh>
 #include<dune/structures/solversteps/base.hh>
 #include<dune/structures/solversteps/interpolation.hh>
 #include<dune/structures/solversteps/newton.hh>
@@ -135,7 +136,7 @@ class VariableBoundaryOneStepMethodStep
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
     auto& gfs = vector->gridFunctionSpace();
-    auto func = build_instationary_gridfunction(tc, gfs, funcs);
+    auto func = makeInstationaryGridFunctionTreeFromCallables(tc, gfs, funcs);
 
     this->onestepmethod->apply(this->time, this->timestep, *vector, func, *this->swapvector);
     vector.swap(this->swapvector);
@@ -159,15 +160,9 @@ class InstationarySolverStep
   public:
   using Base = TransitionSolverStepBase<Vector>;
 
-  InstationarySolverStep(const Dune::ParameterTree& config)
+  InstationarySolverStep(double Tstart, double Tend, double dt)
     : ContinuousVariationTransitionStep<Vector>("time")
-    , dt(config.get<double>("dt"))
-    , Tend(config.get<double>("Tend"))
-  {}
-
-  InstationarySolverStep(double dt, double Tend)
-    : ContinuousVariationTransitionStep<Vector>("time")
-    , dt(dt), Tend(Tend - 1e-8)
+    , dt(dt), Tstart(Tstart), Tend(Tend)
   {}
 
   virtual ~InstationarySolverStep() {}
@@ -175,8 +170,8 @@ class InstationarySolverStep
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     std::cout << "Starting time stepping loop" << std::endl;
-    double time = 0.0;
-    while (time < Tend)
+    double time = Tstart;
+    while (time < Tend - 1e-8)
     {
       this->update_parameter("time", time);
       this->update_parameter("timestep", dt);
@@ -192,6 +187,7 @@ class InstationarySolverStep
 
   private:
   double dt;
+  double Tstart;
   double Tend;
 };
 

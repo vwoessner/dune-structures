@@ -34,11 +34,23 @@ class ElasticitySolverStep
 
   virtual ~ElasticitySolverStep() {}
 
+  //TODO: Get rid of this which is necessary because of multiple inheritance
+  virtual void update_parameter(std::string name, typename Base::Parameter param) override
+  {
+    this->step->update_parameter(name, param);
+  }
+
   virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     auto gfs = vector->gridFunctionSpaceStorage();
     this->step->set_localoperator(std::make_shared<LocalOperator>(*gfs, *gfs, params, this->material));
     this->step->pre(vector, cc);
+  }
+
+  //TODO: Get rid of this which is necessary because of multiple inheritance
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  {
+    this->step->apply(vector, cc);
   }
 
   private:
@@ -86,6 +98,12 @@ class ElastoDynamicsSolverStep
 
   virtual ~ElastoDynamicsSolverStep() {}
 
+  //TODO: Get rid of this which is necessary because of multiple inheritance
+  virtual void update_parameter(std::string name, typename Base::Parameter param) override
+  {
+    this->step->update_parameter(name, param);
+  }
+
   virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     auto& gfs = vector->gridFunctionSpace();
@@ -94,6 +112,7 @@ class ElastoDynamicsSolverStep
     this->step->pre(vector, cc);
   }
 
+  //TODO: Get rid of this which is necessary because of multiple inheritance
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     this->step->apply(vector, cc);

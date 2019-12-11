@@ -44,39 +44,54 @@ int main(int argc, char** argv)
   auto [x, cc] = elastodynamics_setup(es);
   using V = std::remove_reference<decltype(*x)>::type;
 
+  TransitionSolver<V> solver;
   TimeCapsule tc;
 
   // Instantiate the material class
   auto material = parse_material<RangeType>(es, physical, params.sub("material"));
 
+  // Interpolation of initial condition
   auto zero = [](auto x) { return 0.0; };
   InterpolationTransitionStep<V> interpolation(zero);
+  solver.add(interpolation);
 
+  // Set up constraints container
   auto clamp = [](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); };
   ConstraintsTransitionStep<V> constraints(clamp);
-
-  ElastoDynamicsSolverStep<V> elastodyn(es, physical, params, tc, [&tc](auto x){ return 0.2 * tc.getTime(); }, zero, zero, [](auto x){ return 0.2;}, zero, zero);
-
-  TransitionSolver<V> solver;
-  solver.add(interpolation);
   solver.add(constraints);
 
-  InstationarySolverStep<V> instat(0.1, 1.0);
-  instat.add(elastodyn);
+  // Set up visualization
+  VisualizationStep<V, true> vis;
+  SolutionVisualizationStep<V, true> vissol;
+  VonMisesStressVisualizationStep<V, true> visvm(material);
+  vis.add(vissol);
+  vis.add(visvm);
 
+  // The time stepper
+  InstationarySolverStep<V> instat(0.0, 1.0, 0.1);
   solver.add(instat);
 
-//  VisualizationStep<V> vis;
-//  SolutionVisualizationStep<V> vissol;
-//  VonMisesStressVisualizationStep<V> visvm(material);
-//  MPIRankVisualizationStep<V> visrank(helper);
-//  PhysicalEntityVisualizationStep<V> visphys(physical);
-//
-//  vis.add(vissol);
-//  vis.add(visvm);
-//  vis.add(visrank);
-//  vis.add(visphys);
+  // Shifting the bottom to the right
+  ElastoDynamicsSolverStep<V> elastodyn(es, physical, params, tc,
+                                        [&tc](auto x){ return 0.2 * x[2] * tc.getTime(); }, zero, zero,
+                                        [](auto x){ return x[2] * 0.2;}, zero, zero);
+  instat.add(elastodyn);
 
+  // Set up released constraints container
+  auto rclamp = [](auto x){ return x[2] < 1e-08; };
+  ConstraintsTransitionStep<V> release_constraints(rclamp);
+  solver.add(release_constraints);
+
+  // The time stepper
+  InstationarySolverStep<V> instat2(1.0, 1.3, 0.001);
+  solver.add(instat2);
+
+  // Shifting the bottom to the right
+  ElastoDynamicsSolverStep<V> elastodyn2(es, physical, params);
+  instat2.add(elastodyn2);
+  instat2.add(vis);
+
+  // Run the thing
   solver.apply(x, cc);
 
   return 0;

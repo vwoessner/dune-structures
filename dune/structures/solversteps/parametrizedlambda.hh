@@ -17,8 +17,6 @@ template<typename Range, typename... Arguments, typename Param>
 class ParametrizedLambda<Range(Arguments...), Param>
 {
   public:
-//  ParametrizedLambda(const ParametrizedLambda&) = delete;
-
   template<typename FUNC>
   ParametrizedLambda(const FUNC& func)
     : param(std::make_shared<Param>())
