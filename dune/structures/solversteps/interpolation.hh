@@ -31,6 +31,12 @@ class InterpolationTransitionStep
   InterpolationTransitionStep(FUNCS... funcs) : funcs{funcs...}
   {}
 
+  InterpolationTransitionStep(const std::array<std::function<FunctionSignature>,
+                                               Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount
+                                               >& funcs)
+    : funcs(funcs)
+  {}
+
   virtual ~InterpolationTransitionStep() {}
 
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override

@@ -9,6 +9,10 @@ set(DUNE_CODEGEN_ADDITIONAL_PYTHON_SOURCES ${DUNE_CODEGEN_ADDITIONAL_PYTHON_SOUR
 # Search for additional packages needed by dune-structures
 find_package(ParMETIS 4)
 find_package(Gmsh)
+find_package(muparser)
+
+dune_register_package_flags(LIBRARIES muparser::muparser)
+
 
 # Implement automatic, CMake-triggered grid generation
 function(dune_structures_mesh_generation)

@@ -21,7 +21,7 @@ int main(int argc, char** argv)
 
   // Parse the ini file
   Dune::ParameterTree params;
-  Dune::ParameterTreeParser::readINITree("dyncubeapp.ini", params);
+  Dune::ParameterTreeParser::readINITree(argv[1], params);
 
   using RangeType = double;
 
@@ -63,9 +63,7 @@ int main(int argc, char** argv)
   // Set up visualization
   VisualizationStep<V, true> vis;
   SolutionVisualizationStep<V, true> vissol;
-  VonMisesStressVisualizationStep<V, true> visvm(material);
   vis.add(vissol);
-  vis.add(visvm);
 
   // The time stepper
   InstationarySolverStep<V> instat(0.0, 1.0, 0.1);

@@ -4,6 +4,7 @@ material = []
 
 material.append(LinearMaterial())
 material.append(NeoHookeanMaterial())
+material.append(StVenantKirchhoffMaterial())
 #material = LinearMaterial()
 #material = NeoHookeanMaterial()
 #material = MooneyRivlinMaterial()
