@@ -9,6 +9,11 @@
 #include<vector>
 
 
+// Forward declaration of the solver class
+template<typename V>
+class TransitionSolver;
+
+
 template<typename V>
 class TransitionSolverStepBase
 {
@@ -26,12 +31,19 @@ class TransitionSolverStepBase
   using Range = typename Vector::field_type;
   using ConstraintsContainer = typename GridFunctionSpace::template ConstraintsContainer<Range>::Type;
   using VectorBackend = typename GridFunctionSpace::Traits::Backend;
+  using Solver = TransitionSolver<V>;
 
   // The possible types for parametrization of solver steps
-  using Parameter = std::variant<bool, double, int, std::string>;
+  using Material = MaterialCollection<typename Base::EntitySet, double>;
+  using Parameter = std::variant<bool, double, int, std::string, std::shared_ptr<Material>, Dune::ParameterTree>;
 
   // The virtual interface - pretty simple
   virtual ~TransitionSolverStepBase() {}
+
+  virtual void set_solver(std::shared_ptr<Solver> solver_)
+  {
+    solver = solver_;
+  }
 
   virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<ConstraintsContainer> cc)
   {}
@@ -44,6 +56,9 @@ class TransitionSolverStepBase
 
   virtual void update_parameter(std::string name, Parameter param)
   {}
+
+  protected:
+  std::shared_ptr<Solver> solver;
 };
 
 
@@ -59,6 +74,13 @@ class StepCollectionStep
   {}
 
   virtual ~StepCollectionStep() {}
+
+  virtual void set_solver(std::shared_ptr<typename Base::Solver> solver_) override
+  {
+    this->solver = solver_;
+    for (auto step : steps)
+      step->set_solver(solver_);
+  }
 
   virtual void update_parameter(std::string name, typename Base::Parameter param) override
   {
@@ -89,6 +111,7 @@ class StepCollectionStep
   void add(std::shared_ptr<STEP> step)
   {
     steps.push_back(step);
+    step->set_solver(this->solver);
   }
 
   template<typename STEP>
@@ -114,6 +137,12 @@ class WrapperStep
   {}
 
   virtual ~WrapperStep() {}
+
+  virtual void set_solver(std::shared_ptr<typename Base::Solver> solver_) override
+  {
+    this->solver = solver_;
+    this->step->set_solver(solver_);
+  }
 
   virtual void update_parameter(std::string name, typename Base::Parameter param) override
   {

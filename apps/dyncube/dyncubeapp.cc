@@ -6,7 +6,6 @@
 #include<dune/structures/elasticity.hh>
 #include<dune/structures/material.hh>
 #include<dune/structures/onetoone.hh>
-#include<dune/structures/timecapsule.hh>
 #include<dune/structures/transitionsolver.hh>
 #include<dune/structures/vonmises.hh>
 #include<dune/structures/visualization.hh>
@@ -45,10 +44,10 @@ int main(int argc, char** argv)
   using V = std::remove_reference<decltype(*x)>::type;
 
   TransitionSolver<V> solver;
-  TimeCapsule tc;
 
-  // Instantiate the material class
-  auto material = parse_material<RangeType>(es, physical, params.sub("material"));
+  // Instantiate the material
+  MaterialInitialization<V> material(es, physical, params.sub("material"));
+  solver.add(material);
 
   // Interpolation of initial condition
   auto zero = [](auto x) { return 0.0; };
@@ -70,8 +69,8 @@ int main(int argc, char** argv)
   solver.add(instat);
 
   // Shifting the bottom to the right
-  ElastoDynamicsSolverStep<V> elastodyn(es, physical, params, tc,
-                                        [&tc](auto x){ return 0.2 * x[2] * tc.getTime(); }, zero, zero,
+  ElastoDynamicsSolverStep<V> elastodyn(params,
+                                        [&solver](auto x){ return 0.2 * x[2] * solver.param<double>("time"); }, zero, zero,
                                         [](auto x){ return x[2] * 0.2;}, zero, zero);
   instat.add(elastodyn);
 
@@ -85,7 +84,7 @@ int main(int argc, char** argv)
   solver.add(instat2);
 
   // Shifting the bottom to the right
-  ElastoDynamicsSolverStep<V> elastodyn2(es, physical, params);
+  ElastoDynamicsSolverStep<V> elastodyn2(params);
   instat2.add(elastodyn2);
   instat2.add(vis);
 

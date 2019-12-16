@@ -84,9 +84,19 @@ class OneStepMethodStep
       timestep = std::get<double>(param);
   }
 
+  std::shared_ptr<SLOP> get_spatial_localoperator()
+  {
+    return slop;
+  }
+
   void set_spatial_localoperator(std::shared_ptr<SLOP> lop)
   {
     slop = lop;
+  }
+
+  std::shared_ptr<TLOP> get_temporal_localoperator()
+  {
+    return tlop;
   }
 
   void set_temporal_localoperator(std::shared_ptr<TLOP> lop)
@@ -118,17 +128,15 @@ class VariableBoundaryOneStepMethodStep
   using Base = TransitionSolverStepBase<Vector>;
   using FunctionSignature = typename Base::Range(typename Base::GlobalCoordinate);
 
-  VariableBoundaryOneStepMethodStep(TimeCapsule<double>& tc, std::function<FunctionSignature> singlefunc)
-    : tc(tc)
+  VariableBoundaryOneStepMethodStep(std::function<FunctionSignature> singlefunc)
   {
     funcs.fill(singlefunc);
   }
 
   template<typename... FUNCS,
            typename std::enable_if<Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount == sizeof...(FUNCS), int>::type = 0>
-  VariableBoundaryOneStepMethodStep(TimeCapsule<double>& tc, FUNCS... funcs)
-    : tc(tc)
-    , funcs{funcs...}
+  VariableBoundaryOneStepMethodStep(FUNCS... funcs)
+    : funcs{funcs...}
   {}
 
   virtual ~VariableBoundaryOneStepMethodStep() {}
@@ -136,16 +144,13 @@ class VariableBoundaryOneStepMethodStep
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
     auto& gfs = vector->gridFunctionSpace();
-    auto func = makeInstationaryGridFunctionTreeFromCallables(tc, gfs, funcs);
+    auto func = makeInstationaryGridFunctionTreeFromCallables(*this->solver, gfs, funcs);
 
     this->onestepmethod->apply(this->time, this->timestep, *vector, func, *this->swapvector);
     vector.swap(this->swapvector);
   }
 
   private:
-  // We need a reference of the time capsule...
-  TimeCapsule<double>& tc;
-
   // Store the lambdas
   std::array<std::function<FunctionSignature>,
              Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount
@@ -166,6 +171,13 @@ class InstationarySolverStep
   {}
 
   virtual ~InstationarySolverStep() {}
+
+  virtual void set_solver(std::shared_ptr<typename Base::Solver> solver_)
+  {
+    this->solver = solver_;
+    this->solver->update_parameter("time", Tstart);
+    this->solver->update_parameter("timestep", dt);
+  }
 
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {

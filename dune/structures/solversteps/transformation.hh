@@ -4,7 +4,6 @@
 
 #include<dune/pdelab.hh>
 #include<dune/structures/solversteps/base.hh>
-#include<dune/structures/solversteps/parametrizedlambda.hh>
 
 #include<functional>
 
@@ -76,9 +75,5 @@ class TransformationTransitionStep : public TransitionSolverStepBase<Vector>
   private:
   std::function<FunctionSignature> func;
 };
-
-
-template<typename Vector>
-using ParametrizedTransformationTransitionStep = ParametrizedLambdaVariationTransitionStepBase<TransformationTransitionStep<Vector>>;
 
 #endif

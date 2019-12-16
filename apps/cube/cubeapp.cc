@@ -45,9 +45,9 @@ int main(int argc, char** argv)
   auto [x, cc] = elasticity_setup(es);
   using V = std::remove_reference<decltype(*x)>::type;
 
-  // Instantiate the material class
-  auto material = parse_material<RangeType>(es, physical, params.sub("material"));
+  TransitionSolver<V> solver;
 
+  MaterialInitialization<V> material(es, physical, params.sub("material"));
   ConstraintsTransitionStep<V> constraints([](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); });
   OneToOneMappingChecker<V> onetoone;
 
@@ -55,7 +55,7 @@ int main(int argc, char** argv)
   SolutionVisualizationStep<V> vissol;
   MPIRankVisualizationStep<V> visrank(helper);
   PhysicalEntityVisualizationStep<V> visphys(physical);
-  VonMisesStressVisualizationStep<V> visvm(material);
+  VonMisesStressVisualizationStep<V> visvm;
 
   vis.add(vissol);
   vis.add(visrank);
@@ -66,15 +66,14 @@ int main(int argc, char** argv)
   if (method)
   {
     std::cout << "Attempting to solve with incremental compression" << std::endl;
-    ElasticitySolverStep<V> elasticity(es, physical, params);
+    ElasticitySolverStep<V> elasticity(params);
 
     InterpolationTransitionStep<V> interpolation([](auto x) { return 0.0; });
     double maxdispl = params.get<double>("model.compression");
-    ParametrizedTransformationTransitionStep<V> trafo(
-            "compression",
-            [maxdispl](auto u, auto x, auto p)
+    TransformationTransitionStep<V> trafo(
+            [maxdispl, &solver](auto u, auto x)
             {
-              u[2] = - std::get<double>(p) * (1.0 - maxdispl) * x[2];
+              u[2] = - solver.param<double>("compression") * (1.0 - maxdispl) * x[2];
               return u;
             });
 
@@ -83,7 +82,7 @@ int main(int argc, char** argv)
     compress.add(elasticity);
     compress.add(onetoone);
 
-    TransitionSolver<V> solver;
+    solver.add(material);
     solver.add(interpolation);
     solver.add(constraints);
     solver.add(compress);
@@ -94,18 +93,20 @@ int main(int argc, char** argv)
   else
   {
     std::cout << "Attempting to solve through linearization" << std::endl;
-    ElasticitySolverStep<V> elasticity(es, physical, params);
+    ElasticitySolverStep<V> elasticity(params);
 
     double maxdispl = params.get<double>("model.compression");
     InterpolationTransitionStep<V> interpolation([](auto x) { return 0.0; },
                                                  [](auto x) { return 0.0; },
                                                  [maxdispl](auto x) { return - (1.0 - maxdispl) * x[2]; });
 
-    DiscreteMaterialVariationTransitionStep<V> solve([](auto &c, auto p) { c["cube.model"] = std::get<std::string>(p); },
-                                                     {"linear"s, "neohookean"s});
+    DiscreteMaterialVariationTransitionStep<V> solve("compression",
+                                                     [](auto &c, auto p) { c["cube.model"] = std::get<std::string>(p); },
+                                                     {"linear"s, "stvenantkirchhoff"s});
     solve.add(elasticity);
 
     TransitionSolver<V> solver;
+    solver.add(material);
     solver.add(interpolation);
     solver.add(constraints);
     solver.add(solve);

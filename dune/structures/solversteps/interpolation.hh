@@ -5,8 +5,6 @@
 #include<dune/pdelab/gridfunctionspace/tags.hh>
 #include<dune/structures/callableadapters.hh>
 #include<dune/structures/solversteps/base.hh>
-#include<dune/structures/solversteps/parametrizedlambda.hh>
-#include<dune/structures/timecapsule.hh>
 #include<dune/typetree/simpletransformationdescriptors.hh>
 #include<dune/typetree/utility.hh>
 

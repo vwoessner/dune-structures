@@ -10,41 +10,9 @@
 #include<type_traits>
 
 
-// Forward declarations
-template<typename Vector>
-class ParametrizedMaterialStepBase;
-
-template<typename Vector>
-class MaterialDependantStepBase;
-
-
-template<typename Vector>
-class VariationTransitionStepBase
-  : public StepCollectionStep<Vector>
-{
-  public:
-  using Base = TransitionSolverStepBase<Vector>;
-
-  template<typename STEP>
-  void add(std::shared_ptr<STEP> step)
-  {
-    if constexpr (std::is_convertible<STEP*, MaterialDependantStepBase<Vector>*>::value)
-      this->steps.push_back(std::make_shared<ParametrizedMaterialStepBase<Vector>>(step, [](auto& c, auto p) { return c; } ));
-    else
-      this->steps.push_back(step);
-  }
-
-  template<typename STEP>
-  void add(STEP& step)
-  {
-    add(Dune::stackobject_to_shared_ptr(step));
-  }
-};
-
-
 template<typename Vector>
 class ContinuousVariationTransitionStep
-  : public VariationTransitionStepBase<Vector>
+  : public StepCollectionStep<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
@@ -64,7 +32,7 @@ class ContinuousVariationTransitionStep
     for (int i=0; i<iterations; ++i)
     {
       val += (end - start) / iterations;
-      this->update_parameter(name, val);
+      this->solver->update_parameter(name, val);
       for (auto step : this->steps)
         step->apply(vector, cc);
     }
@@ -79,7 +47,7 @@ class ContinuousVariationTransitionStep
 
 template<typename Vector>
 class DiscreteVariationTransitionStep
-  : public VariationTransitionStepBase<Vector>
+  : public StepCollectionStep<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
@@ -95,7 +63,7 @@ class DiscreteVariationTransitionStep
   {
     for (auto val: values)
     {
-      this->update_parameter(name, val);
+      this->solver->update_parameter(name, val);
       for (auto step : this->steps)
         step->apply(vector, cc);
     }

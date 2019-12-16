@@ -21,7 +21,7 @@ class VonMisesStressGridFunction
   private:
   using DisplacementFunction = Dune::PDELab::VectorDiscreteGridFunction<typename Container::GridFunctionSpace, Container>;
   using DisplacementFunctionGradient = Dune::PDELab::VectorDiscreteGridFunctionGradient<typename Container::GridFunctionSpace, Container>;
-  using Material = ElasticMaterialBase<typename Container::GridFunctionSpace::Traits::EntitySet, typename Container::field_type>;
+  using Material = MaterialCollection<typename Container::GridFunctionSpace::Traits::EntitySet, typename Container::field_type>;
 
   public:
   using Traits = Dune::PDELab::GridFunctionTraits<

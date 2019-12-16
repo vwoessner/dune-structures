@@ -84,6 +84,9 @@ class VisualizationStep
   {
     if (name == "time")
       time = std::get<double>(param);
+
+    for (auto step : this->steps)
+      step->update_parameter(name, param);
   }
 
   virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
@@ -241,18 +244,20 @@ class VonMisesStressVisualizationStep
   public:
   using Base = TransitionSolverStepBase<Vector>;
 
-  VonMisesStressVisualizationStep(std::shared_ptr<ElasticMaterialBase<typename Base::EntitySet, typename Base::Range>> material)
-    : material(material)
-  {}
-
   virtual ~VonMisesStressVisualizationStep() {}
+
+  virtual void update_parameter(std::string name, typename Base::Parameter param) override
+  {
+    if (name == "material")
+      material = std::get<std::shared_ptr<typename Base::Material>>(param);
+  }
 
   virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
     auto es = vector->gridFunctionSpace().entitySet();
 
     // A grid function for the stress
-    VonMisesStressGridFunction stress(*vector, material);
+    VonMisesStressGridFunction<Vector> stress(*vector, material);
 
     // Interpolate the stress into a grid function
     using P0FEM = Dune::PDELab::P0LocalFiniteElementMap<typename Base::ctype, typename Base::Range, 3>;
@@ -269,7 +274,7 @@ class VonMisesStressVisualizationStep
   }
 
   private:
-  std::shared_ptr<ElasticMaterialBase<typename Base::EntitySet, typename Base::Range>> material;
+  std::shared_ptr<typename Base::Material> material;
 };
 
 #endif

@@ -11,73 +11,45 @@
 
 
 template<typename Vector>
-class MaterialDependantStepBase
+class MaterialInitialization
   : public TransitionSolverStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
 
-  MaterialDependantStepBase(typename Base::EntitySet es,
-                            std::shared_ptr<std::vector<int>> physical,
-                            const Dune::ParameterTree& params
-                            )
+  MaterialInitialization(typename Base::EntitySet es,
+      std::shared_ptr<std::vector<int>> physical,
+      const Dune::ParameterTree& params
+      )
     : es(es)
     , physical(physical)
     , params(params)
     , material(parse_material<double>(es, physical, params))
   {}
 
-  virtual ~MaterialDependantStepBase() {}
+  virtual ~MaterialInitialization() {}
 
-  void rebuild_material()
+  virtual void set_solver(std::shared_ptr<typename Base::Solver> solver_) override
   {
-    *material = *parse_material<double>(es, physical, params);
+    this->solver = solver_;
+    this->solver->update_parameter("material_params", params);
   }
 
-  Dune::ParameterTree& get_params()
+  virtual void update_parameter(std::string name, typename Base::Parameter param) override
   {
-    return params;
+    if (name == "material_params")
+    {
+      params = std::get<Dune::ParameterTree>(param);
+      this->solver->update_parameter("material", parse_material<double>(es, physical, params));
+    }
   }
 
-  private:
+  protected:
   typename Base::EntitySet es;
   std::shared_ptr<std::vector<int>> physical;
   Dune::ParameterTree params;
-
-  protected:
-  std::shared_ptr<MaterialCollection<typename Base::EntitySet, double>> material;
-};
-
-
-template<typename Vector>
-class ParametrizedMaterialStepBase
-  : public WrapperStep<Vector, MaterialDependantStepBase<Vector>>
-{
-  public:
-  using Base = TransitionSolverStepBase<Vector>;
-
-  ParametrizedMaterialStepBase(std::shared_ptr<MaterialDependantStepBase<Vector>> step,
-                               std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator)
-    : WrapperStep<Vector, MaterialDependantStepBase<Vector>>(step)
-    , modificator(modificator)
-  {}
-
-  virtual ~ParametrizedMaterialStepBase() {}
-
-  virtual void update_parameter(std::string name, typename Base::Parameter val) override
-  {
-    if (name == "material")
-    {
-      auto& params = this->step->get_params();
-      modificator(params, val);
-      this->step->rebuild_material();
-    }
-
-    this->step->update_parameter(name, val);
-  }
-
-  private:
-  std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator;
+  std::shared_ptr<typename Base::Material> material;
+  std::shared_ptr<typename Base::Solver> solver;
 };
 
 
@@ -89,28 +61,31 @@ class DiscreteMaterialVariationTransitionStep
   using Base = TransitionSolverStepBase<Vector>;
 
   DiscreteMaterialVariationTransitionStep(
-      std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator,
-      std::vector<typename Base::Parameter> values)
-    : DiscreteVariationTransitionStep<Vector>("material", values)
+    std::string pname,
+    std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator,
+    std::vector<typename Base::Parameter> values)
+    : DiscreteVariationTransitionStep<Vector>(pname, values)
+    , pname(pname)
     , modificator(modificator)
   {}
 
-  template<typename STEP>
-  void add(std::shared_ptr<STEP> step)
-  {
-    if constexpr (std::is_convertible<STEP*, MaterialDependantStepBase<Vector>*>::value)
-      this->steps.push_back(std::make_shared<ParametrizedMaterialStepBase<Vector>>(step, modificator));
-    else
-      this->steps.push_back(step);
-  }
+  virtual ~DiscreteMaterialVariationTransitionStep() {}
 
-  template<typename STEP>
-  void add(STEP& step)
+  virtual void update_parameter(std::string name, typename Base::Parameter param) override
   {
-    add(Dune::stackobject_to_shared_ptr(step));
+    if (pname == name)
+    {
+      Dune::ParameterTree config = this->solver->template param<Dune::ParameterTree>("material_params");
+      modificator(config, param);
+      this->solver->update_parameter("material_params", config);
+    }
+
+    for (auto step : this->steps)
+      step->update_parameter(name, param);
   }
 
   private:
+  std::string pname;
   std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator;
 };
 
@@ -123,31 +98,33 @@ class ContinuousMaterialVariationTransitionStep
   using Base = TransitionSolverStepBase<Vector>;
 
   ContinuousMaterialVariationTransitionStep(
-      std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator,
-      int iterations=5,
-      double start=0.0,
-      double end=1.0)
-    : ContinuousVariationTransitionStep<Vector>("material", iterations, start, end)
+    std::string pname,
+    std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator,
+    int iterations=5,
+    double start=0.0,
+    double end=1.0)
+    : ContinuousVariationTransitionStep<Vector>(pname, iterations, start, end)
+    , pname(pname)
     , modificator(modificator)
   {}
 
-  template<typename STEP>
-  void add(std::shared_ptr<STEP> step)
-  {
-    if constexpr (std::is_convertible<STEP*, MaterialDependantStepBase<Vector>*>::value)
-    { this->steps.push_back(std::make_shared<ParametrizedMaterialStepBase<Vector>>(step, modificator));
-    }
-    else
-      this->steps.push_back(step);
-  }
+  virtual ~ContinuousMaterialVariationTransitionStep() {}
 
-  template<typename STEP>
-  void add(STEP& step)
+  virtual void update_parameter(std::string name, typename Base::Parameter param) override
   {
-    add(Dune::stackobject_to_shared_ptr(step));
+    if (pname == name)
+    {
+      Dune::ParameterTree config = this->solver->template param<Dune::ParameterTree>("material_params");
+      modificator(config, param);
+      this->solver->update_parameter("material_params", config);
+    }
+
+    for (auto step : this->steps)
+      step->update_parameter(name, param);
   }
 
   private:
+  std::string pname;
   std::function<void(Dune::ParameterTree&, double)> modificator;
 };
 

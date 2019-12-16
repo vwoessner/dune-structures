@@ -44,6 +44,11 @@ class NewtonSolverTransitionStep
     localoperator = lop;
   }
 
+  std::shared_ptr<LocalOperator> get_localoperator()
+  {
+    return localoperator;
+  }
+
   virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     std::cout << "Building Newton" << std::endl;
