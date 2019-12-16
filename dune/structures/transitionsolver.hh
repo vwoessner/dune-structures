@@ -104,6 +104,14 @@ class TransitionSolver
     update_parameter("time", t);
   }
 
+  std::vector<std::pair<std::string, Parameter*>> export_parameters() const
+  {
+    std::vector<std::pair<std::string, Parameter*>> ret;
+    std::transform(paramdata.begin(), paramdata.end(), ret.begin(),
+                   [](auto p){ return std::make_pair<std::string, Parameter*>(p.first, &p.second); });
+    return ret;
+  }
+
   private:
   std::vector<std::shared_ptr<TransitionSolverStepBase<Vector>>> steps;
   std::map<std::string, Parameter> paramdata;

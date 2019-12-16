@@ -2,6 +2,7 @@
 #define DUNE_STRUCTURES_MUPARSER_HH
 
 #include<dune/common/fvector.hh>
+#include<dune/structures/transitionsolver.hh>
 #include<muParser.h>
 #include<string>
 
@@ -25,6 +26,14 @@ class MuParserCallable<R(D)>
     parser.DefineVar("z", &position[2]);
 
     parser.SetExpr(expr);
+  }
+
+  template<typename Vector>
+  MuParserCallable(const TransitionSolver<Vector>& solver, std::string expr)
+    : MuParserCallable(expr)
+  {
+    for (auto [name, pointer] : solver.export_parameters())
+      parser.DefineVar(name, pointer);
   }
 
   R operator()(const D& x)
