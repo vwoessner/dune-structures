@@ -5,7 +5,6 @@ from dune.structures.elasticity import (elasticity_form,
                                         )
 
 from dune.structures.material import (LinearMaterial,
-                                      MooneyRivlinMaterial,
-                                      NeoHookeanMaterial,
+#                                       NeoHookeanMaterial,
                                       StVenantKirchhoffMaterial,
                                       )

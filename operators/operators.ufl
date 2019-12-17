@@ -3,12 +3,8 @@ from dune.structures import *
 material = []
 
 material.append(LinearMaterial())
-material.append(NeoHookeanMaterial())
 material.append(StVenantKirchhoffMaterial())
-#material = LinearMaterial()
-#material = NeoHookeanMaterial()
-#material = MooneyRivlinMaterial()
-#material = StVenantKirchhoffMaterial()
+#material.append(NeoHookeanMaterial())
 
 rdyn, mass = elastodynamics_form(material)
 r = elasticity_form(material)

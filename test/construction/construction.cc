@@ -35,7 +35,7 @@ int main(int argc, char** argv)
   auto [x, cc] = elasticity_setup(es);
   using V = std::remove_reference<decltype(*x)>::type;
 
-  ConstructionContext<V> ctx(helper, params);
+  ConstructionContext<V> ctx(helper, params, es, physical);
   auto solver = ctx.construct(params);
 
   solver->apply(x, cc);

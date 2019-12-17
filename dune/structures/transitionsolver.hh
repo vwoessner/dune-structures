@@ -18,6 +18,7 @@
 #include<dune/structures/solversteps/material.hh>
 #include<dune/structures/solversteps/newton.hh>
 #include<dune/structures/solversteps/onetoone.hh>
+#include<dune/structures/solversteps/parameter.hh>
 #include<dune/structures/solversteps/probe.hh>
 #include<dune/structures/solversteps/transformation.hh>
 #include<dune/structures/solversteps/variation.hh>
@@ -76,18 +77,39 @@ class TransitionSolver
      step->post(vector, constraintscontainer);
   }
 
-  void update_parameter(std::string name, Parameter p)
+  template<typename T>
+  void introduce_parameter(std::string name, T&& val)
   {
-    paramdata[name] = p;
+    introduce_parameter(name, Parameter(std::forward<T>(val)));
+  }
+
+  void introduce_parameter(std::string name, Parameter param)
+  {
+    if (paramdata.count(name) == 0)
+      paramdata[name] = param;
+  }
+
+  template<typename T>
+  void update_parameter(std::string name, T&& val)
+  {
+    std::get<typename std::decay<T>::type>(paramdata[name]) = std::forward<T>(val);
 
     for (auto step: steps)
-      step->update_parameter(name, p);
+      step->update_parameter(name, paramdata[name]);
+  }
+
+  void update_parameter(std::string name, Parameter& val)
+  {
+    paramdata[name] = val;
+
+    for (auto step: steps)
+      step->update_parameter(name, paramdata[name]);
   }
 
   template<typename T>
   T param(std::string name) const
   {
-    return std::get<T>(paramdata.find(name)->second);
+    return std::get<typename std::decay<T>::type>(paramdata.find(name)->second);
   }
 
   // Additional parameter interface for the time
@@ -104,12 +126,22 @@ class TransitionSolver
     update_parameter("time", t);
   }
 
-  std::vector<std::pair<std::string, Parameter*>> export_parameters() const
+  std::vector<std::pair<std::string, double*>> export_parameters()
   {
-    std::vector<std::pair<std::string, Parameter*>> ret;
-    std::transform(paramdata.begin(), paramdata.end(), ret.begin(),
-                   [](auto p){ return std::make_pair<std::string, Parameter*>(p.first, &p.second); });
+    std::vector<std::pair<std::string, double*>> ret;
+    for (auto it = paramdata.begin(); it != paramdata.end(); ++it)
+    {
+      double* val = std::get_if<double>(&it->second);
+      if (val != 0)
+        ret.push_back(std::make_pair(it->first, val));
+    }
+
     return ret;
+  }
+
+  bool has_parameter(std::string name)
+  {
+    return paramdata.count(name) > 0;
   }
 
   private:

@@ -1,6 +1,7 @@
 #ifndef DUNE_STRUCTURES_SOLVERSTEPS_BASE_HH
 #define DUNE_STRUCTURES_SOLVERSTEPS_BASE_HH
 
+#include<dune/structures/material.hh>
 
 #include<memory>
 #include<string>

@@ -38,8 +38,8 @@ class ConstraintsTransitionStep : public TransitionSolverStepBase<Vector>
   {
     auto& gfs = vector->gridFunctionSpace();
     auto bctype = makeBoundaryConditionTreeFromCallables(gfs, funcs);
-    std::cout << "Assembling constraints!" << std::endl;
     Dune::PDELab::constraints(bctype, gfs, *constraintscontainer);
+    std::cout << "Assembled constraints - " << constraintscontainer->size() << " of " << gfs.size() << " dofs constrained!" << std::endl;
   }
 
   private:

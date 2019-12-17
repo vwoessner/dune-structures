@@ -175,8 +175,8 @@ class InstationarySolverStep
   virtual void set_solver(std::shared_ptr<typename Base::Solver> solver_)
   {
     this->solver = solver_;
-    this->solver->update_parameter("time", Tstart);
-    this->solver->update_parameter("timestep", dt);
+    this->solver->introduce_parameter("time", Tstart);
+    this->solver->introduce_parameter("timestep", dt);
   }
 
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override

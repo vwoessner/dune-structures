@@ -6,6 +6,7 @@
 #include<dune/structures/elasticity.hh>
 #include<dune/structures/material.hh>
 #include<dune/structures/onetoone.hh>
+#include<dune/structures/solverconstruction.hh>
 #include<dune/structures/transitionsolver.hh>
 #include<dune/structures/vonmises.hh>
 #include<dune/structures/visualization.hh>
@@ -22,7 +23,7 @@ int main(int argc, char** argv)
 
   // Parse the ini file
   Dune::ParameterTree params;
-  Dune::ParameterTreeParser::readINITree("cubeapp.ini", params);
+  Dune::ParameterTreeParser::readINITree(argv[1], params);
 
   using RangeType = double;
 
@@ -45,75 +46,18 @@ int main(int argc, char** argv)
   auto [x, cc] = elasticity_setup(es);
   using V = std::remove_reference<decltype(*x)>::type;
 
-  TransitionSolver<V> solver;
+  ConstructionContext<V> ctx(helper, params, es, physical);
+  auto solver = ctx.construct(params.sub("solver"));
 
-  MaterialInitialization<V> material(es, physical, params.sub("material"));
-  ConstraintsTransitionStep<V> constraints([](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); });
-  OneToOneMappingChecker<V> onetoone;
-
+  // Manually adding visualization until it is available through the INI interface
   VisualizationStep<V> vis;
   SolutionVisualizationStep<V> vissol;
-  MPIRankVisualizationStep<V> visrank(helper);
-  PhysicalEntityVisualizationStep<V> visphys(physical);
   VonMisesStressVisualizationStep<V> visvm;
-
   vis.add(vissol);
-  vis.add(visrank);
-  vis.add(visphys);
   vis.add(visvm);
+  solver->add(vis);
 
-  bool method = true;
-  if (method)
-  {
-    std::cout << "Attempting to solve with incremental compression" << std::endl;
-    ElasticitySolverStep<V> elasticity(params);
-
-    InterpolationTransitionStep<V> interpolation([](auto x) { return 0.0; });
-    double maxdispl = params.get<double>("model.compression");
-    TransformationTransitionStep<V> trafo(
-            [maxdispl, &solver](auto u, auto x)
-            {
-              u[2] = - solver.param<double>("compression") * (1.0 - maxdispl) * x[2];
-              return u;
-            });
-
-    ContinuousVariationTransitionStep<V> compress("compression", 10);
-    compress.add(trafo);
-    compress.add(elasticity);
-    compress.add(onetoone);
-
-    solver.add(material);
-    solver.add(interpolation);
-    solver.add(constraints);
-    solver.add(compress);
-    solver.add(vis);
-
-    solver.apply(x, cc);
-  }
-  else
-  {
-    std::cout << "Attempting to solve through linearization" << std::endl;
-    ElasticitySolverStep<V> elasticity(params);
-
-    double maxdispl = params.get<double>("model.compression");
-    InterpolationTransitionStep<V> interpolation([](auto x) { return 0.0; },
-                                                 [](auto x) { return 0.0; },
-                                                 [maxdispl](auto x) { return - (1.0 - maxdispl) * x[2]; });
-
-    DiscreteMaterialVariationTransitionStep<V> solve("compression",
-                                                     [](auto &c, auto p) { c["cube.model"] = std::get<std::string>(p); },
-                                                     {"linear"s, "stvenantkirchhoff"s});
-    solve.add(elasticity);
-
-    TransitionSolver<V> solver;
-    solver.add(material);
-    solver.add(interpolation);
-    solver.add(constraints);
-    solver.add(solve);
-    solver.add(vis);
-
-    solver.apply(x, cc);
-  }
+  solver->apply(x, cc);
 
   return 0;
 }

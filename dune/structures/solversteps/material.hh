@@ -3,7 +3,6 @@
 
 #include<dune/structures/material.hh>
 #include<dune/structures/solversteps/base.hh>
-#include<dune/structures/solversteps/newton.hh>
 #include<dune/structures/solversteps/variation.hh>
 
 #include<functional>
@@ -32,7 +31,8 @@ class MaterialInitialization
   virtual void set_solver(std::shared_ptr<typename Base::Solver> solver_) override
   {
     this->solver = solver_;
-    this->solver->update_parameter("material_params", params);
+    this->solver->introduce_parameter("material_params", params);
+    this->solver->introduce_parameter("material", material);
   }
 
   virtual void update_parameter(std::string name, typename Base::Parameter param) override

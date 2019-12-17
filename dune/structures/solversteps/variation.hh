@@ -26,6 +26,14 @@ class ContinuousVariationTransitionStep
 
   virtual ~ContinuousVariationTransitionStep() {}
 
+  virtual void set_solver(std::shared_ptr<typename Base::Solver> solver_) override
+  {
+    this->solver = solver_;
+    this->solver->introduce_parameter(name, start);
+    for (auto step : this->steps)
+      step->set_solver(solver_);
+  }
+
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     double val = start;
@@ -58,6 +66,14 @@ class DiscreteVariationTransitionStep
   {}
 
   virtual ~DiscreteVariationTransitionStep() {}
+
+  virtual void set_solver(std::shared_ptr<typename Base::Solver> solver_) override
+  {
+    this->solver = solver_;
+    this->solver->introduce_parameter(name, values[0]);
+    for (auto step : this->steps)
+      step->set_solver(solver_);
+  }
 
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {

@@ -73,7 +73,7 @@ class VisualizationStep
 
   VisualizationStep(const Dune::ParameterTree& config)
     : steps(0), time(0.0)
-    , name(config.get<std::string>("name"))
+    , name(config.get<std::string>("name"), "output")
     , path(config.get<std::string>("path", ""))
     , extendpath(config.get<std::string>("extendpath", ""))
   {}
