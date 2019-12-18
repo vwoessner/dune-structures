@@ -4,7 +4,7 @@ material = []
 
 material.append(LinearMaterial())
 material.append(StVenantKirchhoffMaterial())
-#material.append(NeoHookeanMaterial())
+material.append(NeoHookeanMaterial())
 
 rdyn, mass = elastodynamics_form(material)
 r = elasticity_form(material)
