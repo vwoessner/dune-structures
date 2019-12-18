@@ -8,6 +8,7 @@
 #include<dune/structures/solversteps/base.hh>
 #include<dune/structures/vonmises.hh>
 
+#include<filesystem>
 #include<memory>
 #include<vector>
 
@@ -112,7 +113,10 @@ class VisualizationStep
       step->apply(vector, cc);
 
     if constexpr (instationary)
+    {
+      std::filesystem::create_directory(std::filesystem::current_path().append(path));
       this->vtkwriter->write(time, Dune::VTK::appendedraw);
+    }
     else
       this->vtkwriter->write(name, Dune::VTK::ascii);
   }
