@@ -139,6 +139,11 @@ class VariableBoundaryOneStepMethodStep
     : funcs{funcs...}
   {}
 
+  VariableBoundaryOneStepMethodStep(const std::array<std::function<FunctionSignature>,
+                                                     Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount>& funcs)
+    : funcs(funcs)
+  {}
+
   virtual ~VariableBoundaryOneStepMethodStep() {}
 
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override

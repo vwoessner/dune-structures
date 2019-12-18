@@ -160,9 +160,6 @@ class ConstructionContext
                    return step;
                  });
 
-    registerStep("elasticity",
-                 with_tree<ElasticitySolverStep<Vector>>);
-
     registerStep("interpolation",
                  [](const auto& ctx, const auto& p)
                  {
@@ -176,9 +173,6 @@ class ConstructionContext
                    return std::make_shared<MaterialInitialization<Vector>>(ctx.es, ctx.physical, p);
                  });
 
-    registerStep("onetoone",
-                 default_constructed<OneToOneMappingChecker<Vector>>);
-
     registerStep("parameter",
                  [](const auto& ctx, const auto& p)
                  {
@@ -186,20 +180,16 @@ class ConstructionContext
                    return std::make_shared<ParameterSetup<Vector>>(p.template get<std::string>("name"), param);
                  });
 
-    registerStep("transformation",
+    registerStep("timeloop",
                  [](auto& ctx, const auto& p)
                  {
-                   return std::make_shared<TransformationTransitionStep<Vector>>(get_transformation<Vector, Coord(Coord, Coord)>(*ctx.solver, p.template get<std::string>("functions")));
+                   auto step = std::make_shared<InstationarySolverStep<Vector>>(p.template get<double>("Tstart"),
+                                                                                p.template get<double>("Tend"),
+                                                                                p.template get<double>("dt"));
+                   step->set_solver(ctx.solver);
+                   ctx.add_children(step, p);
+                   return step;
                  });
-
-//    registerStep("visualization",
-//                 [](auto& ctx, const auto& p)
-//                 {
-//                   auto step = std::make_shared<VisualizationStep<Vector, false>>(p);
-//                   ctx.add_children(step, p);
-//                   return step;
-//                 });
-
   }
 
   void registerStep(std::string identifier, RegisterFunction func)
@@ -225,7 +215,6 @@ class ConstructionContext
 
     for (auto step: steps)
     {
-      std::cout << "Trying to build a step " << step << std::endl;
       str_trim(step);
       if(config.hasSub(step))
         root->add(construct_step(step, config.sub(step)));
@@ -252,10 +241,107 @@ class ConstructionContext
   typename StepBase::EntitySet es;
   std::shared_ptr<std::vector<int>> physical;
 
-  private:
   // The stored mapping for each step
   std::map<std::string, RegisterFunction> mapping;
   std::shared_ptr<TransitionSolver<Vector>> solver;
 };
+
+
+
+template<typename Vector>
+class ElasticityConstructionContext
+  : public ConstructionContext<Vector>
+{
+  public:
+  using Base = ConstructionContext<Vector>;
+
+  template<typename... Params>
+  ElasticityConstructionContext(Params&&... params)
+    : ConstructionContext<Vector>(std::forward<Params>(params)...)
+  {
+    this->registerStep("elasticity",
+                 with_tree<ElasticitySolverStep<Vector>>);
+
+    this->registerStep("onetoone",
+                 default_constructed<OneToOneMappingChecker<Vector>>);
+
+    this->registerStep("transformation",
+                 [](auto& ctx, const auto& p)
+                 {
+                   return std::make_shared<TransformationTransitionStep<Vector>>(get_transformation<Vector, typename Base::Coord(typename Base::Coord, typename Base::Coord)>(*ctx.solver, p.template get<std::string>("functions")));
+                 });
+
+    this->registerStep("visualization",
+                       [](auto& ctx, const auto& p)
+                       {
+                         auto step = std::make_shared<VisualizationStep<Vector, false>>(p);
+                         ctx.add_children(step, p);
+                         return step;
+                       });
+
+    this->registerStep("vis_mpirank",
+                       [](auto& ctx, const auto& p)
+                       {
+                         return std::make_shared<MPIRankVisualizationStep<Vector, true>>(ctx.helper);
+                       });
+
+    this->registerStep("vis_physicalentity",
+                       [](auto& ctx, const auto& p)
+                       {
+                         return std::make_shared<PhysicalEntityVisualizationStep<Vector, false>>(ctx.physical);
+                       });
+
+    this->registerStep("vis_solution",
+                       default_constructed<SolutionVisualizationStep<Vector, false>>);
+
+    this->registerStep("vis_vonmises",
+                       default_constructed<VonMisesStressVisualizationStep<Vector, false>>);
+  }
+};
+
+template<typename Vector>
+class ElastodynamicsConstructionContext
+    : public ConstructionContext<Vector>
+  {
+    public:
+    using Base = ConstructionContext<Vector>;
+
+    template<typename... Params>
+    ElastodynamicsConstructionContext(Params&&... params)
+      : ConstructionContext<Vector>(std::forward<Params>(params)...)
+    {
+      this->registerStep("elastodynamics",
+                   [](const auto& ctx, const auto& p)
+                   {
+                     if (p.hasKey("functions"))
+                       return std::make_shared<ElastoDynamicsSolverStep<Vector>>(p, get_callable_array<Vector, double(typename Base::Coord)>(*ctx.solver, p["functions"]));
+                     else
+                       return std::make_shared<ElastoDynamicsSolverStep<Vector>>(p);
+                   });
+
+      this->registerStep("visualization",
+                         [](auto& ctx, const auto& p)
+                         {
+                           auto step = std::make_shared<VisualizationStep<Vector, true>>(p);
+                           ctx.add_children(step, p);
+                           return step;
+                         });
+
+      this->registerStep("vis_mpirank",
+                         [](auto& ctx, const auto& p)
+                         {
+                           return std::make_shared<MPIRankVisualizationStep<Vector, true>>(ctx.helper);
+                         });
+
+      this->registerStep("vis_physicalentity",
+                         [](auto& ctx, const auto& p)
+                         {
+                           return std::make_shared<PhysicalEntityVisualizationStep<Vector, true>>(ctx.physical);
+                         });
+
+      this->registerStep("vis_solution",
+                         default_constructed<SolutionVisualizationStep<Vector, true>>);
+    }
+  };
 
 #endif

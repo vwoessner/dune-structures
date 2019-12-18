@@ -41,9 +41,7 @@ class VisualizationStepBase
     : vtkwriter(0)
   {}
 
-  virtual ~VisualizationStepBase() {}
-
-  virtual void set_vtkwriter(std::shared_ptr<VTKWriter> vtkwriter_)
+  void set_vtkwriter(std::shared_ptr<VTKWriter> vtkwriter_)
   {
     vtkwriter = vtkwriter_;
   }
@@ -55,25 +53,25 @@ class VisualizationStepBase
 
 template<typename Vector, bool instationary=false>
 class VisualizationStep
-  : public VisualizationStepBase<Vector, instationary>
+  : public StepCollectionStep<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
   using VTKWriter = typename VTKWriterChooser<Vector, instationary>::type;
 
   VisualizationStep(std::string name="output")
-    : steps(0), time(0.0), name(name), path(""), extendpath("")
+    : time(0.0), name(name), path(""), extendpath("")
   {}
 
   VisualizationStep(const std::string& name,
                     const std::string& path,
                     const std::string& extendpath = "")
-    : steps(0), time(0.0), name(name), path(path), extendpath(extendpath)
+    : time(0.0), name(name), path(path), extendpath(extendpath)
   {}
 
   VisualizationStep(const Dune::ParameterTree& config)
-    : steps(0), time(0.0)
-    , name(config.get<std::string>("name"), "output")
+    : time(0.0)
+    , name(config.get<std::string>("name", "output"))
     , path(config.get<std::string>("path", ""))
     , extendpath(config.get<std::string>("extendpath", ""))
   {}
@@ -95,51 +93,36 @@ class VisualizationStep
     auto gv = vector->gridFunctionSpace().gridView();
 
     if constexpr (instationary)
-      this->set_vtkwriter(std::make_shared<typename VTKWriterChooser<Vector, true>::type>(std::make_shared<typename VTKWriterChooser<Vector, false>::type>(gv), name, path, extendpath));
+      vtkwriter = std::make_shared<typename VTKWriterChooser<Vector, true>::type>(std::make_shared<typename VTKWriterChooser<Vector, false>::type>(gv), name, path, extendpath);
     else
-      this->set_vtkwriter(std::make_shared<typename VTKWriterChooser<Vector, false>::type>(gv));
+      vtkwriter = std::make_shared<typename VTKWriterChooser<Vector, false>::type>(gv);
 
-    for (auto step: steps)
+    for (auto step: this->steps)
+    {
+      auto vsp = dynamic_cast<VisualizationStepBase<Vector, instationary>*>(step.get());
+      if (vsp)
+        vsp->set_vtkwriter(vtkwriter);
       step->pre(vector, cc);
+    }
   }
 
   virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
-    for (auto step: steps)
+    for (auto step: this->steps)
       step->apply(vector, cc);
 
     if constexpr (instationary)
       this->vtkwriter->write(time, Dune::VTK::appendedraw);
     else
-      this->vtkwriter->write("output", Dune::VTK::ascii);
-  }
-
-  virtual void set_vtkwriter(std::shared_ptr<VTKWriter> vtkwriter_) override
-  {
-    // Set it in this instance
-    this->vtkwriter = vtkwriter_;
-
-    for (auto step : steps)
-      step->set_vtkwriter(vtkwriter_);
-  }
-
-  void add(std::shared_ptr<VisualizationStepBase<Vector, instationary>> step)
-  {
-    steps.push_back(step);
-  }
-
-  template<typename STEP>
-  void add(STEP& step)
-  {
-    add(Dune::stackobject_to_shared_ptr(step));
+      this->vtkwriter->write(name, Dune::VTK::ascii);
   }
 
   private:
-  std::vector<std::shared_ptr<VisualizationStepBase<Vector, instationary>>> steps;
   double time;
   std::string name;
   std::string path;
   std::string extendpath;
+  std::shared_ptr<VTKWriter> vtkwriter;
 };
 
 

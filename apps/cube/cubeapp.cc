@@ -46,16 +46,8 @@ int main(int argc, char** argv)
   auto [x, cc] = elasticity_setup(es);
   using V = std::remove_reference<decltype(*x)>::type;
 
-  ConstructionContext<V> ctx(helper, params, es, physical);
+  ElasticityConstructionContext<V> ctx(helper, params, es, physical);
   auto solver = ctx.construct(params.sub("solver"));
-
-  // Manually adding visualization until it is available through the INI interface
-  VisualizationStep<V> vis;
-  SolutionVisualizationStep<V> vissol;
-  VonMisesStressVisualizationStep<V> visvm;
-  vis.add(vissol);
-  vis.add(visvm);
-  solver->add(vis);
 
   solver->apply(x, cc);
 

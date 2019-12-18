@@ -6,6 +6,7 @@
 #include<dune/structures/elasticity.hh>
 #include<dune/structures/material.hh>
 #include<dune/structures/onetoone.hh>
+#include<dune/structures/solverconstruction.hh>
 #include<dune/structures/transitionsolver.hh>
 #include<dune/structures/vonmises.hh>
 #include<dune/structures/visualization.hh>
@@ -43,53 +44,10 @@ int main(int argc, char** argv)
   auto [x, cc] = elastodynamics_setup(es);
   using V = std::remove_reference<decltype(*x)>::type;
 
-  TransitionSolver<V> solver;
+  ConstructionContext<V> ctx(helper, params, es, physical);
+  auto solver = ctx.construct(params.sub("solver"));
 
-  // Instantiate the material
-  MaterialInitialization<V> material(es, physical, params.sub("material"));
-  solver.add(material);
-
-  // Interpolation of initial condition
-  auto zero = [](auto x) { return 0.0; };
-  InterpolationTransitionStep<V> interpolation(zero);
-  solver.add(interpolation);
-
-  // Set up constraints container
-  auto clamp = [](auto x){ return (x[2] < 1e-08) || (x[2] > 1.0 - 1e-8); };
-  ConstraintsTransitionStep<V> constraints(clamp);
-  solver.add(constraints);
-
-  // Set up visualization
-  VisualizationStep<V, true> vis;
-  SolutionVisualizationStep<V, true> vissol;
-  vis.add(vissol);
-
-  // The time stepper
-  InstationarySolverStep<V> instat(0.0, 1.0, 0.1);
-  solver.add(instat);
-
-  // Shifting the bottom to the right
-  ElastoDynamicsSolverStep<V> elastodyn(params,
-                                        [&solver](auto x){ return 0.2 * x[2] * solver.param<double>("time"); }, zero, zero,
-                                        [](auto x){ return x[2] * 0.2;}, zero, zero);
-  instat.add(elastodyn);
-
-  // Set up released constraints container
-  auto rclamp = [](auto x){ return x[2] < 1e-08; };
-  ConstraintsTransitionStep<V> release_constraints(rclamp);
-  solver.add(release_constraints);
-
-  // The time stepper
-  InstationarySolverStep<V> instat2(1.0, 1.3, 0.001);
-  solver.add(instat2);
-
-  // Shifting the bottom to the right
-  ElastoDynamicsSolverStep<V> elastodyn2(params);
-  instat2.add(elastodyn2);
-  instat2.add(vis);
-
-  // Run the thing
-  solver.apply(x, cc);
+  solver->apply(x, cc);
 
   return 0;
 }

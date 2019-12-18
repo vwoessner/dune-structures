@@ -88,6 +88,14 @@ class ElastoDynamicsSolverStep
   , params(rootparams)
   {}
 
+  template<typename... FUNCS>
+  ElastoDynamicsSolverStep(const Dune::ParameterTree& rootparams,
+                           const std::array<std::function<typename VariableBoundaryOneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>::FunctionSignature>,
+                                            Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount>& funcs)
+   : WrapperStep<Vector, OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>(std::make_shared<VariableBoundaryOneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>(funcs))
+   , params(rootparams)
+  {}
+
   virtual ~ElastoDynamicsSolverStep() {}
 
   virtual void update_parameter(std::string name, typename Base::Parameter param) override
