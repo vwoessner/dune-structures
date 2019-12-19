@@ -17,6 +17,7 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     libmuparser-dev \
     libopenmpi-dev \
     libsuitesparse-dev \
+    nano \
     openmpi-bin \
     pkg-config \
     python3 \
@@ -39,8 +40,27 @@ RUN cd /structure \
  && git clone https://gitlab.dune-project.org/extensions/dune-alugrid.git \
  && git clone --recursive https://gitlab.dune-project.org/extensions/dune-codegen.git
 
+RUN cd /structure/dune-codegen \
+ && ./patches/apply_patches.sh
+
 COPY config.opts /structure/
 
 RUN /structure/dune-common/bin/dunecontrol --opts=/structure/config.opts --module=dune-codegen --builddir=/structure/build all
 
-RUN git clone --recursive https://gitlab.dune-project.org/dominic/dune-structures.git
+RUN cd /structure \
+ && git clone --recursive https://gitlab.dune-project.org/dominic/dune-structures.git
+
+RUN /structure/dune-common/bin/dunecontrol --opts=/structure/config.opts --only=dune-structures --builddir=/structure/build all
+
+# Copy all apps into the /inst directory
+RUN cp /structure/build/dune-structures/apps/cube/cubeapp \
+       /structure/build/dune-structures/apps/dyncube/dyncubeapp \
+       /structure/build/dune-structures/apps/simplecell/simplecell \
+       /inst
+
+# Copy example ini files into the /inst directory
+RUN cp /structure/dune-structures/apps/cube/iterative_compress.ini \
+       /inst
+
+COPY entry.py /structure
+ENTRYPOINT /structure/build/dune-structures/run-in-dune-env python /structure/entry.py
