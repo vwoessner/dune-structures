@@ -52,15 +52,4 @@ RUN cd /structure \
 
 RUN /structure/dune-common/bin/dunecontrol --opts=/structure/config.opts --only=dune-structures --builddir=/structure/build all
 
-# Copy all apps into the /inst directory
-RUN cp /structure/build/dune-structures/apps/cube/cubeapp \
-       /structure/build/dune-structures/apps/dyncube/dyncubeapp \
-       /structure/build/dune-structures/apps/simplecell/simplecell \
-       /inst
-
-# Copy example ini files into the /inst directory
-RUN cp /structure/dune-structures/apps/cube/iterative_compress.ini \
-       /inst
-
-COPY entry.py /structure
-ENTRYPOINT /structure/build/dune-structures/run-in-dune-env python /structure/entry.py
+ENTRYPOINT /structure/build/dune-structures/run-in-dune-env /structure/build/dune-structures/apps/universal/universalapp

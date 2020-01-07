@@ -1,7 +1,5 @@
 add_subdirectory(construction)
 add_subdirectory(fenics)
-add_subdirectory(material)
-add_subdirectory(mesh)
 add_subdirectory(muparser)
 add_subdirectory(nonlinear)
 add_subdirectory(vonmises)

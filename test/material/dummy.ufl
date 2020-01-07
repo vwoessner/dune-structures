@@ -1,9 +1,0 @@
-from dune.structures.codegen import UFLPhysicalParameter
-
-cell = tetrahedron
-FE = FiniteElement("CG", cell, 1)
-u = TrialFunction(FE)
-v = TestFunction(FE)
-
-p = UFLPhysicalParameter("first_lame", cell)
-r = p * u * v * dx
