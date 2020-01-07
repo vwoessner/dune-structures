@@ -10,7 +10,7 @@ def _elasticity_form_impl(u, v, cell, materials, force):
     def material_form(material):
         piola = material.first_piola(u)
         # Add active prestressed (isotropic) material
-        stress = piola + UFLPhysicalParameter("pretension", cell) * Identity(3)
+        stress = piola #+ UFLPhysicalParameter("pretension", cell) * Identity(3)
 
         dxm = dx(subdomain_data=law_index, subdomain_id=material.id)
         return inner(stress, grad(v)) * dxm

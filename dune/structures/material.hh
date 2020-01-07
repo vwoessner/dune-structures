@@ -26,6 +26,52 @@ std::map<std::string, int> law_to_index = {
     {"mooneyrivlin", 3}
 };
 
+/* Same applies here. Actually it is not used on the Python side at all right now */
+std::map<std::string, std::map<int, std::string>> param_to_index = {
+    {"linear", {{0, "first_lame"},
+                {1, "second_lame"}
+                }
+    },
+    {"stvenantkirchhoff", {{0, "first_lame"},
+                           {1, "second_lame"}
+                           }
+    },
+    {"neohookean", {{0, "first_lame"},
+                    {1, "second_lame"}
+                    }
+    },
+};
+
+
+template<typename T>
+T lookup_with_conversion(const Dune::ParameterTree& params, std::string name)
+{
+  if (params.hasKey(name))
+    return params.get<T>(name);
+
+  T lame1, lame2;
+  if (params.hasKey("youngs_modulus") && params.hasKey("poisson_ratio"))
+  {
+    T young = params.get<T>("youngs_modulus");
+    T pr = params.get<T>("poisson_ratio");
+
+    lame1 = (pr * young) / ((1.0 + pr) * (1.0 - 2.0 * pr));
+    lame2 = young / (2.0 * (1.0 + pr));
+  }
+  else
+  {
+    DUNE_THROW(MaterialError, "Your material specification is not supported!");
+  }
+
+  if (name == "first_lame")
+    return lame1;
+  if (name == "second_lame")
+    return lame2;
+
+  DUNE_THROW(MaterialError, "Your material specification is not supported!");
+  return T(); // Silences warning
+}
+
 
 template<typename GV, typename T>
 class ElasticMaterialBase
@@ -39,29 +85,13 @@ class ElasticMaterialBase
 
   virtual ~ElasticMaterialBase() {}
 
-  virtual T first_lame(const Entity& e, const Coord& x) const = 0;
-  virtual T second_lame(const Entity& e, const Coord& x) const = 0;
+  virtual T parameter(const Entity& e, const Coord& x, int i) const = 0;
+
   virtual int material_law_index(const Entity& e) const = 0;
 
-  virtual T pretension(const Entity& e, const Coord& x) const
+  virtual T parameter(const Entity& e, int i, T x0, T x1, T x2) const
   {
-    return T(0.0);
-  }
-
-  // These are part of a hack that is soon to go away
-  virtual T first_lame(const Entity& e, T x0, T x1, T x2) const
-  {
-    return this->first_lame(e, Dune::FieldVector<T, 3>{x0, x1, x2});
-  }
-
-  virtual T second_lame(const Entity& e, T x0, T x1, T x2) const
-  {
-    return this->second_lame(e, Dune::FieldVector<T, 3>{x0, x1, x2});
-  }
-
-  virtual T pretension(const Entity& e, T x0, T x1, T x2) const
-  {
-    return this->pretension(e, Dune::FieldVector<T, 3>{x0, x1, x2});
+    return this->parameter(e, Dune::FieldVector<T, 3>{x0, x1, x2}, i);
   }
 
   GV gridView() const
@@ -83,11 +113,9 @@ template<typename GV, typename T>
 class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
 {
   public:
-  // I need these weirdos here for the moment.
+  // I need this weirdo here for the moment.
   // Godbolt experiment: https://godbolt.org/z/xBB7zC
-  using ElasticMaterialBase<GV, T>::first_lame;
-  using ElasticMaterialBase<GV, T>::second_lame;
-  using ElasticMaterialBase<GV, T>::pretension;
+  using ElasticMaterialBase<GV, T>::parameter;
 
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
@@ -98,52 +126,19 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
   HomogeneousElasticMaterial(const GV& gv, const Dune::ParameterTree& params)
     : ElasticMaterialBase<GV, T>(gv)
   {
-    law = law_to_index[params.get<std::string>("model", "linear")];
-    pretens = params.get<T>("pretension", T(0.0));
-    // The parameters of linear elasticity are ambiguous.
-    // We only accept some combinations. They can be taken
-    // from here:
-    // https://en.wikipedia.org/wiki/Lam%C3%A9_parameters
-    if (params.hasKey("lame1") && params.hasKey("lame2"))
-    {
-      lame1 = params.get<T>("lame1");
-      lame2 = params.get<T>("lame2");
-    }
-    else if (params.hasKey("youngs_modulus") && params.hasKey("poisson_ratio"))
-    {
-      T young = params.get<T>("youngs_modulus");
-      T pr = params.get<T>("poisson_ratio");
+    auto lawstr = params.get<std::string>("model", "linear");
+    law = law_to_index[lawstr];
 
-      lame1 = (pr * young) / ((1.0 + pr) * (1.0 - 2.0 * pr));
-      lame2 = young / (2.0 * (1.0 + pr));
-    }
-    else
-    {
-      DUNE_THROW(MaterialError, "Your material specification is not supported!");
-    }
+    auto& paramnamemap = param_to_index[lawstr];
+    parameters.resize(paramnamemap.size());
+    std::cout << "Resized to " << parameters.size() << std::endl;
+    for (auto [index, name] : paramnamemap)
+      parameters[index] = lookup_with_conversion<T>(params, name);
   }
 
-  // Construct given explicit Lame parameters
-  HomogeneousElasticMaterial(const GV& gv, T lame1, T lame2)
-    : ElasticMaterialBase<GV, T>(gv),
-      lame1(lame1),
-	    lame2(lame2),
-	    law(0)
-  {}
-
-  virtual T first_lame(const Entity& e, const Coord& x) const override
+  virtual T parameter(const Entity& e, const Coord& x, int i) const override
   {
-    return lame1;
-  }
-
-  virtual T second_lame(const Entity& e, const Coord& x) const override
-  {
-    return lame2;
-  }
-
-  virtual T pretension(const Entity& e, const Coord& x) const override
-  {
-    return pretens;
+    return parameters[i];
   }
 
   virtual int material_law_index(const Entity& e) const override
@@ -152,8 +147,7 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
   }
 
   private:
-  T lame1;
-  T lame2;
+  std::vector<T> parameters;
   T pretens;
   int law;
 };
@@ -163,10 +157,9 @@ template<typename GV, typename T>
 class MaterialCollection : public ElasticMaterialBase<GV, T>
 {
   public:
-  // I need these weirdos here for the moment.
+  // I need this weirdo here for the moment.
   // Godbolt experiment: https://godbolt.org/z/xBB7zC
-  using ElasticMaterialBase<GV, T>::first_lame;
-  using ElasticMaterialBase<GV, T>::second_lame;
+  using ElasticMaterialBase<GV, T>::parameter;
 
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
@@ -195,19 +188,9 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
     add_material(material_index, Dune::stackobject_to_shared_ptr(material));
   }
 
-  virtual T first_lame(const Entity& e, const Coord& x) const override
+  virtual T parameter(const Entity& e, const Coord& x, int i) const override
   {
-    return get_material(e)->first_lame(e, x);
-  }
-
-  virtual T second_lame(const Entity& e, const Coord& x) const override
-  {
-    return get_material(e)->second_lame(e, x);
-  }
-
-  virtual T pretension(const Entity& e, const Coord& x) const override
-  {
-    return get_material(e)->pretension(e, x);
+    return get_material(e)->parameter(e, x ,i);
   }
 
   virtual int material_law_index(const Entity& e) const override

@@ -36,7 +36,7 @@ class MaterialLawBase(object):
             cell = u.ufl_element().cell()
         except:
             cell = u.ufl_operands[0].ufl_operands[0].ufl_element().cell()
-        return [UFLPhysicalParameter(p, cell) for p in self.param_names]
+        return [UFLPhysicalParameter(i, cell) for i in range(len(self.param_names))]
 
     #
     # Some physical quantities for convenience and use in derived classes

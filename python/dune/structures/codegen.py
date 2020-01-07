@@ -25,14 +25,14 @@ import ufl
 
 
 class UFLPhysicalParameter(Coefficient):
-    def __init__(self, param, cell):
-        self.param = param
+    def __init__(self, index, cell):
+        self.index = index
         self.cell = cell
         FE = ufl.FiniteElement("DG", cell, 0)
         Coefficient.__init__(self, FE)
     
     def _ufl_expr_reconstruct_(self):
-        return UFLPhysicalParameter(self.param, self.cell)
+        return UFLPhysicalParameter(self.index, self.cell)
 
     def visit(self, visitor):
         restriction = enforce_boundary_restriction(visitor)
@@ -41,7 +41,7 @@ class UFLPhysicalParameter(Coefficient):
         # in loopy: We need to pass the quadrature points coordinate by coordinate
         # and piece the information back together on the receiving side.
         qp = tuple(maybe_wrap_subscript(visitor.to_cell(visitor.quadrature_position()), i) for i in range(world_dimension()))
-        return prim.Call(LoopyPhysicalParameter(self.param), (cell,) + qp)
+        return prim.Call(LoopyPhysicalParameter(), (cell, self.index) + qp)
 
 
 class UFLMaterialLawIndex(Coefficient):
@@ -78,16 +78,13 @@ class LoopyEntity(lp.symbolic.FunctionIdentifier):
 
 
 class LoopyPhysicalParameter(lp.symbolic.FunctionIdentifier):
-    def __init__(self, param):
-        self.param = param
-
     def __getinitargs__(self):
-        return (self.param,)
+        return ()
     
     @property
     def name(self):
         material_class = name_material_class()
-        return "{}->{}".format(material_class, self.param)
+        return "{}->parameter".format(material_class)
 
 
 class LoopyMaterialLawIndex(lp.symbolic.FunctionIdentifier):
@@ -105,7 +102,8 @@ def dune_structures_function_mangler(knl, func, arg_dtypes):
     if isinstance(func, LoopyPhysicalParameter):
         return lp.CallMangleInfo(func.name,
                                  (lp.types.to_loopy_type(dtype_floatingpoint()),),
-                                 (lp.types.to_loopy_type(np.dtype(str)),) +
+                                 (lp.types.to_loopy_type(np.dtype(str)),
+                                  lp.types.to_loopy_type(np.int32)) +
                                  (lp.types.to_loopy_type(dtype_floatingpoint()),) * world_dimension()
                                 )
 

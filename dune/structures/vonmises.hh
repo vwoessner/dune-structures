@@ -45,8 +45,8 @@ class VonMisesStressGridFunction
     displacement_grad_f.evaluate(e, x, displacement_grad);
 
     // Get the Lame coefficients for this problem
-    auto lame1 = material->first_lame(e, x);
-    auto lame2 = material->second_lame(e, x);
+    auto lame1 = material->parameter(e, x, 0);
+    auto lame2 = material->parameter(e, x, 1);
 
     typename Traits::RangeType sum = 0.0;
 
