@@ -260,10 +260,16 @@ class ElasticityConstructionContext
     : ConstructionContext<Vector>(std::forward<Params>(params)...)
   {
     this->registerStep("elasticity",
-                 with_tree<ElasticitySolverStep<Vector>>);
+                       with_tree<ElasticitySolverStep<Vector>>);
 
     this->registerStep("onetoone",
-                 default_constructed<OneToOneMappingChecker<Vector>>);
+                       default_constructed<OneToOneMappingChecker<Vector>>);
+
+    this->registerStep("probe",
+                       [this](const auto& ctx, const auto& p)
+                       {
+                         return std::make_shared<ProbeTransitionStep<Vector>>(this->es.gridView(), p);
+                       });
 
     this->registerStep("transformation",
                  [](auto& ctx, const auto& p)
@@ -311,13 +317,13 @@ class ElastodynamicsConstructionContext
       : ConstructionContext<Vector>(std::forward<Params>(params)...)
     {
       this->registerStep("elastodynamics",
-                   [](const auto& ctx, const auto& p)
-                   {
-                     if (p.hasKey("functions"))
-                       return std::make_shared<ElastoDynamicsSolverStep<Vector>>(p, get_callable_array<Vector, double(typename Base::Coord)>(*ctx.solver, p["functions"]));
-                     else
-                       return std::make_shared<ElastoDynamicsSolverStep<Vector>>(p);
-                   });
+                         [](const auto& ctx, const auto& p)
+                         {
+                           if (p.hasKey("functions"))
+                             return std::make_shared<ElastoDynamicsSolverStep<Vector>>(p, get_callable_array<Vector, double(typename Base::Coord)>(*ctx.solver, p["functions"]));
+                           else
+                             return std::make_shared<ElastoDynamicsSolverStep<Vector>>(p);
+                         });
 
       this->registerStep("visualization",
                          [](auto& ctx, const auto& p)

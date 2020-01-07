@@ -40,6 +40,8 @@
 /* Define to the revision of dune-structures */
 #define DUNE_STRUCTURES_VERSION_REVISION @DUNE_STRUCTURES_VERSION_REVISION@
 
+#define VIRTUALENV_WRAPPER_DIR "@CMAKE_BINARY_DIR@"
+
 /* end dune-structures
    Everything below here will be overwritten
 */

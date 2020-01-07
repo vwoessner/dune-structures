@@ -1,3 +1,2 @@
-add_subdirectory(cube)
-add_subdirectory(dyncube)
-add_subdirectory(simplecell)
+add_subdirectory(dynamics)
+add_subdirectory(universal)
