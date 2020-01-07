@@ -59,6 +59,33 @@ CMAKE_FLAGS+="-DDUNE_PYTHON_VIRTUALENV_SETUP=1
 
 # Mathematical Abstractions
 
+dune-structures provides solvers for elastostatic and elastodynamic simulations with a variety of linear and nonlinear material laws.
+
+## Basic equations
+
+Given a reference configuration $`T\subseteq\mathbb{R}^3`$ of an elastic body, we aim to calculate the displacement field $`\mathbf{u}:T\rightarrow\mathbb{R}^3`$ that describes the deformation of the body subject to the given forces.
+
+## Strain Measures
+
+Material laws in hyperelasticity are often expressed using a variety of different strain measures.
+These are summarized here with the goal to document the implemented physics:
+
+* *Deformation gradient*: $`\mathbf{F} = \mathbb{I} + \nabla\mathbf{u}`$
+* *Infinitesimal strain*: $`\frac{1}{2}(\nabla\mathbf{u} + \nabla\mathbf{u}^T)`$
+* *Right Cauchy-Green tensor*: $`\mathbf{C} = \mathbf{F}^T\mathbf{F}`$
+* *Left Cauchy-Green tensor*: $`\mathbf{B} = \mathbf{F}\mathbf{F}^T`$
+* *Cauchy-Green strain tensor*: $`\frac{1}{2}(\mathbf{C}-\mathbb{I})`$
+* The *Cauchy-Green invariants*:
+	* $`I_1 = tr(\mathbf{B})`$
+	* $`I_2 = \frac{1}{2}(tr(\mathbf{B})^2 - tr(\mathbf{B}\mathbf{B})`$
+	* $`I_3 = \det \mathbf{B}`$
+* The *isochoric Cauchy-Green invariants*:
+	* $`\bar{I}_1 = J^{-\frac{2}{3}}I_1`$
+	* $`\bar{I}_2 = J^{-\frac{4}{3}}I_2`$
+	* $`J=\sqrt{I_3}`$
+
+## Finite Element formulation
+
 # Software Design
 
 # Solver Component Documentation
