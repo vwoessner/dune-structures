@@ -1,18 +1,17 @@
 #ifndef DUNE_STRUCTURES_MATERIAL_HH
 #define DUNE_STRUCTURES_MATERIAL_HH
 
+#include<dune/common/fmatrix.hh>
 #include<dune/common/fvector.hh>
 #include<dune/common/shared_ptr.hh>
 #include<dune/common/parametertree.hh>
+#include<dune/structures/prestress.hh>
 #include<dune/structures/utilities.hh>
 
 #include<map>
 #include<memory>
 #include<string>
 #include<vector>
-
-
-class MaterialError : public Dune::IOError {};
 
 
 /* This mapping has to agree with the mapping in Python.
@@ -87,6 +86,8 @@ class ElasticMaterialBase
 
   virtual T parameter(const Entity& e, const Coord& x, int i) const = 0;
 
+  virtual void prestress(const Entity& e, const Coord& x, Dune::FieldMatrix<T, 3, 3>&) const = 0;
+
   virtual int material_law_index(const Entity& e) const = 0;
 
   virtual T parameter(const Entity& e, int i, T x0, T x1, T x2) const
@@ -125,13 +126,14 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
   // Construct from a parameter tree
   HomogeneousElasticMaterial(const GV& gv, const Dune::ParameterTree& params)
     : ElasticMaterialBase<GV, T>(gv)
+    , prestr(construct_prestress<GV, T>(params.sub("prestress")))
   {
     auto lawstr = params.get<std::string>("model", "linear");
     law = law_to_index[lawstr];
 
     auto& paramnamemap = param_to_index[lawstr];
     parameters.resize(paramnamemap.size());
-    std::cout << "Resized to " << parameters.size() << std::endl;
+
     for (auto [index, name] : paramnamemap)
       parameters[index] = lookup_with_conversion<T>(params, name);
   }
@@ -141,6 +143,11 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
     return parameters[i];
   }
 
+  virtual void prestress(const Entity& e, const Coord& x, Dune::FieldMatrix<T, 3, 3>& m) const override
+  {
+    prestr->evaluate(e, x, m);
+  }
+
   virtual int material_law_index(const Entity& e) const override
   {
     return law;
@@ -148,7 +155,7 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
 
   private:
   std::vector<T> parameters;
-  T pretens;
+  std::shared_ptr<MaterialPrestressBase<GV, T>> prestr;
   int law;
 };
 
@@ -191,6 +198,11 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
   virtual T parameter(const Entity& e, const Coord& x, int i) const override
   {
     return get_material(e)->parameter(e, x ,i);
+  }
+
+  virtual void prestress(const Entity& e, const Coord& x, Dune::FieldMatrix<T, 3, 3>& m) const override
+  {
+    get_material(e)->prestress(e, x, m);
   }
 
   virtual int material_law_index(const Entity& e) const override

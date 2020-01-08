@@ -8,8 +8,10 @@ from dune.codegen.generation import (class_member,
                                      constructor_parameter,
                                      include_file,
                                      initializer_list,
+                                     instruction,
                                      function_mangler,
                                      template_parameter,
+                                     temporary_variable,
                                      )
 from dune.codegen.pdelab.geometry import (enforce_boundary_restriction,
                                           name_element_geometry_wrapper,
@@ -30,7 +32,7 @@ class UFLPhysicalParameter(Coefficient):
         self.cell = cell
         FE = ufl.FiniteElement("DG", cell, 0)
         Coefficient.__init__(self, FE)
-    
+
     def _ufl_expr_reconstruct_(self):
         return UFLPhysicalParameter(self.index, self.cell)
 
@@ -62,6 +64,37 @@ class UFLMaterialLawIndex(Coefficient):
         return prim.Call(LoopyMaterialLawIndex(), (cell,))
 
 
+class UFLPrestress(Coefficient):
+    def __init__(self, cell):
+        self.cell = cell
+        FE = ufl.TensorElement("DG", cell, 0, (3, 3))
+        Coefficient.__init__(self, FE)
+
+    def _ufl_expr_reconstruct(self):
+        return UFLPrestress(self.cell)
+
+    def visit(self, visitor):
+        restriction = enforce_boundary_restriction(visitor)
+
+        # Get the entity as a string instead of a proper loopy call, because
+        # we need to construct a C-string.
+        from dune.codegen.pdelab.geometry import name_cell
+        cell = name_cell(restriction)
+
+        name = "prestress_eval"
+        temporary_variable(name,
+                           shape=(3, 3),
+                           managed=False,
+                           shape_impl=("fm",))
+        material_class = name_material_class()
+
+        instruction(code="{}->prestress({}, {}, {});".format(material_class, str(cell), str(visitor.quadrature_position()), name),
+                    assignees=frozenset({name}),
+                    within_inames=frozenset(visitor.quadrature_inames()),
+                    )
+        return prim.Variable(name)
+
+
 class LoopyEntity(lp.symbolic.FunctionIdentifier):
     def __init__(self, restriction):
         # Too lazy to implement this for skeletons, given that we do not need it
@@ -80,7 +113,7 @@ class LoopyEntity(lp.symbolic.FunctionIdentifier):
 class LoopyPhysicalParameter(lp.symbolic.FunctionIdentifier):
     def __getinitargs__(self):
         return ()
-    
+
     @property
     def name(self):
         material_class = name_material_class()
