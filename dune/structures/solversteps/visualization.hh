@@ -239,7 +239,7 @@ class VonMisesStressVisualizationStep
       material = std::get<std::shared_ptr<typename Base::Material>>(param);
   }
 
-  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
     auto es = vector->gridFunctionSpace().entitySet();
 
@@ -262,6 +262,41 @@ class VonMisesStressVisualizationStep
 
   private:
   std::shared_ptr<typename Base::Material> material;
+};
+
+
+template<typename Vector>
+class FibreDistanceVisualizationStep
+  : public VisualizationStepBase<Vector, false>
+{
+  public:
+  using Base = TransitionSolverStepBase<Vector>;
+
+  FibreDistanceVisualizationStep(const Dune::ParameterTree& params, const Dune::ParameterTree& rootparams)
+    : prestress(rootparams.sub(params.get<std::string>("key")), rootparams)
+  {}
+
+  virtual ~FibreDistanceVisualizationStep() {}
+
+  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  {
+    auto es = vector->gridFunctionSpace().entitySet();
+    using FEM = Dune::PDELab::PkLocalFiniteElementMap<typename Base::EntitySet, double, typename Base::Range, 1>;
+    auto fem = std::make_shared<FEM>(es);
+    using GFS = Dune::PDELab::GridFunctionSpace<typename Base::EntitySet, FEM, Dune::PDELab::NoConstraints, typename Base::VectorBackend>;
+    auto gfs = std::make_shared<GFS>(es, fem);
+    gfs->name("fibredistance");
+    using DistanceVector = Dune::PDELab::Backend::Vector<GFS, typename Base::ctype>;
+    auto container = std::make_shared<DistanceVector>(gfs);
+
+    auto lambda = [this](const auto& e, const auto& x){ return this->prestress.distance_to_minimum(e, x); };
+    auto gf = Dune::PDELab::makeGridFunctionFromCallable(es.gridView(), lambda);
+    Dune::PDELab::interpolate(gf, *gfs, *container);
+    Dune::PDELab::addSolutionToVTKWriter(*(this->vtkwriter), gfs, container);
+  }
+
+  private:
+  CurvedFibrePrestress<typename Base::GridView, double> prestress;
 };
 
 #endif

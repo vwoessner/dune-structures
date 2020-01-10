@@ -170,7 +170,7 @@ class ConstructionContext
     registerStep("material",
                  [](const auto& ctx, const auto& p)
                  {
-                   return std::make_shared<MaterialInitialization<Vector>>(ctx.es, ctx.physical, p);
+                   return std::make_shared<MaterialInitialization<Vector>>(ctx.es, ctx.physical, p, ctx.rootconfig);
                  });
 
     registerStep("parameter",
@@ -266,9 +266,9 @@ class ElasticityConstructionContext
                        default_constructed<OneToOneMappingChecker<Vector>>);
 
     this->registerStep("probe",
-                       [this](const auto& ctx, const auto& p)
+                       [](const auto& ctx, const auto& p)
                        {
-                         return std::make_shared<ProbeTransitionStep<Vector>>(this->es.gridView(), p);
+                         return std::make_shared<ProbeTransitionStep<Vector>>(ctx.es.gridView(), p);
                        });
 
     this->registerStep("transformation",
@@ -302,6 +302,12 @@ class ElasticityConstructionContext
 
     this->registerStep("vis_vonmises",
                        default_constructed<VonMisesStressVisualizationStep<Vector, false>>);
+
+    this->registerStep("vis_fibredistance",
+                       [](const auto& ctx, const auto& p)
+                       {
+                         return std::make_shared<FibreDistanceVisualizationStep<Vector>>(p, ctx.rootconfig);
+                       });
   }
 };
 

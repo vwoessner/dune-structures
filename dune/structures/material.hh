@@ -124,9 +124,11 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
   virtual ~HomogeneousElasticMaterial() {}
 
   // Construct from a parameter tree
-  HomogeneousElasticMaterial(const GV& gv, const Dune::ParameterTree& params)
+  HomogeneousElasticMaterial(const GV& gv,
+                             const Dune::ParameterTree& params,
+                             const Dune::ParameterTree& rootparams)
     : ElasticMaterialBase<GV, T>(gv)
-    , prestr(construct_prestress<GV, T>(params.sub("prestress")))
+    , prestr(construct_prestress<GV, T>(params.sub("prestress"), rootparams))
   {
     auto lawstr = params.get<std::string>("model", "linear");
     law = law_to_index[lawstr];
@@ -231,7 +233,8 @@ template<typename T,typename GV>
 std::shared_ptr<MaterialCollection<GV, T>> parse_material(
     const GV& gv,
     std::shared_ptr<std::vector<int>> physical_groups,
-    const Dune::ParameterTree& params
+    const Dune::ParameterTree& params,
+    const Dune::ParameterTree& rootparams
     )
 {
   auto coll = std::make_shared<MaterialCollection<GV, T>>(gv, physical_groups);
@@ -243,7 +246,7 @@ std::shared_ptr<MaterialCollection<GV, T>> parse_material(
   {
     str_trim(group);
     const auto& groupconf = params.sub(group);
-    auto material = std::make_shared<HomogeneousElasticMaterial<GV, T>>(gv, groupconf);
+    auto material = std::make_shared<HomogeneousElasticMaterial<GV, T>>(gv, groupconf, rootparams);
     coll->add_material(groupconf.get<int>("group"), material);
   }
 

@@ -18,12 +18,14 @@ class MaterialInitialization
 
   MaterialInitialization(typename Base::EntitySet es,
       std::shared_ptr<std::vector<int>> physical,
-      const Dune::ParameterTree& params
+      const Dune::ParameterTree& params,
+      const Dune::ParameterTree& rootparams
       )
     : es(es)
     , physical(physical)
     , params(params)
-    , material(parse_material<double>(es, physical, params))
+    , rootparams(rootparams)
+    , material(parse_material<double>(es, physical, params, rootparams))
   {}
 
   virtual ~MaterialInitialization() {}
@@ -40,7 +42,7 @@ class MaterialInitialization
     if (name == "material_params")
     {
       params = std::get<Dune::ParameterTree>(param);
-      this->solver->update_parameter("material", parse_material<double>(es, physical, params));
+      this->solver->update_parameter("material", parse_material<double>(es, physical, params, rootparams));
     }
   }
 
@@ -48,6 +50,7 @@ class MaterialInitialization
   typename Base::EntitySet es;
   std::shared_ptr<std::vector<int>> physical;
   Dune::ParameterTree params;
+  Dune::ParameterTree rootparams;
   std::shared_ptr<typename Base::Material> material;
   std::shared_ptr<typename Base::Solver> solver;
 };
