@@ -11,6 +11,7 @@
 #include<filesystem>
 #include<memory>
 #include<vector>
+#include<variant>
 
 
 template<typename Vector, bool instationary>
@@ -18,60 +19,69 @@ struct VTKWriterChooser
 {
   using GV = typename Vector::GridFunctionSpace::Traits::GridViewType;
   using type = Dune::VTKWriter<GV>;
+  using ptype = std::shared_ptr<type>;
 };
+
 
 template<typename Vector>
 struct VTKWriterChooser<Vector, true>
 {
   using GV = typename Vector::GridFunctionSpace::Traits::GridViewType;
   using type = Dune::VTKSequenceWriter<GV>;
+  using ptype = std::shared_ptr<type>;
 };
 
 
+template<typename Vector>
+class VisualizationStep;
 
 
-template<typename Vector, bool instationary>
+template<typename Vector>
 class VisualizationStepBase
   : public TransitionSolverStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
-  using VTKWriter = typename VTKWriterChooser<Vector, instationary>::type;
 
-  VisualizationStepBase()
-    : vtkwriter(0)
-  {}
-
-  void set_vtkwriter(std::shared_ptr<VTKWriter> vtkwriter_)
+  void set_parent(VisualizationStep<Vector>* parent_)
   {
-    vtkwriter = vtkwriter_;
+    parent = parent_;
   }
 
   protected:
-  std::shared_ptr<VTKWriter> vtkwriter;
+  VisualizationStep<Vector>* parent;
 };
 
 
-template<typename Vector, bool instationary=false>
+template<typename Vector>
 class VisualizationStep
   : public StepCollectionStep<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
-  using VTKWriter = typename VTKWriterChooser<Vector, instationary>::type;
+  using VTKWriter = std::variant<
+      std::shared_ptr<typename VTKWriterChooser<Vector, true>::type>,
+      std::shared_ptr<typename VTKWriterChooser<Vector, false>::type>>;
 
-  VisualizationStep(std::string name="output")
-    : time(0.0), name(name), path(""), extendpath("")
+  VisualizationStep(bool instationary = false,
+                    std::string name="output")
+    : instationary(instationary), time(0.0), name(name), path(""), extendpath("")
   {}
 
-  VisualizationStep(const std::string& name,
+  VisualizationStep(bool instationary,
+                    const std::string& name,
                     const std::string& path,
                     const std::string& extendpath = "")
-    : time(0.0), name(name), path(path), extendpath(extendpath)
+    : instationary(instationary)
+    , time(0.0)
+    , name(name)
+    , path(path)
+    , extendpath(extendpath)
   {}
 
   VisualizationStep(const Dune::ParameterTree& config)
-    : time(0.0)
+    : instationary(config.get<bool>("instationary", false))
+    , time(0.0)
     , name(config.get<std::string>("name", "output"))
     , path(config.get<std::string>("path", ""))
     , extendpath(config.get<std::string>("extendpath", ""))
@@ -93,16 +103,16 @@ class VisualizationStep
     // Instantiate a VTKWriter instance
     auto gv = vector->gridFunctionSpace().gridView();
 
-    if constexpr (instationary)
+    if (instationary)
       vtkwriter = std::make_shared<typename VTKWriterChooser<Vector, true>::type>(std::make_shared<typename VTKWriterChooser<Vector, false>::type>(gv), name, path, extendpath);
     else
       vtkwriter = std::make_shared<typename VTKWriterChooser<Vector, false>::type>(gv);
 
     for (auto step: this->steps)
     {
-      auto vsp = dynamic_cast<VisualizationStepBase<Vector, instationary>*>(step.get());
+      auto vsp = dynamic_cast<VisualizationStepBase<Vector>*>(step.get());
       if (vsp)
-        vsp->set_vtkwriter(vtkwriter);
+        vsp->set_parent(this);
       step->pre(vector, cc);
     }
   }
@@ -112,27 +122,52 @@ class VisualizationStep
     for (auto step: this->steps)
       step->apply(vector, cc);
 
-    if constexpr (instationary)
+    if (instationary)
     {
       std::filesystem::create_directory(std::filesystem::current_path().append(path));
-      this->vtkwriter->write(time, Dune::VTK::appendedraw);
+      std::get<typename VTKWriterChooser<Vector, true>::ptype>(vtkwriter)->write(time, Dune::VTK::appendedraw);
     }
     else
-      this->vtkwriter->write(name, Dune::VTK::ascii);
+      std::get<typename VTKWriterChooser<Vector, false>::ptype>(vtkwriter)->write(name, Dune::VTK::ascii);
+  }
+
+  template<typename Container>
+  void add_dataset(std::shared_ptr<Container> container)
+  {
+    if (instationary)
+      Dune::PDELab::addSolutionToVTKWriter(
+          *(std::get<typename VTKWriterChooser<Vector, true>::ptype>(vtkwriter)),
+          container->gridFunctionSpaceStorage(),
+          container);
+    else
+      Dune::PDELab::addSolutionToVTKWriter(
+          *(std::get<typename VTKWriterChooser<Vector, false>::ptype>(vtkwriter)),
+          container->gridFunctionSpaceStorage(),
+          container);
+  };
+
+  template<typename Container>
+  void add_celldata(std::shared_ptr<Container> container, std::string name)
+  {
+    if (instationary)
+      std::get<typename VTKWriterChooser<Vector, true>::ptype>(vtkwriter)->addCellData(*container, name);
+    else
+      std::get<typename VTKWriterChooser<Vector, false>::ptype>(vtkwriter)->addCellData(*container, name);
   }
 
   private:
+  bool instationary;
   double time;
   std::string name;
   std::string path;
   std::string extendpath;
-  std::shared_ptr<VTKWriter> vtkwriter;
+  VTKWriter vtkwriter;
 };
 
 
-template<typename Vector, bool instationary=false>
+template<typename Vector>
 class SolutionVisualizationStep
-  : public VisualizationStepBase<Vector, instationary>
+  : public VisualizationStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
@@ -141,26 +176,14 @@ class SolutionVisualizationStep
 
   virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
-    if constexpr (instationary)
-    {
-      auto gfs = vector->gridFunctionSpaceStorage();
-      auto sgfs1 = std::make_shared<Dune::PDELab::GridFunctionSubSpace<typename Base::GridFunctionSpace, Dune::TypeTree::TreePath<0>>>(gfs);
-      Dune::PDELab::addSolutionToVTKWriter(*(this->vtkwriter), sgfs1, vector);
-      auto sgfs2 = std::make_shared<Dune::PDELab::GridFunctionSubSpace<typename Base::GridFunctionSpace, Dune::TypeTree::TreePath<1>>>(gfs);
-      Dune::PDELab::addSolutionToVTKWriter(*(this->vtkwriter), sgfs2, vector);
-    }
-    else
-    {
-      auto gfs = vector->gridFunctionSpaceStorage();
-      Dune::PDELab::addSolutionToVTKWriter(*(this->vtkwriter), gfs, vector);
-    }
+    this->parent->add_dataset(vector);
   }
 };
 
 
-template<typename Vector, bool instationary=false>
+template<typename Vector>
 class MPIRankVisualizationStep
-  : public VisualizationStepBase<Vector, instationary>
+  : public VisualizationStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
@@ -192,8 +215,8 @@ class MPIRankVisualizationStep
 
   virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
-    RankDummyContainer container(helper, vector->gridFunctionSpace().gridView());
-    this->vtkwriter->addCellData(container, "mpirank");
+    auto container = std::make_shared<RankDummyContainer>(helper, vector->gridFunctionSpace().gridView());
+    this->parent->add_celldata(container, "mpirank");
   }
 
   private:
@@ -201,9 +224,9 @@ class MPIRankVisualizationStep
 };
 
 
-template<typename Vector, bool instationary=false>
+template<typename Vector>
 class PhysicalEntityVisualizationStep
-  : public VisualizationStepBase<Vector, instationary>
+  : public VisualizationStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
@@ -216,7 +239,7 @@ class PhysicalEntityVisualizationStep
 
   virtual void pre(std::shared_ptr<Vector>, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
-    this->vtkwriter->addCellData(*physical, "gmshPhysical");
+    this->parent->add_celldata(physical, "gmshPhysical");
   }
 
   private:
@@ -224,9 +247,9 @@ class PhysicalEntityVisualizationStep
 };
 
 
-template<typename Vector, bool instationary=false>
+template<typename Vector>
 class VonMisesStressVisualizationStep
-  : public VisualizationStepBase<Vector, instationary>
+  : public VisualizationStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
@@ -257,7 +280,7 @@ class VonMisesStressVisualizationStep
     auto stress_container = std::make_shared<StressVector>(p0gfs);
 
     Dune::PDELab::interpolate(stress, *p0gfs, *stress_container);
-    Dune::PDELab::addSolutionToVTKWriter(*(this->vtkwriter), p0gfs, stress_container);
+    this->parent->add_dataset(stress_container);
   }
 
   private:
@@ -267,7 +290,7 @@ class VonMisesStressVisualizationStep
 
 template<typename Vector>
 class FibreDistanceVisualizationStep
-  : public VisualizationStepBase<Vector, false>
+  : public VisualizationStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
@@ -292,7 +315,7 @@ class FibreDistanceVisualizationStep
     auto lambda = [this](const auto& e, const auto& x){ return this->prestress.distance_to_minimum(e, x); };
     auto gf = Dune::PDELab::makeGridFunctionFromCallable(es.gridView(), lambda);
     Dune::PDELab::interpolate(gf, *gfs, *container);
-    Dune::PDELab::addSolutionToVTKWriter(*(this->vtkwriter), gfs, container);
+    this->parent->add_dataset(container);
   }
 
   private:
