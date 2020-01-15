@@ -249,44 +249,6 @@ class CurvedFibrePrestress
                              sample_points.end(),
                              cmp);
   }
-//
-//  T newton_minimize_across_curve(const Dune::FieldVector<T, 3>& point, int cpindex, T guess) const
-//  {
-//    T oldguess(0.0);
-//    T diffeps(1e-4);
-//
-//    int steps = 0;
-//    using std::abs;
-//    while ((abs(oldguess - guess) > 1e-8) && (steps < 10))
-//    {
-//      oldguess = guess;
-//      T left = distance(point, cpindex, guess - diffeps);
-//      T center = distance(point, cpindex, guess);
-//      T right = distance(point, cpindex, guess + diffeps);
-//
-//      guess = guess - diffeps / (1.0 + (left - center) / (right - center));
-//      ++steps;
-//    }
-//
-//    return guess;
-//
-//    if (steps == 100)
-//      std::cout << guess << std::endl;
-//
-//    // Decide whether the minimum we found or the interval endpoints are
-//    // the relevant solutions. Note that if you start to use higher order
-//    // bezier curves their might be additional minima within the interval,
-//    // that we currently do not find. Always check visualization of fibre
-//    // distance to verify that you are doing something meaningful.
-//    using std::min;
-//    auto cmp = [this, point, cpindex](auto a, auto b) {
-//      return this->distance(point, cpindex, a) < this->distance(point, cpindex, b);
-//    };
-//    if ((guess > 0.0) && (guess < 1.0))
-//      return std::min({ 0.0, guess, 1.0 }, cmp);
-//    else
-//      return std::min({ 0.0, 1.0 }, cmp);
-//  }
 
   std::pair<int, T> closest_point(const Dune::FieldVector<T, 3>& point) const
   {

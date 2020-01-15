@@ -247,7 +247,7 @@ std::shared_ptr<MaterialCollection<GV, T>> parse_material(
     str_trim(group);
     const auto& groupconf = params.sub(group);
     auto material = std::make_shared<HomogeneousElasticMaterial<GV, T>>(gv, groupconf, rootparams);
-    coll->add_material(groupconf.get<int>("group"), material);
+    coll->add_material(groupconf.get<int>("group", 0), material);
   }
 
   return coll;
