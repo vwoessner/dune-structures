@@ -94,6 +94,9 @@ withe $`P(u)`$ being the first Piola-Kirchhoff stress tensor.
 
 # Software Design
 
+The software for dune-structures is designed such that it can handle a large variety of problems and numerical techniques without recompilation.
+This is done in order to be able to focus on productivity with experiments.
+
 # Solver Component Documentation
 
 This section gives a comprehensive overview of implemented solver components and the configuration values they accept.
@@ -109,7 +112,7 @@ This step is registered as `interpolation`. It implements interpolation of a giv
 The interpolation step accepts the following keys:
 * `functions` expects a comma separated list of expressions. These expressions are interpolated into the leaves of the function space tree in the given order. For elasticity problems this means that three functions for the displacements in $`x`$, $`y`$ and $`z`$ direction need to be given. Alternatively, a single function can be given, which will then be applied to all leaves of the function tree. Within these functions the strings $`x`$, $`y`$ and $`z`$ can be used to refer to the evaluation point in global coordinates.
 
-The following examples implement interpolation of initial conditions $`\mathbf{u}(\mathbf{x})=0`$ and $`\mathbf{u}(\mathbf{x})=\mathbf{x}`$: 
+The following examples implement interpolation of initial conditions $`\mathbf{u}(\mathbf{x})=0`$ and $`\mathbf{u}(\mathbf{x})=\mathbf{x}`$:
 
 ```
 [interpolation]
@@ -149,9 +152,14 @@ This timestepping step accepts the following keys:
 
 ## Elasticity-specific building blocks
 
+This section describes some solver steps that are very specific to the applications of dune-structures.
+Most other solver parts could be reused in general PDE applications.
+
 ### Nonlinear elasticity solver
 
 This step is registered as `elasticity`.
+It applies a Newton solver for the hyperelastic problem defined by the generated operator (see above).
+It currently does not accept configuration parameters, although there would be plenty of solver related knobs to expose.
 
 ### Material parser
 
@@ -206,6 +214,33 @@ If this step prints failure, the calculated solution cannot be trusted.
 
 ## Utility building blocks
 
+### Parameter definition
+
+This step is registered as `parameter`.
+It introduces a user-defined parameter into the parameter system.
+The parameter will be accessible both from your custom solver steps, as well as from all your function expressions.
+This way, you can specify physical parameters exactly once - removing a potential source of bugs.
+
+The parameter step accepts the following keys:
+* `name` is the string that defines the parameter name
+* `datatype` is currently one of `"double"`, `"int"` or `"string"`.
+* `value` is the value that this parameter is initialized with
+
+The following example illustrates the use of a user-defined parameter in interpolation:
+
+```
+[solver]
+steps = parameter, interpolation
+
+[parameter]
+name = xdispl
+value = 0.5
+datatype = double
+
+[interpolation]
+functions = xdispl, 0.0, 0.0
+```
+
 ### Grid function probe
 
 This step is registered as `probe`.
@@ -235,52 +270,126 @@ functions = ux + 1.0, uy, uz
 
 ## Transition solver building blocks
 
-### Parameter definition 
-
-This step is registered as `parameter`.
+When solving non-linear problems, it is often useful to not solve the full nonlinear problem immediately, but instead provide a sequence of problems of increasing complexity.
+This section describes how such transition solvers can be implemented in dune-structures.
+We distinguish variations of continuous parameter, discrete parameters and (discrete) material variations.
 
 ### Continuous parameter variation
 
 This step is registered as `continuousvariation`.
+It defines the variation of a continuous parameter, that the step introduces into the parameter system.
+It always assumes the data type to be `double`.
+As all the variation steps, this step holds a number of substeps to perform for each value of the varied parameter.
+
+The continuous variation solver step accepts the following keys:
+* `steps` is a list of substeps that will be performed for each value of the varied parameter
+* `name` is the name of the parameter in the parameter system
+* `iterations` is the number of steps to take
+* `start` is the starting value of the variation parameter
+* `end` is the end value of the variation parameter
+
+The following example implements an incremental load parameter variation, where the solver step constructed for `"mysolver"` is responsible of retrieving the value of `"load"` from the parameter system (or using it through a parsed parameter function):
+
+```
+[continuousvariation]
+steps = mysolver
+name = load
+iterations = 10
+start = 0.0
+end = 1000.0
+```
 
 ### Discrete parameter variation
 
 This step is registered as `discretevariation`.
+It defines the variation of a discrete parameter, that the step introduces into the parameter system.
+As all the variation steps, this step holds a number of substeps to perform for each value of the varied parameter.
+
+The discrete variation solver step accepts the following keys:
+* `steps` is a list of substeps that will be performed for each value of the varied parameter
+* `name`is the name of the parameter in the parameter system
+* `datatype` is currently one of `"double"`, `"int"` or `"string"`.
+* `values` is a space-separated list of values that is to be used for this parameter
 
 ### Material parameter variation
 
 This step is registered as `discretematerialvariation`.
+It defines the variation of a discrete material parameter, that the step introduces into the parameter system.
+As all the variation steps, this step holds a number of substeps to perform for each value of the varied parameter.
+
+The discrete variation solver step accepts the following keys:
+* `steps` is a list of substeps that will be performed for each value of the varied parameter
+* `name`is the name of the parameter in the parameter system
+* `key` is the name of the key in the material section that the parameter corresponds to
+* `datatype` is currently one of `"double"`, `"int"` or `"string"`.
+* `values` is a space-separated list of values that is to be used for this parameter
+
+The following example applies a solvet first to a problem with a linear material law and then with a nonlinear one:
+
+```
+[material.mymaterial]
+model = ...
+...
+
+[discretevariation]
+steps = mysolver
+name = modelvar
+key = mymaterial.model
+datatype = string
+values = linear, neohookean
+```
 
 ## Visualization building blocks
+
+Visualization is integrated into the solver process.
+In order to trigger the writing of visualization data, add a visualization step from the next section to your solver.
 
 ### Visualization step
 
 This step is registered as `visualization`.
+This is the main solver step whose `apply` method writes a visualization file to the disk.
+For instationary problems, this step can be nested inside the time stepping solver step in order to produce an output per time step.
+In order to control the datasets contained in the visualization, add substeps to this step.
+Such substeps need to inherit from the base class `VisualizationStepBase<Vector>`.
+
+The visualization step accepts the following keys:
+* `instationary` is a bool specifying whether time sequences need to be written
+* `name` is the basename of the output file(s)
+* `path` is a relative directory where to place the output. If the directory does not exist, it is created.
 
 ### Solution visualization step
 
 This step is registered as `vis_solution`.
 It needs to be added as a child step to a visualization node.
+It visualizes the current solution and accepts no configuration values.
 
 ### MPI rank visualization step
 
 This step is registered as `vis_mpirank`.
 It needs to be added as a child step to a visualization node.
+It visualizes the MPI ranks in a distributed mesh and accepts no configuration values.
 
 ### Von-Mises Stress visualization step
 
 This step is registered as `vis_vonmises`.
 It needs to be added as a child step to a visualization node.
+It visualizes the Von-Mises stress of a given displacement field and accepts no configuration values.
 
 ### Physical entity data visualization step
 
 This step is registered as `vis_physicalentity`.
 It needs to be added as a child step to a visualization node.
+It visualizes the physical entity information from the GMSH file and accepts no configuration values.
 
 ### Fibre distance visualization step
 
 This step is registered as `vis_fibredistance`.
 It needs to be added as a child step to a visualization node.
+It visualizes the distance to a fibre as used in fibre-aligned prestressing.
+This is much more a debugging tool than something you would usually want to use.
+
+It accepts the following keys:
+* `key` is the key of the fibre configuration section from the grid section
 
 # How to...
 
@@ -296,6 +405,10 @@ here are some guidelines for likely extensions of the dune-structures code base.
 ## ... add a solver step
 
 * Write a class that inherits from `TransitionSolverStepBase<Vector>` from the file `dune/structures/solversteps/base.hh`.
+* Decide whether a more specialized base class is useful for you:
+    - `StepCollectionStep<Vector>` implements a step that accepts substeps
+    - `WrapperStep<Vector>` implements a step that wraps another step
+    - `VisualizationStepBase<Vector>` implements a step that adds data to visualization
 * If you want to construct your step from a configuration file, you must register a construction method like seen in `dune/structures/solverconstruction.hh`. This can either be done in that file or you can call the `registerStep` method of the `ConstructionContext` object directly or by doing this in the constructor of the construction object.
 * If your solver step requires parameter functions, have a look at the `get_callable` and `get_callable_array` functions from `dune/structures/solverconstruction.hh`.
 

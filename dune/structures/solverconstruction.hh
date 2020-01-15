@@ -127,7 +127,7 @@ class ConstructionContext
     registerStep("continuousvariation",
                  [](auto& ctx, const auto& p)
                  {
-                   auto step = std::make_shared<ContinuousVariationTransitionStep<Vector>>(p.template get<std::string>("parameter"),
+                   auto step = std::make_shared<ContinuousVariationTransitionStep<Vector>>(p.template get<std::string>("name"),
                                                                                            p.template get<int>("iterations"),
                                                                                            p.template get<double>("start"),
                                                                                            p.template get<double>("end"));
