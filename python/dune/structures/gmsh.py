@@ -176,12 +176,13 @@ def generate_cell_mesh(config, gmshexec="gmsh"):
         fibre = None
         shape = fconfig.get("shape", "cylinder")
         if shape == "cylinder":
-            offset = as_vec(fconfig.get("offset", [-1.0, 0.0, 0.0]))
-            orientation = as_vec(fconfig.get("orientation", [2.0, 0.0, 0.0]))
+            offset = as_vec(fconfig.get("start", [-1.0, 0.0, 0.0]))
+            orientation = as_vec(fconfig.get("end", [2.0, 0.0, 0.0]))
             radius = as_float(fconfig.get("radius", 0.1))
+            orientation = end - start
 
             # Add the cylinder
-            fibre = geo.add_cylinder(offset, orientation, radius)
+            fibre = geo.add_cylinder(start, orientation, radius)
         elif shape == "overnucleus":
             start = as_vec(fconfig.get("start", [-1.0, 0.0, 0.0]))
             middle = as_vec(fconfig.get("middle", [0.0, 0.0, 1.0]))

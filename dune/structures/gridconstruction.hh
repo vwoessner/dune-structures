@@ -22,8 +22,8 @@ auto construct_grid(Dune::MPIHelper& helper, const Dune::ParameterTree& params, 
   auto type = params.get<std::string>("type", "structured");
   if (type == "structured")
   {
-    Dune::FieldVector<double, 3> ll(0.0);
-    Dune::FieldVector<double, 3> ur(1.0);
+    auto ll = params.get<Dune::FieldVector<double, 3>>("lowerleft", Dune::FieldVector<double, 3>(0.0));
+    auto ur = params.get<Dune::FieldVector<double, 3>>("lowerleft", Dune::FieldVector<double, 3>(1.0));
     auto N = params.get<std::array<unsigned int, 3>>("N", {10, 10, 10});
 
     auto grid = Dune::StructuredGridFactory<GridType>::createSimplexGrid(ll, ur, N);
@@ -34,7 +34,7 @@ auto construct_grid(Dune::MPIHelper& helper, const Dune::ParameterTree& params, 
 
     return std::make_tuple(std::shared_ptr<GridType>(std::move(grid)), es, physical);
   }
-  if (type == "structures")
+  if (type == "cell")
   {
     // Trigger python mesh generator
     using namespace std::literals;

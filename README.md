@@ -92,10 +92,15 @@ $`r(v) = \int_\Omega P(u) : v dx`$
 
 withe $`P(u)`$ being the first Piola-Kirchhoff stress tensor.
 
-# Software Design
+# Software Documentation
 
 The software for dune-structures is designed such that it can handle a large variety of problems and numerical techniques without recompilation.
 This is done in order to be able to focus on productivity with experiments.
+
+A simulation program following this design consists of only three components:
+* A mesh generation facility. A later section in this documentation describes how mesh generation can be customized.
+* A facility that provides a container for degrees of freedom and constraints. Typically, this does not need to be changed at all, unless one wants to change the PDELab function spaces that are in use.
+* A solver that is composed of a number of (possibly nested) steps. This solver design will be explained in detail in the following and all implemented steps will be described in the following section.
 
 # Solver Component Documentation
 
@@ -390,6 +395,53 @@ This is much more a debugging tool than something you would usually want to use.
 
 It accepts the following keys:
 * `key` is the key of the fibre configuration section from the grid section
+
+# Mesh generation
+
+Mesh generation in the dune-structures code base is completely controlled from the configuration file.
+The grid specification is read from the `grid` section.
+The key `type` distinguishes several grid construction implementations.
+The currently implemented types are:
+* `structured` for a cube domain
+* `cell` for domains that have the shape of a biological cell
+
+The `structured` grid generator accepts the following keys:
+* `lowerleft` is the global coordinate of the lower left corner given as space-separated coordinates (defaults to $`(0, 0, 0)^T`$)
+* `upperright` is the global coordinate of the upper right corner given as space-separated coordinates (defaults to $`(1, 1, 1)^T`$)
+* `N` is the number of cells per direction given as space-separated values (default to $`10`$ per direction)
+
+The `cell` grid generator is implemented in Python for convenience and is based on `pygmsh`, a code generator for the GMSH language.
+It would in general be possible to write the same code in the GMSH language, but I do not like it (at all).
+It accepts the following keys:
+* `filename` denotes the filename GMSH should use for this mesh. You can omit any extensions, they are added automatically.
+* `scaling` allows to scale the entire mesh by a factor. You should use this when creating meshes on the micrometer scale to prevent gmsh to run into accuracy problems: Define your geometry on an $`\mathcal{O}(1)`$ scale and set the scaling parameter to e.g. $`1e-6`$.
+* `cytoplasm` is a subsection that itself accepts a number of keys:
+    - `meshwidth` is a floating point value that describes the characteristical mesh width
+    - `physical` sets the physical information tag on the cytoplasm. This must match with the information provided in the material section
+    - `shape` is one of `box`, `sphere`, `round`, `spread` and `ellipsoid`
+    - `lowerleft` is the lower left corner of the domain (only relevant for `shape=box`)
+    - `size` is the extent of the domain (only relevant for `shape=box`)
+    - `radius` describes the radius of the domain (only relevant for `shape={sphere,round,spread}`)
+    - `center` is the coordinate of the domain center (only relevant for `shape={sphere, round, ellipsoid}`)
+    - `cutoff` is a parameter $`\in [0,1]$ that describes where to cut off a sphere (only relevant for `shape={round, ellipsoid}`)
+    - `height` is the height of the domain (only relevant for `shape=spread`)
+    - `slope` is a parameter $`\in [0,1]$ that characterizes the curvature of the cell (only relevant for `shape=spread`)
+    - `radii` decribes the radii along the principal axes (only relevant for `shape=ellipsoid`)
+* `nucleus` is a subsection that itself accepts a number of keys:
+    - `enabled` is a boolean that switches off the presence of the nucleus without deleting it from the configuration file
+    - All parameters from the `cytoplasm` subsection are accepted here as well, although the `spread` and `round` shapes will probably never be useful for a cell nucleus.
+* `fibres` is a subsection that itself accepts a number of keys:
+    - `fibres` is a comma-separated list of subsections that describe individual fibres.
+    - The per-fibre subsections accept the following keys:
+        - `shape` is one of `cylinder` or `overnucleus`
+        - `meshwidth` is a floating point value that describes the characteristical mesh width of the fibre
+        - `start` and `end` are the coordinates of the fibre middle line endpoints
+        - `radius` is the fibre radius
+        - `middle` is the fibre curve middle point (only relevant for `shape=overnucleus`)
+        - `slope` is a parameter $`\in [0,1]$ that characterizes the curvature of the fibre (only relevant for `shape=overnucleus`)
+* `export` is a subsection that controls additional debug output from the meshing process and accepts the following keys:
+    - `geo.enabled` describes whether the generated gmsh geo file should be written to disk
+    - `geo.vtk` describes whether GMSH should write a VTK file for visualization of the grid (useful to look at the grid if the simulator fails)
 
 # How to...
 
