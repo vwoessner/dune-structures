@@ -97,10 +97,61 @@ withe $`P(u)`$ being the first Piola-Kirchhoff stress tensor.
 The software for dune-structures is designed such that it can handle a large variety of problems and numerical techniques without recompilation.
 This is done in order to be able to focus on productivity with experiments.
 
+## Principal workflow
+
 A simulation program following this design consists of only three components:
 * A mesh generation facility. A later section in this documentation describes how mesh generation can be customized.
 * A facility that provides a container for degrees of freedom and constraints. Typically, this does not need to be changed at all, unless one wants to change the PDELab function spaces that are in use.
 * A solver that is composed of a number of (possibly nested) steps. This solver design will be explained in detail in the following and all implemented steps will be described in the following section.
+
+## Composable solver abstraction
+
+The class `TransitionSolver<Vector>` from `dune/structures/transitionsolver.hh` implements a solver, which can be composed from individual simulation components.
+These components are called *solver steps* in the following and do inherit from a virtual interface `TransitionSolverStepBase<Vector>`.
+The solver object holds a list of such steps, which might themselves have substeps, resulting in tree-like solver structure.
+Calling the `apply` method of the solver class will trigger the entire solution procedure and will typically be done exactly once.
+
+Solver steps may implement the following virtual methods, where `vector` and `cc` are shared pointers to the vector of degrees of freedom and the constraints container:
+* `void pre(std::shared_ptr<V> vector, std::shared_ptr<CC> cc)` is called exactly once on each solver step before any call to `apply`.
+* `void apply(std::shared_ptr<V> vector, std::shared_ptr<CC> cc)` applies the solver step. This might happen multiple times depending on parent steps.
+* `void post(std::shared_ptr<V> vector, std::shared_ptr<CC> cc)` is called exactly once on each solver step after any call to `apply`.
+* `void set_solver(std::shared_ptr<Solver> solver)` is a hook that will be called exactly once on each solver step when the step is added to a solver. The default implementation stores a shared pointer to the solver object in the step object. This can be used to e.g. introduce a parameter on the solver.
+* `void update_parameter(std::string name, Parameter param)` is called whenever a parameter changes in the solver. A solver step can change its state accordingly or ignore it.
+
+## Parameter system
+
+The solver has a quite general mechanism of tracking parameters across solver steps.
+`std::variant` is used to describe parameters, which requires us to explicitly spell out all possible parameter types.
+This is currently done in `dune/structures/solversteps/base.hh` and contains the following types: `bool`, `int`, `double`, `std::string`, `Dune::ParameterTree` and shared pointers to material implementations.
+Parameters are stored using a string identifier.
+
+A solver step can use the following interface of a solver:
+* `void introduce_parameter(std::string, Parameter param)` registers a new parameter.
+* `void update_parameter(std::string, Parameter param)` updates the value of an existing parameter.
+
+## Runtime solver construction.
+
+While solver steps can be added to the solver via the `add` method, this is typically not desirable as it requires recompilation.
+Instead, solvers and their solver steps can be constructed directly from the ini file.
+This is implemented by the `ConstructionContext<Vector>` class from `dune/structures/solverconstruction.hh`.
+It reads the section `[solver]` from the inifile from which it currently recognizes a single key: `steps`.
+This is expected to be a comma-separated list of section names each describing one solver step.
+All of these step sections accept a key named `type` which defaults to the section name and determines which solver step class is used.
+For detailed information what configuration values the implemented steps accept, see the comprehensive documentation below.
+
+The following example adds two solver steps, where the `type` can be omitted for the `constraints` section:
+
+```
+[solver]
+steps = initialcondition, constraints
+
+[initialcondition]
+type = interpolation
+functions = 0.0, 0.0, 0.0
+
+[constraints]
+functions = 1, 1, 1
+```
 
 # Solver Component Documentation
 
