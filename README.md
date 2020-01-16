@@ -100,6 +100,7 @@ This is done in order to be able to focus on productivity with experiments.
 ## Principal workflow
 
 A simulation program following this design consists of only three components:
+
 * A mesh generation facility. A later section in this documentation describes how mesh generation can be customized.
 * A facility that provides a container for degrees of freedom and constraints. Typically, this does not need to be changed at all, unless one wants to change the PDELab function spaces that are in use.
 * A solver that is composed of a number of (possibly nested) steps. This solver design will be explained in detail in the following and all implemented steps will be described in the following section.
@@ -112,6 +113,7 @@ The solver object holds a list of such steps, which might themselves have subste
 Calling the `apply` method of the solver class will trigger the entire solution procedure and will typically be done exactly once.
 
 Solver steps may implement the following virtual methods, where `vector` and `cc` are shared pointers to the vector of degrees of freedom and the constraints container:
+
 * `void pre(std::shared_ptr<V> vector, std::shared_ptr<CC> cc)` is called exactly once on each solver step before any call to `apply`.
 * `void apply(std::shared_ptr<V> vector, std::shared_ptr<CC> cc)` applies the solver step. This might happen multiple times depending on parent steps.
 * `void post(std::shared_ptr<V> vector, std::shared_ptr<CC> cc)` is called exactly once on each solver step after any call to `apply`.
@@ -126,6 +128,7 @@ This is currently done in `dune/structures/solversteps/base.hh` and contains the
 Parameters are stored using a string identifier.
 
 A solver step can use the following interface of a solver:
+
 * `void introduce_parameter(std::string, Parameter param)` registers a new parameter.
 * `void update_parameter(std::string, Parameter param)` updates the value of an existing parameter.
 
@@ -166,6 +169,7 @@ These solver components handle fundamental building blocks of PDELab simulations
 This step is registered as `interpolation`. It implements interpolation of a given function into the solution vector. This is necessary for initial conditions of instationary problems as well as in order to implement Dirichlet boundary conditions. In the latter case an extension of the Dirichlet boundary condition needs to be interpolated before the solver is applied.
 
 The interpolation step accepts the following keys:
+
 * `functions` expects a comma separated list of expressions. These expressions are interpolated into the leaves of the function space tree in the given order. For elasticity problems this means that three functions for the displacements in $`x`$, $`y`$ and $`z`$ direction need to be given. Alternatively, a single function can be given, which will then be applied to all leaves of the function tree. Within these functions the strings $`x`$, $`y`$ and $`z`$ can be used to refer to the evaluation point in global coordinates.
 
 The following examples implement interpolation of initial conditions $`\mathbf{u}(\mathbf{x})=0`$ and $`\mathbf{u}(\mathbf{x})=\mathbf{x}`$:
@@ -185,6 +189,7 @@ functions = x, y, z
 This step is registered as `constraints`. It implements the assembly of the constraints container. This is e.g. necessary for implementation of Dirichlet boundary conditions.
 
 The constraints assembly step accepts the following keys:
+
 * `functions` expects a comma separated list of expressions as previously described for interpolation. The return value of these functions is a bolean value, where $`0`$ and $`1`$ can be used as literals. A true value results in a Dirichlet-constrained degree of freedom.
 
 The following example implements Dirichlet conditions for the $`z`$ component of the displacement in the $`x-y`$-plane and Neumann boundary conditions elsewhere:
@@ -201,6 +206,7 @@ It controls the basic time stepping loop and introduces parameters `"time"` and 
 This step has substeps, which can be added to through the `add` method.
 
 This timestepping step accepts the following keys:
+
 * `steps` is a list of substeps that will be constructed and added to the time stepper.
 * `Tstart` is the starting time
 * `Tend` is the stopping time
@@ -224,9 +230,11 @@ It introduces the material class as `"material"` into the parameter system, whic
 The parser always assumes the material to be heterogeneous, with the physical identity information from the grid generation process being used to map grid elements to material implementations.
 
 The material parser accepts the following keys:
+
 * `materials` is a list of strings that identifies subsections of the material section. Each such section describes a homogenous material.
 
 Each material subsection accepts the following keys:
+
 * `model` is the string that identifies the material law to be used. Currently implemented material laws are:
     - `linear` for linear isotropic elasticity theory
     - `stvenantkirchhoff` for the Saint-Venant-Kirchhoff model
@@ -278,6 +286,7 @@ The parameter will be accessible both from your custom solver steps, as well as 
 This way, you can specify physical parameters exactly once - removing a potential source of bugs.
 
 The parameter step accepts the following keys:
+
 * `name` is the string that defines the parameter name
 * `datatype` is currently one of `"double"`, `"int"` or `"string"`.
 * `value` is the value that this parameter is initialized with
@@ -304,6 +313,7 @@ It adds a `GridFunctionProbe` to the solver, which evaluates the solution at a g
 This is helpful when evaluating physical quantities of interest.
 
 The probe steps accepts the following keys:
+
 * `name` is a string that identifies the probe in the output (there might be several)
 * `position` is a global coordinate given as a space-separated list of coordinates. It determines the position where the solution is supposed to be evaluated.
 * `displace` is a boolean value that defaults to false. If set to true, the probe will return $`\mathbf{u}(\mathbf{x}) + \mathbf{x}`$ instead of $`\mathbf{u}(\mathbf{x})`$, which might be more insightful if the solution is a displacement field.
@@ -315,6 +325,7 @@ It applies a transformation to the solution.
 It allows the same kinds of expression as the interpolation step, except that the additional symbols `ux`, `uy` and `uz` are available.
 
 The transformation step accepts the following keys:
+
 * `functions` is the list of expressions that define the transformation - one for each leaf of the function space tree.
 
 The following block shifts a body in $`x`$-direction by adding $`1`$ to the displacement in $`x`$-direction.
@@ -338,6 +349,7 @@ It always assumes the data type to be `double`.
 As all the variation steps, this step holds a number of substeps to perform for each value of the varied parameter.
 
 The continuous variation solver step accepts the following keys:
+
 * `steps` is a list of substeps that will be performed for each value of the varied parameter
 * `name` is the name of the parameter in the parameter system
 * `iterations` is the number of steps to take
@@ -362,6 +374,7 @@ It defines the variation of a discrete parameter, that the step introduces into 
 As all the variation steps, this step holds a number of substeps to perform for each value of the varied parameter.
 
 The discrete variation solver step accepts the following keys:
+
 * `steps` is a list of substeps that will be performed for each value of the varied parameter
 * `name`is the name of the parameter in the parameter system
 * `datatype` is currently one of `"double"`, `"int"` or `"string"`.
@@ -374,6 +387,7 @@ It defines the variation of a discrete material parameter, that the step introdu
 As all the variation steps, this step holds a number of substeps to perform for each value of the varied parameter.
 
 The discrete variation solver step accepts the following keys:
+
 * `steps` is a list of substeps that will be performed for each value of the varied parameter
 * `name`is the name of the parameter in the parameter system
 * `key` is the name of the key in the material section that the parameter corresponds to
@@ -409,6 +423,7 @@ In order to control the datasets contained in the visualization, add substeps to
 Such substeps need to inherit from the base class `VisualizationStepBase<Vector>`.
 
 The visualization step accepts the following keys:
+
 * `instationary` is a bool specifying whether time sequences need to be written
 * `name` is the basename of the output file(s)
 * `path` is a relative directory where to place the output. If the directory does not exist, it is created.
@@ -445,6 +460,7 @@ It visualizes the distance to a fibre as used in fibre-aligned prestressing.
 This is much more a debugging tool than something you would usually want to use.
 
 It accepts the following keys:
+
 * `key` is the key of the fibre configuration section from the grid section
 
 # Mesh generation
@@ -453,10 +469,12 @@ Mesh generation in the dune-structures code base is completely controlled from t
 The grid specification is read from the `grid` section.
 The key `type` distinguishes several grid construction implementations.
 The currently implemented types are:
+
 * `structured` for a cube domain
 * `cell` for domains that have the shape of a biological cell
 
 The `structured` grid generator accepts the following keys:
+
 * `lowerleft` is the global coordinate of the lower left corner given as space-separated coordinates (defaults to $`(0, 0, 0)^T`$)
 * `upperright` is the global coordinate of the upper right corner given as space-separated coordinates (defaults to $`(1, 1, 1)^T`$)
 * `N` is the number of cells per direction given as space-separated values (default to $`10`$ per direction)
@@ -464,6 +482,7 @@ The `structured` grid generator accepts the following keys:
 The `cell` grid generator is implemented in Python for convenience and is based on `pygmsh`, a code generator for the GMSH language.
 It would in general be possible to write the same code in the GMSH language, but I do not like it (at all).
 It accepts the following keys:
+
 * `filename` denotes the filename GMSH should use for this mesh. You can omit any extensions, they are added automatically.
 * `scaling` allows to scale the entire mesh by a factor. You should use this when creating meshes on the micrometer scale to prevent gmsh to run into accuracy problems: Define your geometry on an $`\mathcal{O}(1)`$ scale and set the scaling parameter to e.g. $`10^{-6}`$.
 * `cytoplasm` is a subsection that itself accepts a number of keys:

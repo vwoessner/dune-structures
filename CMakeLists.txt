@@ -26,6 +26,7 @@ dune_enable_all_packages()
 
 link_libraries(stdc++fs)
 
+add_subdirectory(doc)
 add_subdirectory(operators)
 add_subdirectory(apps)
 add_subdirectory(cmake/modules)
