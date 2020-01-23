@@ -192,6 +192,12 @@ class ConstructionContext
                    return std::make_shared<ProbeTransitionStep<Vector>>(ctx.es.gridView(), p);
                  });
 
+    registerStep("quasistatic_elasticity",
+                 [](const auto& ctx, const auto& p)
+                 {
+                   return std::make_shared<QuasiStaticElastoDynamicsSolverStep<Vector>>(ctx.rootconfig);
+                 });
+
     registerStep("timeloop",
                  [](auto& ctx, const auto& p)
                  {

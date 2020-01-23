@@ -55,3 +55,18 @@ def elastodynamics_form(materials):
     r = _elasticity_form_impl(u0, v0, cell, materials, False) - inner(u1, v1) * dx
 
     return r, mass
+
+
+def quasistatic_mass_form():
+    # Define cell
+    cell = tetrahedron
+
+    # Setup finite elements
+    element = VectorElement("CG", cell, 1)
+    u = TrialFunction(element)
+    v = TestFunction(element)
+
+    # Later attach some meaning to this value
+    attenuation = 1e-6
+
+    return attenuation * inner(u, v) * dx
