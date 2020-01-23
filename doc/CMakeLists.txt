@@ -5,4 +5,4 @@ add_document(
     PANDOC_DIRECTIVES --lua-filter ${CMAKE_CURRENT_SOURCE_DIR}/gitlab-math.lua
 )
 
-set_target_properties(readme.pdf_product PROPERTIES EXCLUDE_FROM_ALL 1)
+set_target_properties(readme PROPERTIES EXCLUDE_FROM_ALL 1)
