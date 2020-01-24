@@ -35,7 +35,8 @@ struct InterpolationLeafNodeTransformation
 template<typename RootGFS>
 struct GFStoGFTransformation
 {
-  using Function = std::function<double(typename RootGFS::Traits::GridViewType::template Codim<0>::Entity::Geometry::GlobalCoordinate)>;
+  using Function = std::function<double(typename RootGFS::Traits::GridViewType::template Codim<0>::Entity,
+                                        typename RootGFS::Traits::GridViewType::template Codim<0>::Entity::Geometry::LocalCoordinate)>;
   using FunctionArray = std::array<Function, Dune::TypeTree::TreeInfo<RootGFS>::leafCount>;
 
   template<typename... FUNCS>
@@ -99,7 +100,8 @@ struct InstationaryInterpolationLeafNodeTransformation
 template<typename P, typename RootGFS>
 struct GFStoInstationaryGFTransformation
 {
-  using Function = std::function<double(typename RootGFS::Traits::GridViewType::template Codim<0>::Entity::Geometry::GlobalCoordinate)>;
+  using Function = std::function<double(typename RootGFS::Traits::GridViewType::template Codim<0>::Entity,
+                                        typename RootGFS::Traits::GridViewType::template Codim<0>::Entity::Geometry::LocalCoordinate)>;
   using FunctionArray = std::array<Function, Dune::TypeTree::TreeInfo<RootGFS>::leafCount>;
 
   template<typename... FUNCS>
@@ -164,7 +166,8 @@ struct ConstraintsLeafNodeTransformation
 template<typename RootGFS>
 struct GFStoConstraintsTransformation
 {
-  using Function = std::function<bool(typename RootGFS::Traits::GridViewType::template Codim<0>::Entity::Geometry::GlobalCoordinate)>;
+  using Function = std::function<bool(typename RootGFS::Traits::GridViewType::Intersection,
+                                      typename RootGFS::Traits::GridViewType::Intersection::Geometry::LocalCoordinate)>;
   using FunctionArray = std::array<Function, Dune::TypeTree::TreeInfo<RootGFS>::leafCount>;
 
   GFStoConstraintsTransformation(FunctionArray lambdas)

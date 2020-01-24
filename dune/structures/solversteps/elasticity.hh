@@ -68,11 +68,11 @@ class ElasticitySolverStep
     auto gfs = vector->gridFunctionSpaceStorage();
 
     // Interpolate the force vector
-    auto force_gf = makeGridFunctionTreeFromCallables(*gfs, get_callable_array<Vector, double(typename Base::GlobalCoordinate)>(*(this->solver), params.get<std::string>("force", "0.0")));
+    auto force_gf = makeGridFunctionTreeFromCallables(*gfs, get_callable_array<Vector, double(typename Base::Entity, typename Base::GlobalCoordinate)>(*(this->solver), params.get<std::string>("force", "0.0")));
     Dune::PDELab::interpolate(force_gf, *gfs, *force);
 
     // Interpolate the traction vector
-    auto traction_gf = makeGridFunctionTreeFromCallables(*gfs, get_callable_array<Vector, double(typename Base::GlobalCoordinate)>(*(this->solver), params.get<std::string>("traction", "0.0")));
+    auto traction_gf = makeGridFunctionTreeFromCallables(*gfs, get_callable_array<Vector, double(typename Base::Entity, typename Base::GlobalCoordinate)>(*(this->solver), params.get<std::string>("traction", "0.0")));
     Dune::PDELab::interpolate(traction_gf, *gfs, *traction);
 
     this->step->apply(vector, cc);

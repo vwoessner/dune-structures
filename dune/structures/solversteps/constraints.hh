@@ -14,7 +14,7 @@ class ConstraintsTransitionStep : public TransitionSolverStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
-  using FunctionSignature = bool(typename Base::GlobalCoordinate);
+  using FunctionSignature = bool(typename Base::GridView::Intersection, typename Base::GridView::Intersection::Geometry::LocalCoordinate);
 
   ConstraintsTransitionStep(std::function<FunctionSignature> func)
   {

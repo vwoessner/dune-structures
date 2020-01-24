@@ -17,7 +17,7 @@ class InterpolationTransitionStep
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
-  using FunctionSignature = typename Base::Range(typename Base::GlobalCoordinate);
+  using FunctionSignature = typename Base::Range(typename Base::Entity, typename Base::GlobalCoordinate);
 
   InterpolationTransitionStep(std::function<FunctionSignature> func)
   {

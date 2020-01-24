@@ -19,6 +19,7 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     libsuitesparse-dev \
     nano \
     openmpi-bin \
+    pandoc \
     pkg-config \
     python3 \
     python3-dev \

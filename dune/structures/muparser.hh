@@ -18,15 +18,16 @@ class MuParserCallable
 {};
 
 
-template<typename R, typename D>
-class MuParserCallable<R(D)>
+template<typename R, typename E, typename D>
+class MuParserCallable<R(E, D)>
 {
   public:
   using Range = R;
   using Domain = D;
+  using Global = typename E::Geometry::GlobalCoordinate;
 
   MuParserCallable(std::string expr)
-    : position(std::make_shared<D>(0.0))
+    : position(std::make_shared<Global>(0.0))
   {
     parser.DefineVar("x", &(*position)[0]);
     parser.DefineVar("y", &(*position)[1]);
@@ -43,15 +44,16 @@ class MuParserCallable<R(D)>
       parser.DefineVar(name, pointer);
   }
 
-  R operator()(const D& x)
+  R operator()(const E& e, const D& x)
   {
-    *position = x;
+    *position = e.geometry().global(x);
     return parser.Eval();
   }
 
   protected:
   mu::Parser parser;
-  std::shared_ptr<D> position;
+  std::shared_ptr<Global> position;
+  std::shared_ptr<std::vector<int>> physical_info;
 };
 
 

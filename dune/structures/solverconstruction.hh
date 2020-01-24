@@ -76,7 +76,14 @@ class ConstructionContext
   using StepBase = TransitionSolverStepBase<Vector>;
   using StepBasePointer = std::shared_ptr<StepBase>;
   using RegisterFunction = std::function<StepBasePointer(ConstructionContext<Vector>&, const Dune::ParameterTree&)>;
+  using Entity = typename StepBase::Entity;
   using Coord = typename StepBase::GlobalCoordinate;
+  using LocalCoord = typename Entity::Geometry::LocalCoordinate;
+  using Intersection = typename StepBase::GridView::Intersection;
+  using IntersectionLocalCoord = typename Intersection::Geometry::LocalCoordinate;
+
+  using LocalEntitySignature = double(Entity, LocalCoord);
+  using LocalIntersectionSignature = bool(Intersection, IntersectionLocalCoord);
 
   ConstructionContext(Dune::MPIHelper& helper,
                       const Dune::ParameterTree& config,
@@ -92,7 +99,7 @@ class ConstructionContext
                  [](const auto& ctx, const auto& p)
                  {
                    return std::make_shared<ConstraintsTransitionStep<Vector>>(
-                     get_callable_array<Vector, bool(Coord)>(*ctx.solver, p.template get<std::string>("functions")));
+                     get_callable_array<Vector, LocalIntersectionSignature>(*ctx.solver, p.template get<std::string>("functions")));
                  });
 
     registerStep("continuousvariation",
@@ -138,7 +145,7 @@ class ConstructionContext
                  [](const auto& ctx, const auto& p)
                  {
                    return std::make_shared<InterpolationTransitionStep<Vector>>(
-                     get_callable_array<Vector, double(Coord)>(*ctx.solver, p["functions"]));
+                     get_callable_array<Vector, LocalEntitySignature>(*ctx.solver, p["functions"]));
                  });
 
     registerStep("material",
@@ -180,12 +187,12 @@ class ConstructionContext
                    return step;
                  });
 
-
-    registerStep("transformation",
-                 [](auto& ctx, const auto& p)
-                 {
-                   return std::make_shared<TransformationTransitionStep<Vector>>(get_transformation<Vector, Coord(Coord, Coord)>(*ctx.solver, p.template get<std::string>("functions")));
-                 });
+//
+//    registerStep("transformation",
+//                 [](auto& ctx, const auto& p)
+//                 {
+//                   return std::make_shared<TransformationTransitionStep<Vector>>(get_transformation<Vector, Coord(Coord, Coord)>(*ctx.solver, p.template get<std::string>("functions")));
+//                 });
 
     registerStep("visualization",
                  [](auto& ctx, const auto& p)
