@@ -221,7 +221,12 @@ Most other solver parts could be reused in general PDE applications.
 
 This step is registered as `elasticity`.
 It applies a Newton solver for the hyperelastic problem defined by the generated operator (see above).
-It currently does not accept configuration parameters, although there would be plenty of solver related knobs to expose.
+
+The elasticity solver accepts the follwing keys:
+* `force` is a comma-separated list of expressions that describes the applied body force source term.
+  It is interpolated into a finite element function.
+* `traction` is a comma-separated list of expressions that describes the Neumann boundary force term.
+  It is interpolated into a finite element function.
 
 ### Material parser
 

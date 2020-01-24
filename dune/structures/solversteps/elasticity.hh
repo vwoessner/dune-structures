@@ -1,6 +1,7 @@
 #ifndef DUNE_STRUCTURES_SOLVERSTEPS_ELASTICITY_HH
 #define DUNE_STRUCTURES_SOLVERSTEPS_ELASTICITY_HH
 
+#include<dune/structures/muparser.hh>
 #include<dune/structures/solversteps/base.hh>
 #include<dune/structures/solversteps/instationary.hh>
 #include<dune/structures/solversteps/material.hh>
@@ -16,12 +17,16 @@ template<typename Vector>
 class ElasticitySolverStep
   : public WrapperStep<Vector,
                        NewtonSolverTransitionStep<Vector, ElasticityOperator<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
+                                                                             typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
+                                                                             typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
                                                                              typename TransitionSolverStepBase<Vector>::GridFunctionSpace>>>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
-  using LocalOperator = ElasticityOperator<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                           typename TransitionSolverStepBase<Vector>::GridFunctionSpace>;
+  using LocalOperator = ElasticityOperator<typename Base::GridFunctionSpace,
+                                           typename Base::GridFunctionSpace,
+                                           typename Base::GridFunctionSpace,
+                                           typename Base::GridFunctionSpace>;
 
   ElasticitySolverStep(const Dune::ParameterTree& params)
     : WrapperStep<Vector, NewtonSolverTransitionStep<Vector, LocalOperator>>(std::make_shared<NewtonSolverTransitionStep<Vector, LocalOperator>>())
@@ -49,12 +54,34 @@ class ElasticitySolverStep
   virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     auto gfs = vector->gridFunctionSpaceStorage();
-    this->step->set_localoperator(std::make_shared<LocalOperator>(*gfs, *gfs, params, material));
+    auto lop = std::make_shared<LocalOperator>(*gfs, *gfs, params, material);
+    force = std::make_shared<Vector>(*gfs, 0.0);
+    traction = std::make_shared<Vector>(*gfs, 0.0);
+    lop->setCoefficientForce(gfs, force);
+    lop->setCoefficientTraction(gfs, traction);
+    this->step->set_localoperator(lop);
     this->step->pre(vector, cc);
+  }
+
+  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  {
+    auto gfs = vector->gridFunctionSpaceStorage();
+
+    // Interpolate the force vector
+    auto force_gf = makeGridFunctionTreeFromCallables(*gfs, get_callable_array<Vector, double(typename Base::GlobalCoordinate)>(*(this->solver), params.get<std::string>("force", "0.0")));
+    Dune::PDELab::interpolate(force_gf, *gfs, *force);
+
+    // Interpolate the traction vector
+    auto traction_gf = makeGridFunctionTreeFromCallables(*gfs, get_callable_array<Vector, double(typename Base::GlobalCoordinate)>(*(this->solver), params.get<std::string>("traction", "0.0")));
+    Dune::PDELab::interpolate(traction_gf, *gfs, *traction);
+
+    this->step->apply(vector, cc);
   }
 
   private:
   std::shared_ptr<typename Base::Material> material;
+  std::shared_ptr<Vector> force;
+  std::shared_ptr<Vector> traction;
   Dune::ParameterTree params;
 };
 
@@ -63,6 +90,8 @@ template<typename Vector>
 class QuasiStaticElastoDynamicsSolverStep
   : public WrapperStep<Vector, OneStepMethodStep<Vector,
                                                  ElasticityOperator<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
+                                                                    typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
+                                                                    typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
                                                                     typename TransitionSolverStepBase<Vector>::GridFunctionSpace>,
                                                  QuasiStaticMassOperator<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
                                                                          typename TransitionSolverStepBase<Vector>::GridFunctionSpace>
@@ -72,6 +101,8 @@ class QuasiStaticElastoDynamicsSolverStep
   using Base = TransitionSolverStepBase<Vector>;
 
   using SpatialLocalOperator = ElasticityOperator<typename Base::GridFunctionSpace,
+                                                  typename Base::GridFunctionSpace,
+                                                  typename Base::GridFunctionSpace,
                                                   typename Base::GridFunctionSpace>;
 
   using TemporalLocalOperator = QuasiStaticMassOperator<typename Base::GridFunctionSpace,

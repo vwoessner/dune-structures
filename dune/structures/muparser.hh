@@ -2,9 +2,15 @@
 #define DUNE_STRUCTURES_MUPARSER_HH
 
 #include<dune/common/fvector.hh>
-#include<dune/structures/transitionsolver.hh>
+#include<dune/structures/utilities.hh>
+
 #include<muParser.h>
 #include<string>
+
+
+// Forward declaration of the transition solver class
+template<typename V>
+class TransitionSolver;
 
 
 template<typename Signature>
@@ -96,5 +102,37 @@ class MuParserTransformation<R(R, R)>
   }
   std::shared_ptr<Domain> solution;
 };
+
+
+template<typename Vector, typename Signature>
+std::function<Signature> get_callable(TransitionSolver<Vector>& solver, std::string expr)
+{
+  return MuParserCallable<Signature>(solver, expr);
+}
+
+
+template<typename Vector, typename Signature>
+std::function<Signature> get_transformation(TransitionSolver<Vector>& solver, std::string expr)
+{
+  return MuParserTransformation<Signature>(solver, expr);
+}
+
+
+template<typename Vector, typename Signature>
+std::array<std::function<Signature>,
+           Dune::TypeTree::TreeInfo<typename Vector::GridFunctionSpace>::leafCount> get_callable_array(TransitionSolver<Vector>& solver, std::string expr)
+{
+  using GFS = typename Vector::GridFunctionSpace;
+  constexpr auto len = Dune::TypeTree::TreeInfo<GFS>::leafCount;
+  std::array<std::function<Signature>, len> result;
+
+  auto exprs = str_split(expr);
+  if (exprs.size() == 1)
+    result.fill(get_callable<Vector, Signature>(solver, exprs[0]));
+  else
+    std::transform(exprs.begin(), exprs.end(), result.begin(), [&solver](auto it){ return get_callable<Vector, Signature>(solver, it); });
+
+  return std::move(result);
+}
 
 #endif

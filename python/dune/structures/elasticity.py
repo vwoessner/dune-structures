@@ -4,7 +4,7 @@ from dune.structures.codegen import UFLPhysicalParameter, UFLMaterialLawIndex, U
 from dune.testtools.parametertree.parser import parse_ini_file
 
 
-def _elasticity_form_impl(u, v, cell, materials, force):
+def _elasticity_form_impl(u, v, cell, materials):
     law_index = UFLMaterialLawIndex(cell)
 
     def material_form(material):
@@ -19,11 +19,6 @@ def _elasticity_form_impl(u, v, cell, materials, force):
     # The final form is a sum of all possible materials
     form = sum((material_form(m) for m in materials), Form([]))
 
-    # Maybe add some body force
-    if force:
-        f = Coefficient(element)
-        form = form - inner(force, v) * dx
-
     return form
 
 
@@ -37,7 +32,17 @@ def elasticity_form(materials, force=False):
     u = TrialFunction(element)
     v = TestFunction(element)
 
-    return _elasticity_form_impl(u, v, cell, materials, force)
+    form = _elasticity_form_impl(u, v, cell, materials)
+
+    # Add some body force (source term)
+    force = Coefficient(element, cargo={"name": "Force"})
+    form = form - inner(force, v) * dx
+
+    # Add some surface traction (Neumann boundary condition)
+    traction = Coefficient(element, cargo={"name": "Traction"})
+    form = form - inner(traction, v) * ds
+
+    return form
 
 
 def elastodynamics_form(materials):
@@ -52,7 +57,7 @@ def elastodynamics_form(materials):
     v0, v1 = TestFunctions(element)
 
     mass = (inner(u0, v1) + inner(u1, v0)) * dx
-    r = _elasticity_form_impl(u0, v0, cell, materials, False) - inner(u1, v1) * dx
+    r = _elasticity_form_impl(u0, v0, cell, materials) - inner(u1, v1) * dx
 
     return r, mass
 
