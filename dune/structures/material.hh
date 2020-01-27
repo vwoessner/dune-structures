@@ -78,6 +78,7 @@ class ElasticMaterialBase
   public:
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
+  static constexpr int dim = GV::dimension;
 
   ElasticMaterialBase(const GV& gv) : gv(gv)
   {}
@@ -86,13 +87,13 @@ class ElasticMaterialBase
 
   virtual T parameter(const Entity& e, const Coord& x, int i) const = 0;
 
-  virtual void prestress(const Entity& e, const Coord& x, Dune::FieldMatrix<T, 3, 3>&) const = 0;
+  virtual void prestress(const Entity& e, const Coord& x, Dune::FieldMatrix<T, dim, dim>&) const = 0;
 
   virtual int material_law_index(const Entity& e) const = 0;
 
-  virtual T parameter(const Entity& e, int i, T x0, T x1, T x2) const
+  T parameter_unrolled(const Entity& e, int i, T x...) const
   {
-    return this->parameter(e, Dune::FieldVector<T, 3>{x0, x1, x2}, i);
+    return this->parameter(e, Dune::FieldVector<T, dim>{x}, i);
   }
 
   GV gridView() const
@@ -114,12 +115,9 @@ template<typename GV, typename T>
 class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
 {
   public:
-  // I need this weirdo here for the moment.
-  // Godbolt experiment: https://godbolt.org/z/xBB7zC
-  using ElasticMaterialBase<GV, T>::parameter;
-
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
+  static constexpr int dim = GV::dimension;
 
   virtual ~HomogeneousElasticMaterial() {}
 
@@ -145,7 +143,7 @@ class HomogeneousElasticMaterial : public ElasticMaterialBase<GV, T>
     return parameters[i];
   }
 
-  virtual void prestress(const Entity& e, const Coord& x, Dune::FieldMatrix<T, 3, 3>& m) const override
+  virtual void prestress(const Entity& e, const Coord& x, Dune::FieldMatrix<T, dim, dim>& m) const override
   {
     prestr->evaluate(e, x, m);
   }
@@ -166,12 +164,9 @@ template<typename GV, typename T>
 class MaterialCollection : public ElasticMaterialBase<GV, T>
 {
   public:
-  // I need this weirdo here for the moment.
-  // Godbolt experiment: https://godbolt.org/z/xBB7zC
-  using ElasticMaterialBase<GV, T>::parameter;
-
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
+  static constexpr int dim = GV::dimension;
 
   virtual ~MaterialCollection() {}
 
@@ -202,7 +197,7 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
     return get_material(e)->parameter(e, x ,i);
   }
 
-  virtual void prestress(const Entity& e, const Coord& x, Dune::FieldMatrix<T, 3, 3>& m) const override
+  virtual void prestress(const Entity& e, const Coord& x, Dune::FieldMatrix<T, dim, dim>& m) const override
   {
     get_material(e)->prestress(e, x, m);
   }

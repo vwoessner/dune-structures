@@ -270,8 +270,8 @@ class VonMisesStressVisualizationStep
     VonMisesStressGridFunction<Vector> stress(*vector, material);
 
     // Interpolate the stress into a grid function
-    using P0FEM = Dune::PDELab::P0LocalFiniteElementMap<typename Base::ctype, typename Base::Range, 3>;
-    auto p0fem = std::make_shared<P0FEM>(Dune::GeometryTypes::simplex(3));
+    using P0FEM = Dune::PDELab::P0LocalFiniteElementMap<typename Base::ctype, typename Base::Range, Base::dim>;
+    auto p0fem = std::make_shared<P0FEM>(Dune::GeometryTypes::simplex(Base::dim));
     using P0GFS = Dune::PDELab::GridFunctionSpace<typename Base::EntitySet, P0FEM, Dune::PDELab::NoConstraints, typename Base::VectorBackend>;
     auto p0gfs = std::make_shared<P0GFS>(es, p0fem);
     p0gfs->name("vonmises");
@@ -303,19 +303,22 @@ class FibreDistanceVisualizationStep
 
   virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
-    auto es = vector->gridFunctionSpace().entitySet();
-    using FEM = Dune::PDELab::PkLocalFiniteElementMap<typename Base::EntitySet, double, typename Base::Range, 1>;
-    auto fem = std::make_shared<FEM>(es);
-    using GFS = Dune::PDELab::GridFunctionSpace<typename Base::EntitySet, FEM, Dune::PDELab::NoConstraints, typename Base::VectorBackend>;
-    auto gfs = std::make_shared<GFS>(es, fem);
-    gfs->name("fibredistance");
-    using DistanceVector = Dune::PDELab::Backend::Vector<GFS, typename Base::ctype>;
-    auto container = std::make_shared<DistanceVector>(gfs);
+    if constexpr (Base::dim == 3)
+    {
+      auto es = vector->gridFunctionSpace().entitySet();
+      using FEM = Dune::PDELab::PkLocalFiniteElementMap<typename Base::EntitySet, double, typename Base::Range, 1>;
+      auto fem = std::make_shared<FEM>(es);
+      using GFS = Dune::PDELab::GridFunctionSpace<typename Base::EntitySet, FEM, Dune::PDELab::NoConstraints, typename Base::VectorBackend>;
+      auto gfs = std::make_shared<GFS>(es, fem);
+      gfs->name("fibredistance");
+      using DistanceVector = Dune::PDELab::Backend::Vector<GFS, typename Base::ctype>;
+      auto container = std::make_shared<DistanceVector>(gfs);
 
-    auto lambda = [this](const auto& e, const auto& x){ return this->prestress.distance_to_minimum(e, x); };
-    auto gf = Dune::PDELab::makeGridFunctionFromCallable(es.gridView(), lambda);
-    Dune::PDELab::interpolate(gf, *gfs, *container);
-    this->parent->add_dataset(container);
+      auto lambda = [this](const auto& e, const auto& x){ return this->prestress.distance_to_minimum(e, x); };
+      auto gf = Dune::PDELab::makeGridFunctionFromCallable(es.gridView(), lambda);
+      Dune::PDELab::interpolate(gf, *gfs, *container);
+      this->parent->add_dataset(container);
+    }
   }
 
   private:

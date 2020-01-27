@@ -7,4 +7,5 @@ dune_symlink_to_source_files(FILES fibrecube.ini
                                    quasistatic.ini
                                    robert.ini
                                    simplecell.ini
+                                   twod_beam.ini
                              )

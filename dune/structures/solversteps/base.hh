@@ -24,6 +24,7 @@ class TransitionSolverStepBase
   using Vector = V;
   using GridFunctionSpace = typename Vector::GridFunctionSpace;
   using GridView = typename GridFunctionSpace::Traits::GridViewType;
+  static constexpr int dim = GridView::dimension;
   using Grid = typename GridView::Traits::Grid;
   using EntitySet = typename GridFunctionSpace::Traits::EntitySet;
   using ctype = typename Grid::ctype;

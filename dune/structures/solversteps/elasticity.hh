@@ -7,26 +7,47 @@
 #include<dune/structures/solversteps/material.hh>
 #include<dune/structures/solversteps/newton.hh>
 
+// The 3D operators
 #include"operators/elasticity_operator.hh"
 #include"operators/quasistatic_mass_operator.hh"
+
+// The 2D operators
+#include"operators/elasticity_2d_operator.hh"
+#include"operators/quasistatic_mass_2d_operator.hh"
+
 //#include"operators/elastodynamics_spatial_operator.hh"
 //#include"operators/elastodynamics_temporal_operator.hh"
+
+
+template<typename GFS, int dim>
+struct OperatorSwitch
+{};
+
+template<typename GFS>
+struct OperatorSwitch<GFS, 3>
+{
+  using Elasticity = ElasticityOperator<GFS, GFS, GFS, GFS>;
+  using Mass = QuasiStaticMassOperator<GFS, GFS>;
+};
+
+template<typename GFS>
+struct OperatorSwitch<GFS, 2>
+{
+  using Elasticity = Elasticity2DOperator<GFS, GFS, GFS, GFS>;
+  using Mass = QuasiStaticMass2DOperator<GFS, GFS>;
+};
 
 
 template<typename Vector>
 class ElasticitySolverStep
   : public WrapperStep<Vector,
-                       NewtonSolverTransitionStep<Vector, ElasticityOperator<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                                             typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                                             typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                                             typename TransitionSolverStepBase<Vector>::GridFunctionSpace>>>
+                       NewtonSolverTransitionStep<Vector, typename OperatorSwitch<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
+                                                                                  TransitionSolverStepBase<Vector>::dim>::Elasticity>>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
-  using LocalOperator = ElasticityOperator<typename Base::GridFunctionSpace,
-                                           typename Base::GridFunctionSpace,
-                                           typename Base::GridFunctionSpace,
-                                           typename Base::GridFunctionSpace>;
+  static constexpr int dim = Base::dim;
+  using LocalOperator = typename OperatorSwitch<typename Base::GridFunctionSpace, dim>::Elasticity;
 
   ElasticitySolverStep(const Dune::ParameterTree& params)
     : WrapperStep<Vector, NewtonSolverTransitionStep<Vector, LocalOperator>>(std::make_shared<NewtonSolverTransitionStep<Vector, LocalOperator>>())
@@ -89,24 +110,19 @@ class ElasticitySolverStep
 template<typename Vector>
 class QuasiStaticElastoDynamicsSolverStep
   : public WrapperStep<Vector, OneStepMethodStep<Vector,
-                                                 ElasticityOperator<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                                    typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                                    typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                                    typename TransitionSolverStepBase<Vector>::GridFunctionSpace>,
-                                                 QuasiStaticMassOperator<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                                         typename TransitionSolverStepBase<Vector>::GridFunctionSpace>
-    >>
+                                                 typename OperatorSwitch<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
+                                                                         TransitionSolverStepBase<Vector>::dim>::Elasticity,
+                                                 typename OperatorSwitch<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
+                                                                         TransitionSolverStepBase<Vector>::dim>::Mass>
+    >
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
+  using SpatialLocalOperator = typename OperatorSwitch<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
+                                                       Base::dim>::Elasticity;
 
-  using SpatialLocalOperator = ElasticityOperator<typename Base::GridFunctionSpace,
-                                                  typename Base::GridFunctionSpace,
-                                                  typename Base::GridFunctionSpace,
-                                                  typename Base::GridFunctionSpace>;
-
-  using TemporalLocalOperator = QuasiStaticMassOperator<typename Base::GridFunctionSpace,
-                                                        typename Base::GridFunctionSpace>;
+  using TemporalLocalOperator = typename OperatorSwitch<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
+                                                        Base::dim>::Mass;
 
   QuasiStaticElastoDynamicsSolverStep(const Dune::ParameterTree& rootparams)
     : WrapperStep<Vector, OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>(std::make_shared<OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>())

@@ -67,7 +67,8 @@ class UFLMaterialLawIndex(Coefficient):
 class UFLPrestress(Coefficient):
     def __init__(self, cell):
         self.cell = cell
-        FE = ufl.TensorElement("DG", cell, 0, (3, 3))
+        dim = cell.topological_dimension()
+        FE = ufl.TensorElement("DG", cell, 0, (dim, dim))
         Coefficient.__init__(self, FE)
 
     def _ufl_expr_reconstruct(self):
@@ -82,8 +83,9 @@ class UFLPrestress(Coefficient):
         cell = name_cell(restriction)
 
         name = "prestress_eval"
+        dim = self.cell.topological_dimension()
         temporary_variable(name,
-                           shape=(3, 3),
+                           shape=(dim, dim),
                            managed=False,
                            shape_impl=("fm",))
         material_class = name_material_class()
@@ -117,7 +119,7 @@ class LoopyPhysicalParameter(lp.symbolic.FunctionIdentifier):
     @property
     def name(self):
         material_class = name_material_class()
-        return "{}->parameter".format(material_class)
+        return "{}->parameter_unrolled".format(material_class)
 
 
 class LoopyMaterialLawIndex(lp.symbolic.FunctionIdentifier):

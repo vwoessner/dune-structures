@@ -2,6 +2,7 @@ from dune.codegen.options import get_option
 from dune.codegen.ufl.execution import *
 from dune.structures.codegen import UFLPhysicalParameter, UFLMaterialLawIndex, UFLPrestress
 from dune.testtools.parametertree.parser import parse_ini_file
+from ufl.cell import simplex
 
 
 def _elasticity_form_impl(u, v, cell, materials):
@@ -23,9 +24,9 @@ def _elasticity_form_impl(u, v, cell, materials):
 
 
 
-def elasticity_form(materials, force=False):
+def elasticity_form(materials, dim=3):
     # Define cell
-    cell = tetrahedron
+    cell = simplex(dim)
 
     # Setup finite elements
     element = VectorElement("CG", cell, 1)
@@ -45,9 +46,9 @@ def elasticity_form(materials, force=False):
     return form
 
 
-def elastodynamics_form(materials):
+def elastodynamics_form(materials, dim=3):
     # Define cell
-    cell = tetrahedron
+    cell = simplex(dim)
 
     # Setup finite elements
     delement = VectorElement("CG", cell, 1)
@@ -62,9 +63,9 @@ def elastodynamics_form(materials):
     return r, mass
 
 
-def quasistatic_mass_form():
+def quasistatic_mass_form(dim=3):
     # Define cell
-    cell = tetrahedron
+    cell = simplex(dim)
 
     # Setup finite elements
     element = VectorElement("CG", cell, 1)

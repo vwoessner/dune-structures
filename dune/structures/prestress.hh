@@ -18,10 +18,11 @@ class MaterialPrestressBase
   public:
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
+  static constexpr int dim = GV::dimension;
 
   virtual ~MaterialPrestressBase() {}
 
-  virtual void evaluate(const Entity&, const Coord&, Dune::FieldMatrix<T, 3, 3>&) const = 0;
+  virtual void evaluate(const Entity&, const Coord&, Dune::FieldMatrix<T, dim, dim>&) const = 0;
 };
 
 
@@ -32,12 +33,13 @@ class NoPrestress
   public:
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
+  static constexpr int dim = GV::dimension;
 
   virtual ~NoPrestress() {}
 
-  virtual void evaluate(const Entity&, const Coord&, Dune::FieldMatrix<T, 3, 3>& m) const override
+  virtual void evaluate(const Entity&, const Coord&, Dune::FieldMatrix<T, dim, dim>& m) const override
   {
-    m = Dune::FieldMatrix<T, 3, 3>(0.0);
+    m = Dune::FieldMatrix<T, dim, dim>(0.0);
   }
 };
 
@@ -49,6 +51,7 @@ class IsotropicPrestress
   public:
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
+  static constexpr int dim = GV::dimension;
 
   IsotropicPrestress(const Dune::ParameterTree& param)
     : scale(param.get<T>("scale"))
@@ -56,9 +59,9 @@ class IsotropicPrestress
 
   virtual ~IsotropicPrestress() {}
 
-  virtual void evaluate(const Entity&, const Coord&, Dune::FieldMatrix<T, 3, 3>& m) const override
+  virtual void evaluate(const Entity&, const Coord&, Dune::FieldMatrix<T, dim, dim>& m) const override
   {
-    Dune::FieldMatrix<T, 3, 3> ret(0.0);
+    Dune::FieldMatrix<T, dim, dim> ret(0.0);
     ret[0][0] = scale;
     ret[1][1] = scale;
     ret[2][2] = scale;
@@ -77,40 +80,51 @@ class StraightFibrePrestress
   public:
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
+  static constexpr int dim = GV::dimension;
 
   StraightFibrePrestress(const Dune::ParameterTree& param)
     : scale(param.get<T>("scale"))
-    , dir(param.get<Dune::FieldVector<T, 3>>("direction"))
+    , dir(param.get<Dune::FieldVector<T, dim>>("direction"))
   {
     T norm = dir.two_norm();
-    for (int i=0; i<3; ++i)
+    for (int i=0; i<dim; ++i)
       dir[i] = dir[i] / norm;
   }
 
   virtual ~StraightFibrePrestress() {}
 
-  virtual void evaluate(const Entity&, const Coord&, Dune::FieldMatrix<T, 3, 3>& m) const override
+  virtual void evaluate(const Entity&, const Coord&, Dune::FieldMatrix<T, dim, dim>& m) const override
   {
-    for (int i=0; i<3; ++i)
-      for (int j=0; j<3; ++j)
+    for (int i=0; i<dim; ++i)
+      for (int j=0; j<dim; ++j)
         m[i][j] = scale * dir[i] * dir[j];
   }
 
   private:
   T scale;
-  Dune::FieldVector<T, 3> dir;
+  Dune::FieldVector<T, dim> dir;
 };
 
+template<typename GV, typename T, int dim>
+class CurvedFibrePrestressImpl
+  : public NoPrestress<GV, T>
+{
+  public:
+  CurvedFibrePrestressImpl(const Dune::ParameterTree&, const Dune::ParameterTree&)
+  {
+    DUNE_THROW(MaterialError, "Curved fibre prestress not implemented in 2d");
+  }
+};
 
 template<typename GV, typename T>
-class CurvedFibrePrestress
+class CurvedFibrePrestressImpl<GV, T, 3>
   : public MaterialPrestressBase<GV, T>
 {
   public:
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
 
-  CurvedFibrePrestress(const Dune::ParameterTree& param, const Dune::ParameterTree& rootconfig)
+  CurvedFibrePrestressImpl(const Dune::ParameterTree& param, const Dune::ParameterTree& rootconfig)
     : scale(param.get<T>("scale", T(1.0)))
     , sampling(param.get<int>("sampling", 50))
     , subsampling(param.get<int>("subsampling", 100))
@@ -148,7 +162,7 @@ class CurvedFibrePrestress
     control_points[1][2] = end;
   }
 
-  virtual ~CurvedFibrePrestress() {}
+  virtual ~CurvedFibrePrestressImpl() {}
 
   virtual void evaluate(const Entity& e, const Coord& x, Dune::FieldMatrix<T, 3, 3>& m) const override
   {
@@ -276,6 +290,9 @@ class CurvedFibrePrestress
   T scale;
   int sampling, subsampling;
 };
+
+template<typename GV, typename T>
+using CurvedFibrePrestress = CurvedFibrePrestressImpl<GV, T, GV::dimension>;
 
 
 template<typename GV, typename T>

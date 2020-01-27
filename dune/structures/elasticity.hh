@@ -11,6 +11,8 @@
 template<typename ES, typename RangeType = double>
 auto elasticity_setup(ES es)
 {
+  constexpr int dim = ES::dimension;
+
   // Set up finite element maps...
   using FEM = Dune::PDELab::PkLocalFiniteElementMap<ES, double, RangeType, 1>;
   auto fem = std::make_shared<FEM>(es);
@@ -18,7 +20,7 @@ auto elasticity_setup(ES es)
   // Set up grid function spaces...
   using VB = Dune::PDELab::ISTL::VectorBackend<Dune::PDELab::ISTL::Blocking::none>;
   using CASS = Dune::PDELab::ConformingDirichletConstraints;
-  using GFS = Dune::PDELab::VectorGridFunctionSpace<ES, FEM, 3, VB, VB, CASS>;
+  using GFS = Dune::PDELab::VectorGridFunctionSpace<ES, FEM, dim, VB, VB, CASS>;
   auto gfs = std::make_shared<GFS>(es, fem);
   gfs->name("displacement");
   gfs->update();

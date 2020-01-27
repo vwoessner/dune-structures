@@ -54,9 +54,10 @@ class TransformationTransitionStep : public TransitionSolverStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
+  static constexpr int dim = Base::dim;
   using GridFunction = TransformationGridFunction<Vector>;
 
-  using FunctionSignature = Dune::FieldVector<double, 3>(Dune::FieldVector<double, 3>, Dune::FieldVector<double, 3>);
+  using FunctionSignature = Dune::FieldVector<double, dim>(Dune::FieldVector<double, dim>, Dune::FieldVector<double, dim>);
 
   TransformationTransitionStep(const std::function<FunctionSignature>& func)
     : func(func)

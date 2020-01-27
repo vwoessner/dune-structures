@@ -7,14 +7,30 @@
 #include<memory>
 
 
-template<typename Vector>
-class OneToOneMappingChecker
+template<typename Vector, int dim>
+class OneToOneMappingCheckerImpl
  : public TransitionSolverStepBase<Vector>
 {
   public:
   using Base = TransitionSolverStepBase<Vector>;
 
-  virtual ~OneToOneMappingChecker() {}
+  virtual ~OneToOneMappingCheckerImpl() {}
+
+  void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  {
+    std::cout << "One-to-one checker not implemented for dimension " << dim << std::endl;
+  }
+};
+
+
+template<typename Vector>
+class OneToOneMappingCheckerImpl<Vector, 3>
+ : public TransitionSolverStepBase<Vector>
+{
+  public:
+  using Base = TransitionSolverStepBase<Vector>;
+
+  virtual ~OneToOneMappingCheckerImpl() {}
 
   void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
@@ -27,5 +43,9 @@ class OneToOneMappingChecker
     std::cout << (is_onetoone(vdgf) ? "Success!" : "Failure") << std::endl;
   }
 };
+
+
+template<typename Vector>
+using OneToOneMappingChecker = OneToOneMappingCheckerImpl<Vector, TransitionSolverStepBase<Vector>::dim>;
 
 #endif

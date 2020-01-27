@@ -15,14 +15,30 @@ int main(int argc, char** argv)
   Dune::ParameterTree params;
   Dune::ParameterTreeParser::readINITree(argv[1], params);
 
-  auto [grid, es, physical] = construct_grid(helper, params.sub("grid"), argv);
-  auto [x, cc] = elasticity_setup(es);
-  using V = std::remove_reference<decltype(*x)>::type;
+  // Dispatch on grid dimension
+  auto dim = params.get<int>("grid.dimension", 3);
+  if (dim == 2)
+  {
+    auto [grid, es, physical] = construct_grid<2>(helper, params.sub("grid"), argv);
+    auto [x, cc] = elasticity_setup(es);
+    using V = std::remove_reference<decltype(*x)>::type;
 
-  ConstructionContext<V> ctx(helper, params, es, physical);
-  auto solver = ctx.construct(params.sub("solver"));
+    ConstructionContext<V> ctx(helper, params, es, physical);
+    auto solver = ctx.construct(params.sub("solver"));
 
-  solver->apply(x, cc);
+    solver->apply(x, cc);
+  }
+  else if (dim == 3)
+  {
+    auto [grid, es, physical] = construct_grid<3>(helper, params.sub("grid"), argv);
+    auto [x, cc] = elasticity_setup(es);
+    using V = std::remove_reference<decltype(*x)>::type;
+
+    ConstructionContext<V> ctx(helper, params, es, physical);
+    auto solver = ctx.construct(params.sub("solver"));
+
+    solver->apply(x, cc);
+  }
 
   return 0;
 }

@@ -50,7 +50,8 @@ class MaterialLawBase(object):
         raise NotImplementedError
 
     def deformation_gradient(self, u):
-        return Identity(3) + grad(u)
+        dim = u.ufl_element().cell().topological_dimension()
+        return Identity(dim) + grad(u)
 
     def infinitesimal_strain(self, u):
         return Variable(0.5 * (grad(u) + grad(u).T), label=Label(42))
@@ -85,7 +86,8 @@ class MaterialLawBase(object):
 
 class InfinitesimalStrainBaseMaterialLaw(MaterialLawBase):
     def deformation_gradient(self, u):
-        return Identity(3)
+        dim = u.ufl_element().cell().topological_dimension()
+        return Identity(dim)
 
     def second_piola(self, u):
         return diff(self.strain_energy(u), self.infinitesimal_strain(u))
