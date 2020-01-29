@@ -7,6 +7,36 @@
 #include<memory>
 #include<tuple>
 
+// The 3D operators
+#include"operators/elasticity_operator.hh"
+#include"operators/quasistatic_mass_operator.hh"
+
+// The 2D operators
+#include"operators/elasticity_2d_operator.hh"
+#include"operators/quasistatic_mass_2d_operator.hh"
+
+//#include"operators/elastodynamics_spatial_operator.hh"
+//#include"operators/elastodynamics_temporal_operator.hh"
+
+
+template<typename GFS, int dim>
+struct OperatorSwitch
+{};
+
+template<typename GFS>
+struct OperatorSwitch<GFS, 3>
+{
+  using Elasticity = ElasticityOperator<GFS, GFS, GFS, GFS>;
+  using Mass = QuasiStaticMassOperator<GFS, GFS>;
+};
+
+template<typename GFS>
+struct OperatorSwitch<GFS, 2>
+{
+  using Elasticity = Elasticity2DOperator<GFS, GFS, GFS, GFS>;
+  using Mass = QuasiStaticMass2DOperator<GFS, GFS>;
+};
+
 
 template<typename ES, typename RangeType = double>
 auto elasticity_setup(ES es)

@@ -472,6 +472,7 @@ It accepts the following keys:
 
 Mesh generation in the dune-structures code base is completely controlled from the configuration file.
 The grid specification is read from the `grid` section.
+The `dimension` key from this section is used to select the correct simulator. Note that the code base is geared towards 3D simulation and the 2D code does not support all the features the 3D one does. It was only implemented to reproduce results from papers.
 The key `type` distinguishes several grid construction implementations.
 The currently implemented types are:
 

@@ -20,6 +20,7 @@
 #include<dune/structures/solversteps/onetoone.hh>
 #include<dune/structures/solversteps/parameter.hh>
 #include<dune/structures/solversteps/probe.hh>
+#include<dune/structures/solversteps/reinforced.hh>
 #include<dune/structures/solversteps/transformation.hh>
 #include<dune/structures/solversteps/variation.hh>
 #include<dune/structures/solversteps/visualization.hh>
