@@ -107,71 +107,71 @@ class EulerBernoulli2DLocalOperator
       int index = -1;
       typename GFS::Traits::GridView::template Codim<0>::Entity element = *(gv.template begin<0>());
 
-      for(const auto& e : elements(gv))
-      {
-        auto geo = e.geometry();
-        if (referenceElement(geo).checkInside(geo.local((*fibre)(0.0))))
-        {
-          index = is.index(e);
-          element = e;
-          break;
-        }
-      }
-
-      if (index == -1)
-        DUNE_THROW(Dune::Exception, "Fibre start out of domain!");
-
       // This tolerance threshold is used in the following
       double tol = 1e-12;
 
+      // We iterate this algorithm, because in rare scenarios the strategy of going from cell to cell
+      // across intersections. This is when the curve traverses through a grid vertex from one cell
+      // to a non-adjacent one. In these cases we restart the algorithm by doing a grid search for the
+      // current cell.
       double t = 0.0;
-      bool first_cell = true;
-      while(index != -1)
+      while(t + tol < 1.0)
       {
-        // Find the value of t where the curve leaves the element
-        double bisect_a = t;
-        double bisect_b = 1.0;
-        while (bisect_b - bisect_a > tol)
+        if (t > tol)
+          std::cout << "A restart of the curve cutting algorithm was needed at t=" << t << std::endl;
+
+        // Find the first cell in the grid that the curve traverses
+        for(const auto& e : elements(gv))
         {
-          double mid = 0.5 * (bisect_a + bisect_b);
-          auto geo = element.geometry();
-          if (referenceElement(geo).checkInside(geo.local((*fibre)(mid))))
-            bisect_a = mid;
-          else
-            bisect_b = mid;
+          auto geo = e.geometry();
+          if (referenceElement(geo).checkInside(geo.local((*fibre)(t + tol))))
+          {
+            index = is.index(e);
+            element = e;
+            break;
+          }
         }
 
-        // Store the intersection that we found
-        element_fibre_intersections[index].push_back({fibindex, t, bisect_a});
-        t = bisect_a;
+        if (index == -1)
+          DUNE_THROW(Dune::Exception, "Fibre start is not in the domain!");
 
-        bool boundary_found = false;
-        for (auto intersection : intersections(gv, element))
+        // Go from cell to cell by finding the intersection that the
+        while(index != -1)
         {
-          if (intersection.boundary())
-            boundary_found = true;
-          else
+          // Find the value of t where the curve leaves the element
+          double bisect_a = t;
+          double bisect_b = 1.0;
+          while (bisect_b - bisect_a > tol)
           {
-            auto geo = intersection.outside().geometry();
-            if (referenceElement(geo).checkInside(geo.local((*fibre)(t + tol))))
-            {
-              element = intersection.outside();
-              index = is.index(element);
-              break;
-            }
+            double mid = 0.5 * (bisect_a + bisect_b);
+            auto geo = element.geometry();
+            if (referenceElement(geo).checkInside(geo.local((*fibre)(mid))))
+              bisect_a = mid;
+            else
+              bisect_b = mid;
           }
 
-          // If we get here, we did not find the next cell
+          // Store the fibre segment that we found
+          element_fibre_intersections[index].push_back({fibindex, t, bisect_a});
+          t = bisect_a;
+
+          // Find the intersection and the outside cell
+          bool boundary_found = false;
           index = -1;
+          for (auto intersection : intersections(gv, element))
+          {
+            if (!intersection.boundary())
+            {
+              auto geo = intersection.outside().geometry();
+              if (referenceElement(geo).checkInside(geo.local((*fibre)(t + tol))))
+              {
+                element = intersection.outside();
+                index = is.index(element);
+                break;
+              }
+            }
+          }
         }
-
-        // This checks for the following awkward scenario: We did not find the next cell,
-        // but we are not yet at the exit boundary. This means that the curve crosses a
-        // grid vertex so exactly, that the tolerance prohibits finding a neighboring cell.
-        if ((index == -1) && ((!boundary_found) || (first_cell)))
-          std::cout << "There is an issue here!" << std::endl;
-
-        first_cell = false;
       }
     }
 
