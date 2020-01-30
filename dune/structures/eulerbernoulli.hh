@@ -132,8 +132,41 @@ class EulerBernoulli2DLocalOperator
           }
         }
 
+        // Coordinate not in the grid, but this is not the start => It is the end.
+        if ((index == -1) && (t > tol))
+          break;
+
+        // The coordinate was not found in the grid, we need to bisect the curve
+        // to find a starting element within the grid.
         if (index == -1)
-          DUNE_THROW(Dune::Exception, "Fibre start is not in the domain!");
+        {
+          double bisect_a = t;
+          double bisect_b = 0.5;
+          while (bisect_b - bisect_a > tol)
+          {
+            double mid = 0.5 * (bisect_a + bisect_b);
+            index = -1;
+            for(const auto& e : elements(gv))
+            {
+              auto geo = e.geometry();
+              if (referenceElement(geo).checkInside(geo.local((*fibre)(mid))))
+              {
+                index = is.index(e);
+                element = e;
+                break;
+              }
+            }
+
+            if (index == -1)
+              bisect_a = mid;
+            else
+              bisect_b = mid;
+          }
+
+          // Restart the outer loop
+          t = bisect_a;
+          continue;
+        }
 
         // Go from cell to cell by finding the intersection that the
         while(index != -1)
