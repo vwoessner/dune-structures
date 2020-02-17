@@ -8,6 +8,7 @@
  *  Cut Finite Element Methods for Linear Elasticity Problems
  */
 
+#include<dune/geometry/affinegeometry.hh>
 #include<dune/pdelab.hh>
 #include<dune/pdelab/localoperator/sum.hh>
 #include<dune/structures/elasticity.hh>
@@ -23,7 +24,8 @@ class FibreParametrizationBase
   public:
   using GlobalCoordinate = Dune::FieldVector<double, dim>;
   virtual ~FibreParametrizationBase() = default;
-  virtual GlobalCoordinate operator()(double t) const = 0;
+  virtual GlobalCoordinate eval(double t) const = 0;
+  virtual GlobalCoordinate tangent(double t) const = 0;
 };
 
 
@@ -40,13 +42,60 @@ class StraightFibre
     , dir(param.get<GlobalCoordinate>("end") - start)
   {}
 
-  virtual GlobalCoordinate operator()(double t) const override
+  virtual GlobalCoordinate eval(double t) const override
   {
     return start + t * dir;
   }
 
+  virtual GlobalCoordinate tangent(double t) const override
+  {
+    return dir;
+  }
+
   private:
   GlobalCoordinate start, dir;
+};
+
+
+template<typename LocalBasis>
+class BasisEvaluator
+{
+  public:
+  using RFT = typename LocalBasis::Traits::RangeFieldType;
+
+  BasisEvaluator(const LocalBasis& basis) : basis(basis)
+  {}
+
+  void update(const typename LocalBasis::Traits::DomainType& coord)
+  {
+    basis.partial({0, 0}, coord, phi);
+    basis.partial({1, 0}, coord, d1phi[0]);
+    basis.partial({0, 1}, coord, d1phi[1]);
+    basis.partial({2, 0}, coord, d2phi[0]);
+    basis.partial({1, 1}, coord, d2phi[1]);
+    basis.partial({0, 2}, coord, d2phi[2]);
+  }
+
+  RFT function(std::size_t i) const
+  {
+    return phi[i][0];
+  }
+
+  RFT jacobian(std::size_t i, std::size_t j) const
+  {
+    return d1phi[j][i][0];
+  }
+
+  RFT hessian(std::size_t i, std::size_t j, std::size_t k) const
+  {
+    return d2phi[j + k][i][0];
+  }
+
+  private:
+  const LocalBasis& basis;
+  std::vector<typename LocalBasis::Traits::RangeType> phi;
+  std::array<std::vector<typename LocalBasis::Traits::RangeType>, 2> d1phi;
+  std::array<std::vector<typename LocalBasis::Traits::RangeType>, 3> d2phi;
 };
 
 
@@ -124,7 +173,7 @@ class EulerBernoulli2DLocalOperator
         for(const auto& e : elements(gv))
         {
           auto geo = e.geometry();
-          if (referenceElement(geo).checkInside(geo.local((*fibre)(t + tol))))
+          if (referenceElement(geo).checkInside(geo.local(fibre->eval(t + tol))))
           {
             index = is.index(e);
             element = e;
@@ -149,7 +198,7 @@ class EulerBernoulli2DLocalOperator
             for(const auto& e : elements(gv))
             {
               auto geo = e.geometry();
-              if (referenceElement(geo).checkInside(geo.local((*fibre)(mid))))
+              if (referenceElement(geo).checkInside(geo.local(fibre->eval(mid))))
               {
                 index = is.index(e);
                 element = e;
@@ -178,7 +227,7 @@ class EulerBernoulli2DLocalOperator
           {
             double mid = 0.5 * (bisect_a + bisect_b);
             auto geo = element.geometry();
-            if (referenceElement(geo).checkInside(geo.local((*fibre)(mid))))
+            if (referenceElement(geo).checkInside(geo.local(fibre->eval(mid))))
               bisect_a = mid;
             else
               bisect_b = mid;
@@ -196,7 +245,7 @@ class EulerBernoulli2DLocalOperator
             if (!intersection.boundary())
             {
               auto geo = intersection.outside().geometry();
-              if (referenceElement(geo).checkInside(geo.local((*fibre)(t + tol))))
+              if (referenceElement(geo).checkInside(geo.local(fibre->eval(t + tol))))
               {
                 element = intersection.outside();
                 index = is.index(element);
@@ -217,7 +266,79 @@ class EulerBernoulli2DLocalOperator
 
   template<typename EG, typename LFSU, typename X, typename LFSV, typename R>
   void alpha_volume (const EG& eg, const LFSU& lfsu, const X& x, const LFSV& lfsv, R& r) const
-  {}
+  {
+    // See whether something needs to be done on this cell
+    auto entity = eg.entity();
+    auto it = element_fibre_intersections.find(is.index(entity));
+    if (it == element_fibre_intersections.end())
+      return;
+
+    // Extract some necessary information
+    using namespace Dune::Indices;
+    auto child_0 = child(lfsu, _0);
+    auto child_1 = child(lfsu, _1);
+    auto cellgeo = entity.geometry();
+
+    BasisEvaluator<typename LFSU::template Child<0>::Type::Traits::FiniteElementType::Traits::LocalBasisType> basis(child_0.finiteElement().localBasis());
+
+    // Loop over curve segments in this cell. most of the time this will be just one.
+    auto segments = it->second;
+    for (auto segment : segments)
+    {
+      auto fibre = fibre_parametrizations[std::get<0>(segment)];
+      auto start = fibre->eval(std::get<1>(segment));
+      auto stop = fibre->eval(std::get<2>(segment));
+
+      // Construct the geometry of the 1D inclusion embedded into the reference element of the cell
+      using LineGeometry = Dune::AffineGeometry<double, 1, 2>;
+      const auto& linerefelem = Dune::Geo::ReferenceElements<double, 1>::simplex();
+      LineGeometry linegeo(linerefelem, std::vector<Dune::FieldVector<double, 2>>{cellgeo.local(start), cellgeo.local(stop)});
+
+      // Iterate over the quadrature points - currently always midpoint rule
+      for (const auto& ip : quadratureRule(linegeo, 0))
+      {
+        // Position in reference element of the cell
+        auto pos = linegeo.global(ip.position());
+
+        // Evaluate the basis, its jacobian and its hessians
+        basis.update(pos);
+
+        // Evaluate the displacement field u
+        Dune::FieldVector<double, 2> u(0.0);
+        for (std::size_t c=0; c<2; ++c)
+          for (std::size_t i=0; i<child_0.size(); i++)
+            u[c] += x(child(lfsu, c), i) * basis.function(i);
+
+        // And the jacobian of displacement
+        Dune::FieldMatrix<double, 2, 2> d1u(0.0);
+        for (std::size_t c=0; c<2; ++c)
+          for (std::size_t d=0; d<2; ++d)
+            for (std::size_t i=0; i<child_0.size(); ++i)
+              d1u[c][d] = x(child(lfsu, c), i) * basis.jacobian(i, d);
+
+        // And finally the hessian of the displacement
+        std::array<Dune::FieldMatrix<double, 2, 2>, 2> d2u{0.0, 0.0};
+        for (std::size_t c=0; c<2; ++c)
+          for (std::size_t d0=0; d0<2; ++d0)
+            for (std::size_t d1=0; d1<2; ++d1)
+              for (std::size_t i=0; i<child_0.size(); ++i)
+                d2u[c][d0][d1] = x(child(lfsu, c), i) * basis.hessian(i, d0, d1);
+
+        // Evaluate the jacobian inverse transposed
+        auto jit = cellgeo.jacobianInverseTransposed(pos);
+
+        // The tangential and normal vector for the curve
+        // Determination of the evaluation parameter here is a bit flaky.
+        auto t = fibre->tangent(std::get<1>(segment) + ip.position() * (std::get<2>(segment) - std::get<1>(segment)));
+        Dune::FieldVector<double, 2> n{1.0, -t[0] / t[1]};
+
+        // The needed tangential derivative quantities. These expressions are generated
+        // using the generate_tangential_derivatives Python script.
+        auto dtut = ((d1u[1][1] * jit[1][1] + d1u[1][0] * jit[1][0]) * t[1] + (d1u[0][1] * jit[1][1] + d1u[0][0] * jit[1][0]) * t[0]) * t[1] + ((d1u[1][1] * jit[0][1] + d1u[1][0] * jit[0][0]) * t[1] + (d1u[0][1] * jit[0][1] + d1u[0][0] * jit[0][0]) * t[0]) * t[0];
+        auto dt2ut = ((d1u[1][1] * jit[1][1] + d1u[1][0] * jit[1][0]) * t[1] + (d1u[0][1] * jit[1][1] + d1u[0][0] * jit[1][0]) * t[0]) * t[1] + ((d1u[1][1] * jit[0][1] + d1u[1][0] * jit[0][0]) * t[1] + (d1u[0][1] * jit[0][1] + d1u[0][0] * jit[0][0]) * t[0]) * t[0];
+      }
+    }
+  }
 
   template<typename IG, typename LFSU, typename X, typename LFSV, typename R>
   void alpha_skeleton (const IG& ig,
@@ -230,6 +351,10 @@ class EulerBernoulli2DLocalOperator
   const typename GFS::Traits::GridView::IndexSet& is;
   std::map<int, std::vector<std::tuple<std::size_t, double, double>>> element_fibre_intersections;
   std::vector<std::shared_ptr<FibreParametrizationBase<2>>> fibre_parametrizations;
+
+  using LocalBasisType = typename GFS::template Child<0>::Type::Traits::FiniteElementMap::Traits::FiniteElementType::Traits::LocalBasisType;
+  using Cache = Dune::PDELab::LocalBasisCache<LocalBasisType>;
+  Cache cache;
 };
 
 
