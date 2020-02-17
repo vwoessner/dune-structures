@@ -170,7 +170,7 @@ This step is registered as `interpolation`. It implements interpolation of a giv
 
 The interpolation step accepts the following keys:
 
-* `functions` expects a comma separated list of expressions. These expressions are interpolated into the leaves of the function space tree in the given order. For elasticity problems this means that three functions for the displacements in $`x`$, $`y`$ and $`z`$ direction need to be given. Alternatively, a single function can be given, which will then be applied to all leaves of the function tree. Within these functions the strings $`x`$, $`y`$ and $`z`$ can be used to refer to the evaluation point in global coordinates.
+* `functions` expects a comma separated list of expressions. These expressions are interpolated into the leaves of the function space tree in the given order. For elasticity problems this means that three functions for the displacements in $`x`$, $`y`$ and $`z`$ direction need to be given. Alternatively, a single function can be given, which will then be applied to all leaves of the function tree. Within these functions the strings $`x`$, $`y`$ and $`z`$ can be used to refer to the evaluation point in global coordinates. Additionally, the symbol $`group`$ can be used to get access to the physical entity tag from the current cell.
 
 The following examples implement interpolation of initial conditions $`\mathbf{u}(\mathbf{x})=0`$ and $`\mathbf{u}(\mathbf{x})=\mathbf{x}`$:
 

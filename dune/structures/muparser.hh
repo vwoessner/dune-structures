@@ -2,6 +2,7 @@
 #define DUNE_STRUCTURES_MUPARSER_HH
 
 #include<dune/common/fvector.hh>
+#include<dune/grid/concepts/intersection.hh>
 #include<dune/structures/utilities.hh>
 
 #include<muParser.h>
@@ -13,39 +14,47 @@ template<typename V>
 class TransitionSolver;
 
 
-template<typename Signature>
+template<typename Vector, typename Signature>
 class MuParserCallable
 {};
 
 
-template<typename R, typename E, typename D>
-class MuParserCallable<R(E, D)>
+template<typename Vector, typename R, typename E, typename D>
+class MuParserCallable<Vector, R(E, D)>
 {
   public:
   using Range = R;
   using Domain = D;
   using Global = typename E::Geometry::GlobalCoordinate;
 
-  MuParserCallable(std::string expr)
+  MuParserCallable(TransitionSolver<Vector>& solver, std::string expr)
     : position(std::make_shared<Global>(0.0))
+    , current_physical(std::make_shared<double>(0))
+    , indexset(solver.entitySet().indexSet())
+    , physical_info(solver.template param<std::shared_ptr<std::vector<int>>>("physical"))
   {
     parser.DefineVar("x", &(*position)[0]);
     parser.DefineVar("y", &(*position)[1]);
     parser.DefineVar("z", &(*position)[2]);
 
     parser.SetExpr(expr);
-  }
 
-  template<typename Vector>
-  MuParserCallable(TransitionSolver<Vector>& solver, std::string expr)
-    : MuParserCallable(expr)
-  {
+    parser.DefineVar("group", current_physical.get());
     for (auto [name, pointer] : solver.export_parameters())
       parser.DefineVar(name, pointer);
   }
 
   R operator()(const E& e, const D& x)
   {
+    // Look up the index of this cell (or the neighboring in the intersection case)
+    int index;
+    if constexpr (Dune::isIntersection<E>())
+        index = indexset.index(e.inside());
+    else
+        index = indexset.index(e);
+
+    // Evaluate quantities accessible from muparser expressions
+    *current_physical = (*physical_info)[index];
     *position = e.geometry().global(x);
     return parser.Eval();
   }
@@ -53,33 +62,28 @@ class MuParserCallable<R(E, D)>
   protected:
   mu::Parser parser;
   std::shared_ptr<Global> position;
+  std::shared_ptr<double> current_physical;
+  const typename TransitionSolver<Vector>::EntitySet::Traits::IndexSet& indexset;
   std::shared_ptr<std::vector<int>> physical_info;
+
 };
 
 
-template<typename Signature>
+template<typename Vector, typename Signature>
 class MuParserTransformation
 {};
 
 
-template<typename R>
-class MuParserTransformation<R(R, R)>
-  : public MuParserCallable<R(R)>
+template<typename Vector, typename R>
+class MuParserTransformation<Vector, R(R, R)>
+  : public MuParserCallable<Vector, R(R)>
 {
   public:
   using Range = R;
   using Domain = R;
 
-  MuParserTransformation(std::string expr)
-    : MuParserCallable<R(R)>(expr)
-    , solution(std::make_shared<Domain>(0.0))
-  {
-    define_solution_variables();
-  }
-
-  template<typename Vector>
   MuParserTransformation(TransitionSolver<Vector>& solver, std::string expr)
-    : MuParserCallable<R(R)>(solver, expr)
+    : MuParserCallable<Vector, R(R)>(solver, expr)
     , solution(std::make_shared<Domain>(0.0))
   {
     define_solution_variables();
@@ -109,14 +113,14 @@ class MuParserTransformation<R(R, R)>
 template<typename Vector, typename Signature>
 std::function<Signature> get_callable(TransitionSolver<Vector>& solver, std::string expr)
 {
-  return MuParserCallable<Signature>(solver, expr);
+  return MuParserCallable<Vector, Signature>(solver, expr);
 }
 
 
 template<typename Vector, typename Signature>
 std::function<Signature> get_transformation(TransitionSolver<Vector>& solver, std::string expr)
 {
-  return MuParserTransformation<Signature>(solver, expr);
+  return MuParserTransformation<Vector, Signature>(solver, expr);
 }
 
 

@@ -94,7 +94,7 @@ class ConstructionContext
     , rootconfig(config)
     , es(es)
     , physical(physical)
-    , solver(std::make_unique<TransitionSolver<Vector>>())
+    , solver(std::make_unique<TransitionSolver<Vector>>(es))
   {
     registerStep("constraints",
                  [](const auto& ctx, const auto& p)

@@ -37,7 +37,13 @@ class TransitionSolverStepBase
 
   // The possible types for parametrization of solver steps
   using Material = MaterialCollection<typename Base::EntitySet, double>;
-  using Parameter = std::variant<bool, double, int, std::string, std::shared_ptr<Material>, Dune::ParameterTree>;
+  using Parameter = std::variant<bool,
+                                 double,
+                                 int,
+                                 std::string,
+                                 std::shared_ptr<Material>,
+                                 std::shared_ptr<std::vector<int>>,
+                                 Dune::ParameterTree>;
 
   // The virtual interface - pretty simple
   virtual ~TransitionSolverStepBase() {}

@@ -34,15 +34,17 @@ template<typename Vector>
 class TransitionSolver
 {
   public:
+  using EntitySet = typename TransitionSolverStepBase<Vector>::EntitySet;
   using ConstraintsContainer = typename Vector::GridFunctionSpace::template ConstraintsContainer<typename Vector::field_type>::Type;
   using Parameter = typename TransitionSolverStepBase<Vector>::Parameter;
 
-  TransitionSolver()
-    : steps(0)
+  TransitionSolver(EntitySet es)
+    : es(es), steps(0)
   {}
 
-  TransitionSolver(std::vector<std::shared_ptr<TransitionSolverStepBase<Vector>>> steps)
-    : steps(steps)
+  TransitionSolver(EntitySet es, std::vector<std::shared_ptr<TransitionSolverStepBase<Vector>>> steps)
+    : es(es)
+    , steps(steps)
   {}
 
   template<typename STEP>
@@ -145,7 +147,13 @@ class TransitionSolver
     return paramdata.count(name) > 0;
   }
 
+  EntitySet entitySet() const
+  {
+    return es;
+  }
+
   private:
+  EntitySet es;
   std::vector<std::shared_ptr<TransitionSolverStepBase<Vector>>> steps;
   std::map<std::string, Parameter> paramdata;
 };

@@ -33,6 +33,7 @@ class MaterialInitialization
   virtual void set_solver(std::shared_ptr<typename Base::Solver> solver_) override
   {
     this->solver = solver_;
+    this->solver->introduce_parameter("physical", physical);
     this->solver->introduce_parameter("material_params", params);
     this->solver->introduce_parameter("material", material);
   }
