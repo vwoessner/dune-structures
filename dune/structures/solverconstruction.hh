@@ -81,6 +81,7 @@ class ConstructionContext
   using LocalCoord = typename Entity::Geometry::LocalCoordinate;
   using Intersection = typename StepBase::GridView::Intersection;
   using IntersectionLocalCoord = typename Intersection::Geometry::LocalCoordinate;
+  static constexpr int dim = StepBase::dim;
 
   using LocalEntitySignature = double(Entity, LocalCoord);
   using LocalIntersectionSignature = bool(Intersection, IntersectionLocalCoord);
@@ -141,11 +142,12 @@ class ConstructionContext
     registerStep("elasticity",
                  with_tree<ElasticitySolverStep<Vector>>);
 
-    registerStep("fibrereinforcedelasticity",
-                 [](auto& ctx, const auto& p)
-                 {
-                   return std::make_shared<FibreReinforcedElasticitySolverStep<Vector, 0>>(ctx.rootconfig, p);
-                 });
+    if constexpr (dim == 2)
+      registerStep("fibrereinforcedelasticity",
+                   [](auto& ctx, const auto& p)
+                   {
+                     return std::make_shared<FibreReinforcedElasticitySolverStep<Vector, 0>>(ctx.rootconfig, p);
+                   });
 
     registerStep("interpolation",
                  [](const auto& ctx, const auto& p)
