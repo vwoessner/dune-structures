@@ -24,12 +24,12 @@ def _elasticity_form_impl(u, v, cell, materials):
 
 
 
-def elasticity_form(materials, dim=3):
+def elasticity_form(materials, degree=1, dim=3):
     # Define cell
     cell = simplex(dim)
 
     # Setup finite elements
-    element = VectorElement("CG", cell, 1)
+    element = VectorElement("CG", cell, degree)
     u = TrialFunction(element)
     v = TestFunction(element)
 
@@ -46,12 +46,12 @@ def elasticity_form(materials, dim=3):
     return form
 
 
-def elastodynamics_form(materials, dim=3):
+def elastodynamics_form(materials, degree=1, dim=3):
     # Define cell
     cell = simplex(dim)
 
     # Setup finite elements
-    delement = VectorElement("CG", cell, 1)
+    delement = VectorElement("CG", cell, degree)
     element = MixedElement(delement, delement)
 
     u0, u1 = TrialFunctions(element)
@@ -63,12 +63,12 @@ def elastodynamics_form(materials, dim=3):
     return r, mass
 
 
-def quasistatic_mass_form(dim=3):
+def quasistatic_mass_form(degree=1, dim=3):
     # Define cell
     cell = simplex(dim)
 
     # Setup finite elements
-    element = VectorElement("CG", cell, 1)
+    element = VectorElement("CG", cell, degree)
     u = TrialFunction(element)
     v = TestFunction(element)
 

@@ -21,7 +21,7 @@ class ElasticitySolverStep
   using LocalOperator = typename OperatorSwitch<typename Base::GridFunctionSpace, dim>::Elasticity;
 
   ElasticitySolverStep(const Dune::ParameterTree& params)
-    : WrapperStep<Vector, NewtonSolverTransitionStep<Vector, LocalOperator>>(std::make_shared<NewtonSolverTransitionStep<Vector, LocalOperator>>())
+    : WrapperStep<Vector, NewtonSolverTransitionStep<Vector, LocalOperator>>(std::make_shared<NewtonSolverTransitionStep<Vector, LocalOperator>>(params))
     , params(params)
   {}
 

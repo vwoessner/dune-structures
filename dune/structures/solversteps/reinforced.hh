@@ -16,7 +16,7 @@ class FibreReinforcedElasticitySolverStep
   using LocalOperator = FibreReinforcedBulkOperator<typename Base::GridFunctionSpace, dim>;
 
   FibreReinforcedElasticitySolverStep(const Dune::ParameterTree& rootparams, const Dune::ParameterTree& params)
-    : WrapperStep<Vector, NewtonSolverTransitionStep<Vector, LocalOperator>>(std::make_shared<NewtonSolverTransitionStep<Vector, LocalOperator>>())
+    : WrapperStep<Vector, NewtonSolverTransitionStep<Vector, LocalOperator>>(std::make_shared<NewtonSolverTransitionStep<Vector, LocalOperator>>(params))
     , rootparams(rootparams)
     , params(params)
   {}

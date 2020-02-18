@@ -195,12 +195,13 @@ class ConstructionContext
                    return step;
                  });
 
-//
-//    registerStep("transformation",
-//                 [](auto& ctx, const auto& p)
-//                 {
-//                   return std::make_shared<TransformationTransitionStep<Vector>>(get_transformation<Vector, Coord(Coord, Coord)>(*ctx.solver, p.template get<std::string>("functions")));
-//                 });
+    if constexpr (false) {
+    registerStep("transformation",
+                 [](auto& ctx, const auto& p)
+                 {
+                   return std::make_shared<TransformationTransitionStep<Vector>>(get_transformation<Vector, Coord(Coord, Coord)>(*ctx.solver, p.template get<std::string>("functions")));
+                 });
+    }
 
     registerStep("visualization",
                  [](auto& ctx, const auto& p)

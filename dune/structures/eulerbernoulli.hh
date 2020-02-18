@@ -257,11 +257,11 @@ class EulerBernoulli2DLocalOperator
       }
     }
 
-    std::cout << "Fibre intersection summary:" << std::endl;
-    for (auto [cell, info] : element_fibre_intersections)
-      for (auto sinfo : info)
-        std::cout << "Cell " << cell << " intersects fibre " << std::get<0>(sinfo)
-                  << " on the curve interval [" << std::get<1>(sinfo) << "," << std::get<2>(sinfo) << "]" << std::endl;
+//    std::cout << "Fibre intersection summary:" << std::endl;
+//    for (auto [cell, info] : element_fibre_intersections)
+//      for (auto sinfo : info)
+//        std::cout << "Cell " << cell << " intersects fibre " << std::get<0>(sinfo)
+//                  << " on the curve interval [" << std::get<1>(sinfo) << "," << std::get<2>(sinfo) << "]" << std::endl;
   }
 
   template<typename EG, typename LFSU, typename X, typename LFSV, typename R>
@@ -295,7 +295,7 @@ class EulerBernoulli2DLocalOperator
       LineGeometry linegeo(linerefelem, std::vector<Dune::FieldVector<double, 2>>{cellgeo.local(start), cellgeo.local(stop)});
 
       // Iterate over the quadrature points - currently always midpoint rule
-      for (const auto& ip : quadratureRule(linegeo, 0))
+      for (const auto& ip : quadratureRule(linegeo, 2))
       {
         // Position in reference element of the cell
         auto pos = linegeo.global(ip.position());
@@ -330,12 +330,30 @@ class EulerBernoulli2DLocalOperator
         // The tangential and normal vector for the curve
         // Determination of the evaluation parameter here is a bit flaky.
         auto t = fibre->tangent(std::get<1>(segment) + ip.position() * (std::get<2>(segment) - std::get<1>(segment)));
-        Dune::FieldVector<double, 2> n{1.0, -t[0] / t[1]};
+        Dune::FieldVector<double, 2> n{-t[1], t[0]};
 
         // The needed tangential derivative quantities. These expressions are generated
         // using the generate_tangential_derivatives Python script.
         auto dtut = ((d1u[1][1] * jit[1][1] + d1u[1][0] * jit[1][0]) * t[1] + (d1u[0][1] * jit[1][1] + d1u[0][0] * jit[1][0]) * t[0]) * t[1] + ((d1u[1][1] * jit[0][1] + d1u[1][0] * jit[0][0]) * t[1] + (d1u[0][1] * jit[0][1] + d1u[0][0] * jit[0][0]) * t[0]) * t[0];
-        auto dt2ut = ((d1u[1][1] * jit[1][1] + d1u[1][0] * jit[1][0]) * t[1] + (d1u[0][1] * jit[1][1] + d1u[0][0] * jit[1][0]) * t[0]) * t[1] + ((d1u[1][1] * jit[0][1] + d1u[1][0] * jit[0][0]) * t[1] + (d1u[0][1] * jit[0][1] + d1u[0][0] * jit[0][0]) * t[0]) * t[0];
+        auto dt2ut = (((jit[1][1] * (jit[1][1] * d2u[1][1][1] + jit[1][0] * d2u[1][1][0]) + jit[1][0] * (jit[1][1] * d2u[1][0][1] + jit[1][0] * d2u[1][0][0])) * n[1] + (jit[1][1] * (jit[1][1] * d2u[0][1][1] + jit[1][0] * d2u[0][1][0]) + jit[1][0] * (jit[1][1] * d2u[0][0][1] + jit[1][0] * d2u[0][0][0])) * n[0]) * t[1] + ((jit[0][1] * (jit[1][1] * d2u[1][1][1] + jit[1][0] * d2u[1][1][0]) + jit[0][0] * (jit[1][1] * d2u[1][0][1] + jit[1][0] * d2u[1][0][0])) * n[1] + (jit[0][1] * (jit[1][1] * d2u[0][1][1] + jit[1][0] * d2u[0][1][0]) + jit[0][0] * (jit[1][1] * d2u[0][0][1] + jit[1][0] * d2u[0][0][0])) * n[0]) * t[0]) * t[1] + (((jit[1][1] * (jit[0][1] * d2u[1][1][1] + jit[0][0] * d2u[1][1][0]) + jit[1][0] * (jit[0][1] * d2u[1][0][1] + jit[0][0] * d2u[1][0][0])) * n[1] + (jit[1][1] * (jit[0][1] * d2u[0][1][1] + jit[0][0] * d2u[0][1][0]) + jit[1][0] * (jit[0][1] * d2u[0][0][1] + jit[0][0] * d2u[0][0][0])) * n[0]) * t[1] + ((jit[0][1] * (jit[0][1] * d2u[1][1][1] + jit[0][0] * d2u[1][1][0]) + jit[0][0] * (jit[0][1] * d2u[1][0][1] + jit[0][0] * d2u[1][0][0])) * n[1] + (jit[0][1] * (jit[0][1] * d2u[0][1][1] + jit[0][0] * d2u[0][1][0]) + jit[0][0] * (jit[0][1] * d2u[0][0][1] + jit[0][0] * d2u[0][0][0])) * n[0]) * t[0]) * t[0];
+
+//        std::cout << "dtut = " << dtut << " dt2ut = " << dt2ut << std::endl;
+        for (std::size_t i=0; i<child_0.size(); ++i)
+        {
+          auto dtvt = ((jit[1][1] * basis.jacobian(i, 1) + jit[1][0] * basis.jacobian(i, 0)) * t[1] + (jit[1][1] * basis.jacobian(i, 1) + jit[1][0] * basis.jacobian(i, 0)) * t[0]) * t[1] + ((jit[0][1] * basis.jacobian(i, 1) + jit[0][0] * basis.jacobian(i, 0)) * t[1] + (jit[0][1] * basis.jacobian(i, 1) + jit[0][0] * basis.jacobian(i, 0)) * t[0]) * t[0];
+          auto dt2vn = (((jit[1][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * n[1] + (jit[1][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * n[0]) * t[1] + ((jit[0][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * n[1] + (jit[0][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * n[0]) * t[0]) * t[1] + (((jit[1][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * n[1] + (jit[1][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * n[0]) * t[1] + ((jit[0][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * n[1] + (jit[0][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * n[0]) * t[0]) * t[0];
+//          std::cout << "dtvt = " << dtvt << " dt2vn = " << dt2vn << std::endl;
+
+          // TODO: Get these from somewhere
+          auto E = 1e6;
+          auto d = 0.1;
+          auto A = d;
+          auto I = (d*d*d) / 12.0;
+          Dune::FieldVector<double, 2> force{0.0, -1.0};
+
+          for (std::size_t k=0; k<2; ++k)
+            r.accumulate(lfsu.child(k), i, (E*A*dtut*dtvt + E*I*dt2ut*dt2vn - A*force[k]*basis.function(i)) * ip.weight() * linegeo.integrationElement(ip.position()));
+        }
       }
     }
   }

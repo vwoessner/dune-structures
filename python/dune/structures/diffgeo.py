@@ -23,7 +23,7 @@ def generate_tangential_derivatives():
     u = Coefficient(FE, cargo={"name": "u"})
     v = TestFunction(FE)
     t = Coefficient(FE, cargo={"name": "t", "diff": 0})
-    n = Coefficient(FE, cargo={"name": "n", "diff": 0})
+    n = perp(t)
 
     quantities = {
         "dtut" : inner(t, grad(inner(u, t))),
@@ -40,8 +40,7 @@ def generate_tangential_derivatives():
         expr = remove_complex_nodes(expr)
         expr = pushdown_indexed(expr)
     
-        print("\n\nThe expression for the quantity {} is:".format(name))
-        print(ufl_to_code(expr))
+        print("\n\nauto {} = {};".format(name, ufl_to_code(expr)))
 
 
 class AdHocVisitor(UFL2LoopyVisitor):
@@ -50,10 +49,18 @@ class AdHocVisitor(UFL2LoopyVisitor):
         self.grad_count = 0
         
     def argument(self, o):
-        name = "phi"
-        if self.grad_count > 0:
-            name = "d{}{}".format(self.grad_count, name)
-        return prim.Subscript(prim.Variable(name), (prim.Variable("i"), 0))
+        if self.grad_count == 0:
+            name = "basis.function"
+        elif self.grad_count == 1:
+            name = "basis.jacobian"
+        elif self.grad_count == 2:
+            name = "basis.hessian"
+        else:
+            raise NotImplementedError
+
+        indices = self.indices[1:]
+        self.indices = None
+        return prim.Call(prim.Variable(name), (prim.Variable("i"),) + indices)
 
     def coefficient(self, o):
         name = o.cargo["name"]
@@ -91,12 +98,6 @@ def ufl_to_code(expr):
         nester = IndexNester()
         from pymbolic.mapper.c_code import CCodeMapper
         ccm = CCodeMapper()
-        
         expr = visitor(expr)
-        
-        # Not worth it right now, maybe for some other expressions
-        from dune.codegen.sympy import simplify_pymbolic_expression
-        expr = simplify_pymbolic_expression(expr)
-         
         expr = nester(expr)
         return ccm(expr)
