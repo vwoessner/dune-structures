@@ -71,7 +71,7 @@ class NewtonSolverTransitionStep
   }
 
   protected:
-  const Dune::ParameterTree& params;
+  Dune::ParameterTree params;
   std::shared_ptr<LocalOperator> localoperator;
   std::shared_ptr<LinearSolver> linearsolver;
   std::shared_ptr<GridOperator> gridoperator;

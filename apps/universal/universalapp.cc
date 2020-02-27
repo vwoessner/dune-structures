@@ -7,6 +7,20 @@
 #include<dune/structures/solverconstruction.hh>
 
 
+template<int dim, int degree>
+void apply(Dune::MPIHelper& helper, const Dune::ParameterTree& params, char** argv)
+{
+  auto [grid, es, physical] = construct_grid<dim>(helper, params.sub("grid"), argv);
+  auto [x, cc] = elasticity_setup<degree>(es);
+  using V = typename std::remove_reference<decltype(*x)>::type;
+
+  ConstructionContext<V> ctx(helper, params, es, physical);
+  auto solver = ctx.construct(params.sub("solver"));
+
+  solver->apply(x, cc);
+}
+
+
 int main(int argc, char** argv)
 {
   Dune::MPIHelper& helper = Dune::MPIHelper::instance(argc, argv);
@@ -17,28 +31,21 @@ int main(int argc, char** argv)
 
   // Dispatch on grid dimension
   auto dim = params.get<int>("grid.dimension", 3);
+  auto degree = params.get<int>("solver.degree", 1);
+
   if (dim == 2)
   {
-//    auto [grid, es, physical] = construct_grid<2>(helper, params.sub("grid"), argv);
-//    auto [x, cc] = elasticity_setup(es);
-//    using V = std::remove_reference<decltype(*x)>::type;
-//
-//    ConstructionContext<V> ctx(helper, params, es, physical);
-//    auto solver = ctx.construct(params.sub("solver"));
-//
-//    solver->apply(x, cc);
+    if (degree == 1)
+      apply<2, 1>(helper, params, argv);
+    if (degree == 2)
+      apply<2, 2>(helper, params, argv);
   }
-  else if (dim == 3)
+  if (dim == 3)
   {
-    auto [grid, es, physical] = construct_grid<3>(helper, params.sub("grid"), argv);
-    auto [x, cc] = elasticity_setup(es);
-    using V = std::remove_reference<decltype(*x)>::type;
-
-    ConstructionContext<V> ctx(helper, params, es, physical);
-    auto solver = ctx.construct(params.sub("solver"));
-
-    solver->apply(x, cc);
+    if (degree == 1)
+      apply<3, 1>(helper, params, argv);
+    if (degree == 2)
+      apply<3, 2>(helper, params, argv);
   }
-
   return 0;
 }

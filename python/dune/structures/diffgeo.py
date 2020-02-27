@@ -6,7 +6,9 @@ are copied and pasted into the 1D fibre operator.
 """
 
 from dune.codegen.ufl.execution import *
+from dune.codegen.pdelab.restriction import restricted_name
 from ufl.algorithms import expand_derivatives
+from ufl.algorithms.apply_restrictions import apply_restrictions
 from ufl.algorithms.apply_algebra_lowering import apply_algebra_lowering
 from ufl.algorithms.remove_complex_nodes import remove_complex_nodes
 from ufl.algorithms.apply_function_pullbacks import apply_function_pullbacks
@@ -22,7 +24,7 @@ def generate_tangential_derivatives():
     FE = VectorElement("CG", triangle, 2)
     u = Coefficient(FE, cargo={"name": "u"})
     v = TestFunction(FE)
-    t = Coefficient(FE, cargo={"name": "t", "diff": 0})
+    t = Coefficient(FE, cargo={"name": "t", "diff": 0, "restriction": 0})
     n = perp(t)
 
     quantities = {
@@ -30,6 +32,12 @@ def generate_tangential_derivatives():
         "dtvt" : inner(t, grad(inner(v, t))),
         "dt2un" : inner(t, grad(inner(t, grad(inner(u, n))))),
         "dt2vn" : inner(t, grad(inner(t, grad(inner(v, n))))),
+        "sk_dt2un" : avg(inner(t, grad(inner(t, grad(inner(u, n)))))),
+        "dt2vn_n" : inner(t, grad(inner(t, grad(inner(v('+'), n))))),
+        "dt2vn_s" : inner(t, grad(inner(t, grad(inner(v('-'), n))))),
+        "sk_dtun" : jump(inner(t, grad(inner(u, n)))),
+        "dtvn_n" : inner(t, grad(inner(v('+'), n))),
+        "dtvn_s" : inner(t, grad(inner(v('-'), n))),
     }
 
     for name, expr in quantities.items():
@@ -38,6 +46,11 @@ def generate_tangential_derivatives():
         expr = expand_derivatives(expr)
         expr = apply_algebra_lowering(expr)
         expr = remove_complex_nodes(expr)
+
+        # This weird check would go away if we reproduced more of the UFL preprocessing here...
+        if name.startswith('sk'):
+            expr = apply_restrictions(expr)
+
         expr = pushdown_indexed(expr)
     
         print("\n\nauto {} = {};".format(name, ufl_to_code(expr)))
@@ -49,12 +62,14 @@ class AdHocVisitor(UFL2LoopyVisitor):
         self.grad_count = 0
         
     def argument(self, o):
+        name = restricted_name("basis", self.restriction)
+
         if self.grad_count == 0:
-            name = "basis.function"
+            name = "{}.function".format(name)
         elif self.grad_count == 1:
-            name = "basis.jacobian"
+            name = "{}.jacobian".format(name)
         elif self.grad_count == 2:
-            name = "basis.hessian"
+            name = "{}.hessian".format(name)
         else:
             raise NotImplementedError
 
@@ -63,7 +78,8 @@ class AdHocVisitor(UFL2LoopyVisitor):
         return prim.Call(prim.Variable(name), (prim.Variable("i"),) + indices)
 
     def coefficient(self, o):
-        name = o.cargo["name"]
+        name = restricted_name(o.cargo["name"], o.cargo.get("restriction", self.restriction))
+
         if self.grad_count > 0:
             if "diff" in o.cargo:
                 self.indices = None
@@ -81,7 +97,7 @@ class AdHocVisitor(UFL2LoopyVisitor):
         i, j = self.indices
         self.indices = None
         
-        return prim.Subscript(prim.Variable("jit"), (j, i))
+        return prim.Subscript(prim.Variable(restricted_name("jit", self.restriction)), (j, i))
 
 
 class IndexNester(IdentityMapper):

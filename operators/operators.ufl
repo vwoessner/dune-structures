@@ -7,10 +7,15 @@ material.append(StVenantKirchhoffMaterial())
 material.append(NeoHookeanMaterial())
 
 # 3D forms
-#rdyn, mass = elastodynamics_form(material)
-r = elasticity_form(material)
-mass = quasistatic_mass_form()
+r = elasticity_form(material, degree=1, dim=3)
+mass = quasistatic_mass_form(degree=1, dim=3)
+
+r_p2 = elasticity_form(material, degree=2, dim=3)
+mass_p2 = quasistatic_mass_form(degree=2, dim=3)
 
 # 2D forms - only linear elasticity right now
-r2d = elasticity_form([LinearMaterial()], dim=2)
-mass2d = quasistatic_mass_form(dim=2)
+r_2d = elasticity_form([LinearMaterial()], degree=1, dim=2)
+mass_2d = quasistatic_mass_form(degree=1, dim=2)
+
+r_2d_p2 = elasticity_form([LinearMaterial()], degree=2, dim=2)
+mass_2d_p2 = quasistatic_mass_form(degree=2, dim=2)

@@ -160,7 +160,7 @@ class EulerBernoulli2DLocalOperator
       double tol = 1e-12;
 
       // We iterate this algorithm, because in rare scenarios the strategy of going from cell to cell
-      // across intersections. This is when the curve traverses through a grid vertex from one cell
+      // across intersections fails. This is when the curve traverses through a grid vertex from one cell
       // to a non-adjacent one. In these cases we restart the algorithm by doing a grid search for the
       // current cell.
       double t = 0.0;
@@ -238,7 +238,6 @@ class EulerBernoulli2DLocalOperator
           t = bisect_a;
 
           // Find the intersection and the outside cell
-          bool boundary_found = false;
           index = -1;
           for (auto intersection : intersections(gv, element))
           {
@@ -247,8 +246,11 @@ class EulerBernoulli2DLocalOperator
               auto geo = intersection.outside().geometry();
               if (referenceElement(geo).checkInside(geo.local(fibre->eval(t + tol))))
               {
+                int inside_index = is.index(element);
                 element = intersection.outside();
                 index = is.index(element);
+                face_fibre_intersections[std::make_pair(inside_index, index)].push_back({fibindex, t});
+                face_fibre_intersections[std::make_pair(index, inside_index)].push_back({fibindex, t});
                 break;
               }
             }
@@ -257,11 +259,18 @@ class EulerBernoulli2DLocalOperator
       }
     }
 
-//    std::cout << "Fibre intersection summary:" << std::endl;
-//    for (auto [cell, info] : element_fibre_intersections)
-//      for (auto sinfo : info)
-//        std::cout << "Cell " << cell << " intersects fibre " << std::get<0>(sinfo)
-//                  << " on the curve interval [" << std::get<1>(sinfo) << "," << std::get<2>(sinfo) << "]" << std::endl;
+    std::cout << "Fibre intersection summary:" << std::endl;
+    for (auto [cell, info] : element_fibre_intersections)
+      for (auto sinfo : info)
+        std::cout << "Cell " << cell << " intersects fibre " << std::get<0>(sinfo)
+                  << " on the curve interval [" << std::get<1>(sinfo) << "," << std::get<2>(sinfo) << "]" << std::endl;
+    for (auto [cells, info] :face_fibre_intersections)
+    {
+      auto [inside, outside] = cells;
+      for (auto sinfo : info)
+        std::cout << "Facet between cell " << inside << " and " << outside << " intersects fibre "
+                  << std::get<0>(sinfo) << " at t=" << std::get<1>(sinfo) << std::endl;
+    }
   }
 
   template<typename EG, typename LFSU, typename X, typename LFSV, typename R>
@@ -293,6 +302,7 @@ class EulerBernoulli2DLocalOperator
       using LineGeometry = Dune::AffineGeometry<double, 1, 2>;
       const auto& linerefelem = Dune::Geo::ReferenceElements<double, 1>::simplex();
       LineGeometry linegeo(linerefelem, std::vector<Dune::FieldVector<double, 2>>{cellgeo.local(start), cellgeo.local(stop)});
+      LineGeometry global_linegeo(linerefelem, std::vector<Dune::FieldVector<double, 2>>{start, stop});
 
       // Iterate over the quadrature points - currently always midpoint rule
       for (const auto& ip : quadratureRule(linegeo, 2))
@@ -327,22 +337,20 @@ class EulerBernoulli2DLocalOperator
         // Evaluate the jacobian inverse transposed
         auto jit = cellgeo.jacobianInverseTransposed(pos);
 
-        // The tangential and normal vector for the curve
+        // The tangential vector for the curve
         // Determination of the evaluation parameter here is a bit flaky.
         auto t = fibre->tangent(std::get<1>(segment) + ip.position() * (std::get<2>(segment) - std::get<1>(segment)));
-        Dune::FieldVector<double, 2> n{-t[1], t[0]};
 
         // The needed tangential derivative quantities. These expressions are generated
         // using the generate_tangential_derivatives Python script.
         auto dtut = ((d1u[1][1] * jit[1][1] + d1u[1][0] * jit[1][0]) * t[1] + (d1u[0][1] * jit[1][1] + d1u[0][0] * jit[1][0]) * t[0]) * t[1] + ((d1u[1][1] * jit[0][1] + d1u[1][0] * jit[0][0]) * t[1] + (d1u[0][1] * jit[0][1] + d1u[0][0] * jit[0][0]) * t[0]) * t[0];
-        auto dt2ut = (((jit[1][1] * (jit[1][1] * d2u[1][1][1] + jit[1][0] * d2u[1][1][0]) + jit[1][0] * (jit[1][1] * d2u[1][0][1] + jit[1][0] * d2u[1][0][0])) * n[1] + (jit[1][1] * (jit[1][1] * d2u[0][1][1] + jit[1][0] * d2u[0][1][0]) + jit[1][0] * (jit[1][1] * d2u[0][0][1] + jit[1][0] * d2u[0][0][0])) * n[0]) * t[1] + ((jit[0][1] * (jit[1][1] * d2u[1][1][1] + jit[1][0] * d2u[1][1][0]) + jit[0][0] * (jit[1][1] * d2u[1][0][1] + jit[1][0] * d2u[1][0][0])) * n[1] + (jit[0][1] * (jit[1][1] * d2u[0][1][1] + jit[1][0] * d2u[0][1][0]) + jit[0][0] * (jit[1][1] * d2u[0][0][1] + jit[1][0] * d2u[0][0][0])) * n[0]) * t[0]) * t[1] + (((jit[1][1] * (jit[0][1] * d2u[1][1][1] + jit[0][0] * d2u[1][1][0]) + jit[1][0] * (jit[0][1] * d2u[1][0][1] + jit[0][0] * d2u[1][0][0])) * n[1] + (jit[1][1] * (jit[0][1] * d2u[0][1][1] + jit[0][0] * d2u[0][1][0]) + jit[1][0] * (jit[0][1] * d2u[0][0][1] + jit[0][0] * d2u[0][0][0])) * n[0]) * t[1] + ((jit[0][1] * (jit[0][1] * d2u[1][1][1] + jit[0][0] * d2u[1][1][0]) + jit[0][0] * (jit[0][1] * d2u[1][0][1] + jit[0][0] * d2u[1][0][0])) * n[1] + (jit[0][1] * (jit[0][1] * d2u[0][1][1] + jit[0][0] * d2u[0][1][0]) + jit[0][0] * (jit[0][1] * d2u[0][0][1] + jit[0][0] * d2u[0][0][0])) * n[0]) * t[0]) * t[0];
+        auto dt2un = ((t[0] * (jit[1][1] * (jit[1][1] * d2u[1][1][1] + jit[1][0] * d2u[1][1][0]) + jit[1][0] * (jit[1][1] * d2u[1][0][1] + jit[1][0] * d2u[1][0][0])) + (jit[1][1] * (jit[1][1] * d2u[0][1][1] + jit[1][0] * d2u[0][1][0]) + jit[1][0] * (jit[1][1] * d2u[0][0][1] + jit[1][0] * d2u[0][0][0])) * (-1) * t[1]) * t[1] + (t[0] * (jit[0][1] * (jit[1][1] * d2u[1][1][1] + jit[1][0] * d2u[1][1][0]) + jit[0][0] * (jit[1][1] * d2u[1][0][1] + jit[1][0] * d2u[1][0][0])) + (jit[0][1] * (jit[1][1] * d2u[0][1][1] + jit[1][0] * d2u[0][1][0]) + jit[0][0] * (jit[1][1] * d2u[0][0][1] + jit[1][0] * d2u[0][0][0])) * (-1) * t[1]) * t[0]) * t[1] + ((t[0] * (jit[1][1] * (jit[0][1] * d2u[1][1][1] + jit[0][0] * d2u[1][1][0]) + jit[1][0] * (jit[0][1] * d2u[1][0][1] + jit[0][0] * d2u[1][0][0])) + (jit[1][1] * (jit[0][1] * d2u[0][1][1] + jit[0][0] * d2u[0][1][0]) + jit[1][0] * (jit[0][1] * d2u[0][0][1] + jit[0][0] * d2u[0][0][0])) * (-1) * t[1]) * t[1] + (t[0] * (jit[0][1] * (jit[0][1] * d2u[1][1][1] + jit[0][0] * d2u[1][1][0]) + jit[0][0] * (jit[0][1] * d2u[1][0][1] + jit[0][0] * d2u[1][0][0])) + (jit[0][1] * (jit[0][1] * d2u[0][1][1] + jit[0][0] * d2u[0][1][0]) + jit[0][0] * (jit[0][1] * d2u[0][0][1] + jit[0][0] * d2u[0][0][0])) * (-1) * t[1]) * t[0]) * t[0];
 
 //        std::cout << "dtut = " << dtut << " dt2ut = " << dt2ut << std::endl;
         for (std::size_t i=0; i<child_0.size(); ++i)
         {
           auto dtvt = ((jit[1][1] * basis.jacobian(i, 1) + jit[1][0] * basis.jacobian(i, 0)) * t[1] + (jit[1][1] * basis.jacobian(i, 1) + jit[1][0] * basis.jacobian(i, 0)) * t[0]) * t[1] + ((jit[0][1] * basis.jacobian(i, 1) + jit[0][0] * basis.jacobian(i, 0)) * t[1] + (jit[0][1] * basis.jacobian(i, 1) + jit[0][0] * basis.jacobian(i, 0)) * t[0]) * t[0];
-          auto dt2vn = (((jit[1][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * n[1] + (jit[1][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * n[0]) * t[1] + ((jit[0][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * n[1] + (jit[0][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * n[0]) * t[0]) * t[1] + (((jit[1][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * n[1] + (jit[1][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * n[0]) * t[1] + ((jit[0][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * n[1] + (jit[0][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * n[0]) * t[0]) * t[0];
-//          std::cout << "dtvt = " << dtvt << " dt2vn = " << dt2vn << std::endl;
+          auto dt2vn = ((t[0] * (jit[1][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) + (jit[1][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[0] * (jit[0][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) + (jit[0][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * (-1) * t[1]) * t[0]) * t[1] + ((t[0] * (jit[1][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) + (jit[1][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[0] * (jit[0][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) + (jit[0][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * (-1) * t[1]) * t[0]) * t[0];
 
           // TODO: Get these from somewhere
           auto E = 1e6;
@@ -352,7 +360,7 @@ class EulerBernoulli2DLocalOperator
           Dune::FieldVector<double, 2> force{0.0, -1.0};
 
           for (std::size_t k=0; k<2; ++k)
-            r.accumulate(lfsu.child(k), i, (E*A*dtut*dtvt + E*I*dt2ut*dt2vn - A*force[k]*basis.function(i)) * ip.weight() * linegeo.integrationElement(ip.position()));
+            r.accumulate(lfsu.child(k), i, (E*A*dtut*dtvt + E*I*dt2un*dt2vn - A*force[k]*basis.function(i)) * ip.weight() * global_linegeo.integrationElement(ip.position()));
         }
       }
     }
@@ -363,11 +371,110 @@ class EulerBernoulli2DLocalOperator
                        const LFSU& lfsu_s, const X& x_s, const LFSV& lfsv_s,
                        const LFSU& lfsu_n, const X& x_n, const LFSV& lfsv_n,
                        R& r_s, R& r_n) const
-  {}
+  {
+    // See whether something needs to be done on this intersection
+    auto inside_entity = ig.inside();
+    auto outside_entity = ig.outside();
+    auto it = face_fibre_intersections.find(std::make_pair(is.index(inside_entity), is.index(outside_entity)));
+    if (it == face_fibre_intersections.end())
+      return;
+
+    // Extract some necessary information
+    using namespace Dune::Indices;
+    auto child_0 = child(lfsu_s, _0);
+    auto child_1 = child(lfsu_s, _1);
+    auto cellgeo_s = ig.inside().geometry();
+    auto cellgeo_n = ig.outside().geometry();
+
+    using Evaluator = BasisEvaluator<typename LFSU::template Child<0>::Type::Traits::FiniteElementType::Traits::LocalBasisType>;
+    Evaluator basis_s(child_0.finiteElement().localBasis());
+    Evaluator basis_n(child_0.finiteElement().localBasis());
+
+    // Loop over curve segments in this cell. most of the time this will be just one.
+    auto segments = it->second;
+    for (auto segment : segments)
+    {
+      auto fibre = fibre_parametrizations[std::get<0>(segment)];
+      auto tparam = fibre->eval(std::get<1>(segment));
+
+      // Position in reference element of the inside/outside cell
+      auto pos_s = cellgeo_s.local(tparam);
+      auto pos_n = cellgeo_n.local(tparam);
+
+      // Evaluate the basis, its jacobian and its hessians in inside/outside cell
+      basis_s.update(pos_s);
+      basis_n.update(pos_n);
+
+      // Evaluate the displacement field u
+      Dune::FieldVector<double, 2> u_s(0.0), u_n(0.0);
+      for (std::size_t c=0; c<2; ++c)
+        for (std::size_t i=0; i<child_0.size(); i++)
+        {
+          u_s[c] += x_s(child(lfsu_s, c), i) * basis_s.function(i);
+          u_n[c] += x_n(child(lfsu_n, c), i) * basis_n.function(i);
+        }
+
+      // And the jacobian of displacement
+      Dune::FieldMatrix<double, 2, 2> d1u_s(0.0), d1u_n(0.0);
+      for (std::size_t c=0; c<2; ++c)
+        for (std::size_t d=0; d<2; ++d)
+          for (std::size_t i=0; i<child_0.size(); ++i)
+          {
+            d1u_s[c][d] = x_s(child(lfsu_s, c), i) * basis_s.jacobian(i, d);
+            d1u_n[c][d] = x_n(child(lfsu_n, c), i) * basis_n.jacobian(i, d);
+          }
+
+      // And finally the hessian of the displacement
+      std::array<Dune::FieldMatrix<double, 2, 2>, 2> d2u_s{0.0, 0.0}, d2u_n{0.0, 0.0};
+      for (std::size_t c=0; c<2; ++c)
+        for (std::size_t d0=0; d0<2; ++d0)
+          for (std::size_t d1=0; d1<2; ++d1)
+            for (std::size_t i=0; i<child_0.size(); ++i)
+            {
+              d2u_s[c][d0][d1] = x_s(child(lfsu_s, c), i) * basis_s.hessian(i, d0, d1);
+              d2u_n[c][d0][d1] = x_n(child(lfsu_n, c), i) * basis_n.hessian(i, d0, d1);
+            }
+
+      // Evaluate the jacobian inverse transposed in inside/outside cell
+      auto jit_s = cellgeo_s.jacobianInverseTransposed(pos_s);
+      auto jit_n = cellgeo_n.jacobianInverseTransposed(pos_n);
+
+      // The tangential vector for the curve
+      auto t = fibre->tangent(std::get<1>(segment));
+
+      // The needed tangential derivative quantities. These expressions are generated
+      // using the generate_tangential_derivatives Python script.
+      auto sk_dtun = (t[0] * (jit_s[1][1] * d1u_s[1][1] + jit_s[1][0] * d1u_s[1][0]) + (jit_s[1][1] * d1u_s[0][1] + jit_s[1][0] * d1u_s[0][0]) * (-1) * t[1]) * t[1] + (t[0] * (jit_s[0][1] * d1u_s[1][1] + jit_s[0][0] * d1u_s[1][0]) + (jit_s[0][1] * d1u_s[0][1] + jit_s[0][0] * d1u_s[0][0]) * (-1) * t[1]) * t[0] - ((t[0] * (jit_n[1][1] * d1u_n[1][1] + jit_n[1][0] * d1u_n[1][0]) + (jit_n[1][1] * d1u_n[0][1] + jit_n[1][0] * d1u_n[0][0]) * (-1) * t[1]) * t[1] + (t[0] * (jit_n[0][1] * d1u_n[1][1] + jit_n[0][0] * d1u_n[1][0]) + (jit_n[0][1] * d1u_n[0][1] + jit_n[0][0] * d1u_n[0][0]) * (-1) * t[1]) * t[0]);
+      auto sk_dt2un = 0.5 * (((t[0] * ((jit_s[1][1] * d2u_s[1][1][1] + jit_s[1][0] * d2u_s[1][1][0]) * jit_s[1][1] + (jit_s[1][1] * d2u_s[1][0][1] + jit_s[1][0] * d2u_s[1][0][0]) * jit_s[1][0]) + ((jit_s[1][1] * d2u_s[0][1][1] + jit_s[1][0] * d2u_s[0][1][0]) * jit_s[1][1] + (jit_s[1][1] * d2u_s[0][0][1] + jit_s[1][0] * d2u_s[0][0][0]) * jit_s[1][0]) * (-1) * t[1]) * t[1] + (t[0] * ((jit_s[1][1] * d2u_s[1][1][1] + jit_s[1][0] * d2u_s[1][1][0]) * jit_s[0][1] + (jit_s[1][1] * d2u_s[1][0][1] + jit_s[1][0] * d2u_s[1][0][0]) * jit_s[0][0]) + ((jit_s[1][1] * d2u_s[0][1][1] + jit_s[1][0] * d2u_s[0][1][0]) * jit_s[0][1] + (jit_s[1][1] * d2u_s[0][0][1] + jit_s[1][0] * d2u_s[0][0][0]) * jit_s[0][0]) * (-1) * t[1]) * t[0]) * t[1] + ((t[0] * ((jit_s[0][1] * d2u_s[1][1][1] + jit_s[0][0] * d2u_s[1][1][0]) * jit_s[1][1] + (jit_s[0][1] * d2u_s[1][0][1] + jit_s[0][0] * d2u_s[1][0][0]) * jit_s[1][0]) + ((jit_s[0][1] * d2u_s[0][1][1] + jit_s[0][0] * d2u_s[0][1][0]) * jit_s[1][1] + (jit_s[0][1] * d2u_s[0][0][1] + jit_s[0][0] * d2u_s[0][0][0]) * jit_s[1][0]) * (-1) * t[1]) * t[1] + (t[0] * ((jit_s[0][1] * d2u_s[1][1][1] + jit_s[0][0] * d2u_s[1][1][0]) * jit_s[0][1] + (jit_s[0][1] * d2u_s[1][0][1] + jit_s[0][0] * d2u_s[1][0][0]) * jit_s[0][0]) + ((jit_s[0][1] * d2u_s[0][1][1] + jit_s[0][0] * d2u_s[0][1][0]) * jit_s[0][1] + (jit_s[0][1] * d2u_s[0][0][1] + jit_s[0][0] * d2u_s[0][0][0]) * jit_s[0][0]) * (-1) * t[1]) * t[0]) * t[0] + ((t[0] * ((jit_n[1][1] * d2u_n[1][1][1] + jit_n[1][0] * d2u_n[1][1][0]) * jit_n[1][1] + (jit_n[1][1] * d2u_n[1][0][1] + jit_n[1][0] * d2u_n[1][0][0]) * jit_n[1][0]) + ((jit_n[1][1] * d2u_n[0][1][1] + jit_n[1][0] * d2u_n[0][1][0]) * jit_n[1][1] + (jit_n[1][1] * d2u_n[0][0][1] + jit_n[1][0] * d2u_n[0][0][0]) * jit_n[1][0]) * (-1) * t[1]) * t[1] + (t[0] * ((jit_n[1][1] * d2u_n[1][1][1] + jit_n[1][0] * d2u_n[1][1][0]) * jit_n[0][1] + (jit_n[1][1] * d2u_n[1][0][1] + jit_n[1][0] * d2u_n[1][0][0]) * jit_n[0][0]) + ((jit_n[1][1] * d2u_n[0][1][1] + jit_n[1][0] * d2u_n[0][1][0]) * jit_n[0][1] + (jit_n[1][1] * d2u_n[0][0][1] + jit_n[1][0] * d2u_n[0][0][0]) * jit_n[0][0]) * (-1) * t[1]) * t[0]) * t[1] + ((t[0] * ((jit_n[0][1] * d2u_n[1][1][1] + jit_n[0][0] * d2u_n[1][1][0]) * jit_n[1][1] + (jit_n[0][1] * d2u_n[1][0][1] + jit_n[0][0] * d2u_n[1][0][0]) * jit_n[1][0]) + ((jit_n[0][1] * d2u_n[0][1][1] + jit_n[0][0] * d2u_n[0][1][0]) * jit_n[1][1] + (jit_n[0][1] * d2u_n[0][0][1] + jit_n[0][0] * d2u_n[0][0][0]) * jit_n[1][0]) * (-1) * t[1]) * t[1] + (t[0] * ((jit_n[0][1] * d2u_n[1][1][1] + jit_n[0][0] * d2u_n[1][1][0]) * jit_n[0][1] + (jit_n[0][1] * d2u_n[1][0][1] + jit_n[0][0] * d2u_n[1][0][0]) * jit_n[0][0]) + ((jit_n[0][1] * d2u_n[0][1][1] + jit_n[0][0] * d2u_n[0][1][0]) * jit_n[0][1] + (jit_n[0][1] * d2u_n[0][0][1] + jit_n[0][0] * d2u_n[0][0][0]) * jit_n[0][0]) * (-1) * t[1]) * t[0]) * t[0]);
+
+      for (std::size_t i=0; i<child_0.size(); ++i)
+      {
+        auto dtvn_n = (t[0] * (jit_s[1][1] * basis_s.jacobian(i, 1) + jit_s[1][0] * basis_s.jacobian(i, 0)) + (jit_s[1][1] * basis_s.jacobian(i, 1) + jit_s[1][0] * basis_s.jacobian(i, 0)) * (-1) * t[1]) * t[1] + (t[0] * (jit_s[0][1] * basis_s.jacobian(i, 1) + jit_s[0][0] * basis_s.jacobian(i, 0)) + (jit_s[0][1] * basis_s.jacobian(i, 1) + jit_s[0][0] * basis_s.jacobian(i, 0)) * (-1) * t[1]) * t[0];
+        auto dtvn_s = (t[0] * (jit_n[1][1] * basis_n.jacobian(i, 1) + jit_n[1][0] * basis_n.jacobian(i, 0)) + (jit_n[1][1] * basis_n.jacobian(i, 1) + jit_n[1][0] * basis_n.jacobian(i, 0)) * (-1) * t[1]) * t[1] + (t[0] * (jit_n[0][1] * basis_n.jacobian(i, 1) + jit_n[0][0] * basis_n.jacobian(i, 0)) + (jit_n[0][1] * basis_n.jacobian(i, 1) + jit_n[0][0] * basis_n.jacobian(i, 0)) * (-1) * t[1]) * t[0];
+        auto dt2vn_n = ((t[0] * (jit_s[1][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0))) + (jit_s[1][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[0] * (jit_s[0][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0))) + (jit_s[0][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1]) * t[0]) * t[1] + ((t[0] * (jit_s[1][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0))) + (jit_s[1][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[0] * (jit_s[0][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0))) + (jit_s[0][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1]) * t[0]) * t[0];
+        auto dt2vn_s = ((t[0] * (jit_n[1][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0))) + (jit_n[1][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[0] * (jit_n[0][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0))) + (jit_n[0][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0))) * (-1) * t[1]) * t[0]) * t[1] + ((t[0] * (jit_n[1][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0))) + (jit_n[1][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[0] * (jit_n[0][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0))) + (jit_n[0][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0))) * (-1) * t[1]) * t[0]) * t[0];
+
+        // TODO: Get these from somewhere
+        auto E = 1e6;
+        auto d = 0.1;
+        auto A = d;
+        auto I = (d*d*d) / 12.0;
+        Dune::FieldVector<double, 2> force{0.0, -1.0};
+        auto beta = 1.0;
+
+        for (std::size_t k=0; k<2; ++k)
+        {
+          r_s.accumulate(lfsu_s.child(k), i, -E*I*(-sk_dt2un*dtvn_s - dt2vn_s * sk_dtun + beta*sk_dtun*dtvn_s));
+          r_n.accumulate(lfsu_s.child(k), i,  E*I*(-sk_dt2un*dtvn_n - dt2vn_n * sk_dtun + beta*sk_dtun*dtvn_n));
+        }
+      }
+    }
+  }
 
   private:
   const typename GFS::Traits::GridView::IndexSet& is;
   std::map<int, std::vector<std::tuple<std::size_t, double, double>>> element_fibre_intersections;
+  std::map<std::pair<int, int>, std::vector<std::tuple<std::size_t, double>>> face_fibre_intersections;
   std::vector<std::shared_ptr<FibreParametrizationBase<2>>> fibre_parametrizations;
 
   using LocalBasisType = typename GFS::template Child<0>::Type::Traits::FiniteElementMap::Traits::FiniteElementType::Traits::LocalBasisType;
