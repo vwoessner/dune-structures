@@ -32,36 +32,36 @@ struct VTKWriterChooser<Vector, true>
 };
 
 
-template<typename Vector>
+template<typename... V>
 class VisualizationStep;
 
 
-template<typename Vector>
+template<typename... V>
 class VisualizationStepBase
-  : public TransitionSolverStepBase<Vector>
+  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
-  void set_parent(VisualizationStep<Vector>* parent_)
+  void set_parent(VisualizationStep<V...>* parent_)
   {
     parent = parent_;
   }
 
   protected:
-  VisualizationStep<Vector>* parent;
+  VisualizationStep<V...>* parent;
 };
 
 
-template<typename Vector>
+template<typename... V>
 class VisualizationStep
-  : public StepCollectionStep<Vector>
+  : public StepCollectionStep<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
   using VTKWriter = std::variant<
-      std::shared_ptr<typename VTKWriterChooser<Vector, true>::type>,
-      std::shared_ptr<typename VTKWriterChooser<Vector, false>::type>>;
+      std::shared_ptr<typename VTKWriterChooser<typename Base::Vector, true>::type>,
+      std::shared_ptr<typename VTKWriterChooser<typename Base::Vector, false>::type>>;
 
   VisualizationStep(bool instationary = false,
                     std::string name="output")
@@ -98,26 +98,26 @@ class VisualizationStep
       step->update_parameter(name, param);
   }
 
-  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void pre(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     // Instantiate a VTKWriter instance
     auto gv = vector->gridFunctionSpace().gridView();
 
     if (instationary)
-      vtkwriter = std::make_shared<typename VTKWriterChooser<Vector, true>::type>(std::make_shared<typename VTKWriterChooser<Vector, false>::type>(gv), name, path, extendpath);
+      vtkwriter = std::make_shared<typename VTKWriterChooser<typename Base::Vector, true>::type>(std::make_shared<typename VTKWriterChooser<typename Base::Vector, false>::type>(gv), name, path, extendpath);
     else
-      vtkwriter = std::make_shared<typename VTKWriterChooser<Vector, false>::type>(gv);
+      vtkwriter = std::make_shared<typename VTKWriterChooser<typename Base::Vector, false>::type>(gv);
 
     for (auto step: this->steps)
     {
-      auto vsp = dynamic_cast<VisualizationStepBase<Vector>*>(step.get());
+      auto vsp = dynamic_cast<VisualizationStepBase<V...>*>(step.get());
       if (vsp)
         vsp->set_parent(this);
       step->pre(vector, cc);
     }
   }
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     for (auto step: this->steps)
       step->apply(vector, cc);
@@ -125,10 +125,10 @@ class VisualizationStep
     if (instationary)
     {
       std::filesystem::create_directory(std::filesystem::current_path().append(path));
-      std::get<typename VTKWriterChooser<Vector, true>::ptype>(vtkwriter)->write(time, Dune::VTK::appendedraw);
+      std::get<typename VTKWriterChooser<typename Base::Vector, true>::ptype>(vtkwriter)->write(time, Dune::VTK::appendedraw);
     }
     else
-      std::get<typename VTKWriterChooser<Vector, false>::ptype>(vtkwriter)->write(name, Dune::VTK::ascii);
+      std::get<typename VTKWriterChooser<typename Base::Vector, false>::ptype>(vtkwriter)->write(name, Dune::VTK::ascii);
   }
 
   template<typename Container>
@@ -136,12 +136,12 @@ class VisualizationStep
   {
     if (instationary)
       Dune::PDELab::addSolutionToVTKWriter(
-          *(std::get<typename VTKWriterChooser<Vector, true>::ptype>(vtkwriter)),
+          *(std::get<typename VTKWriterChooser<typename Base::Vector, true>::ptype>(vtkwriter)),
           container->gridFunctionSpaceStorage(),
           container);
     else
       Dune::PDELab::addSolutionToVTKWriter(
-          *(std::get<typename VTKWriterChooser<Vector, false>::ptype>(vtkwriter)),
+          *(std::get<typename VTKWriterChooser<typename Base::Vector, false>::ptype>(vtkwriter)),
           container->gridFunctionSpaceStorage(),
           container);
   };
@@ -150,9 +150,9 @@ class VisualizationStep
   void add_celldata(std::shared_ptr<Container> container, std::string name)
   {
     if (instationary)
-      std::get<typename VTKWriterChooser<Vector, true>::ptype>(vtkwriter)->addCellData(*container, name);
+      std::get<typename VTKWriterChooser<typename Base::Vector, true>::ptype>(vtkwriter)->addCellData(*container, name);
     else
-      std::get<typename VTKWriterChooser<Vector, false>::ptype>(vtkwriter)->addCellData(*container, name);
+      std::get<typename VTKWriterChooser<typename Base::Vector, false>::ptype>(vtkwriter)->addCellData(*container, name);
   }
 
   private:
@@ -165,28 +165,28 @@ class VisualizationStep
 };
 
 
-template<typename Vector>
+template<typename... V>
 class SolutionVisualizationStep
-  : public VisualizationStepBase<Vector>
+  : public VisualizationStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   virtual ~SolutionVisualizationStep() {}
 
-  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void pre(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
     this->parent->add_dataset(vector);
   }
 };
 
 
-template<typename Vector>
+template<typename... V>
 class MPIRankVisualizationStep
-  : public VisualizationStepBase<Vector>
+  : public VisualizationStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   struct RankDummyContainer
   {
@@ -213,7 +213,7 @@ class MPIRankVisualizationStep
 
   virtual ~MPIRankVisualizationStep() {}
 
-  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void pre(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
     auto container = std::make_shared<RankDummyContainer>(helper, vector->gridFunctionSpace().gridView());
     this->parent->add_celldata(container, "mpirank");
@@ -224,12 +224,12 @@ class MPIRankVisualizationStep
 };
 
 
-template<typename Vector>
+template<typename... V>
 class PhysicalEntityVisualizationStep
-  : public VisualizationStepBase<Vector>
+  : public VisualizationStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   PhysicalEntityVisualizationStep(std::shared_ptr<std::vector<int>> physical)
     : physical(physical)
@@ -237,7 +237,7 @@ class PhysicalEntityVisualizationStep
 
   virtual ~PhysicalEntityVisualizationStep() {}
 
-  virtual void pre(std::shared_ptr<Vector>, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void pre(std::shared_ptr<typename Base::Vector>, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
     this->parent->add_celldata(physical, "gmshPhysical");
   }
@@ -247,12 +247,12 @@ class PhysicalEntityVisualizationStep
 };
 
 
-template<typename Vector>
+template<typename... V>
 class VonMisesStressVisualizationStep
-  : public VisualizationStepBase<Vector>
+  : public VisualizationStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   virtual ~VonMisesStressVisualizationStep() {}
 
@@ -262,12 +262,12 @@ class VonMisesStressVisualizationStep
       material = std::get<std::shared_ptr<typename Base::Material>>(param);
   }
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
     auto es = vector->gridFunctionSpace().entitySet();
 
     // A grid function for the stress
-    VonMisesStressGridFunction<Vector> stress(*vector, material);
+    VonMisesStressGridFunction<typename Base::Vector> stress(*vector, material);
 
     // Interpolate the stress into a grid function
     using P0FEM = Dune::PDELab::P0LocalFiniteElementMap<typename Base::ctype, typename Base::Range, Base::dim>;
@@ -288,12 +288,12 @@ class VonMisesStressVisualizationStep
 };
 
 
-template<typename Vector>
+template<typename... V>
 class FibreDistanceVisualizationStep
-  : public VisualizationStepBase<Vector>
+  : public VisualizationStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   FibreDistanceVisualizationStep(const Dune::ParameterTree& params, const Dune::ParameterTree& rootparams)
     : prestress(rootparams.sub(params.get<std::string>("key")), rootparams)
@@ -301,7 +301,7 @@ class FibreDistanceVisualizationStep
 
   virtual ~FibreDistanceVisualizationStep() {}
 
-  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void pre(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
     if constexpr (Base::dim == 3)
     {

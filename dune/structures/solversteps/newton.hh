@@ -5,12 +5,12 @@
 #include<dune/structures/solversteps/base.hh>
 
 
-template<typename Vector, typename LocalOperator>
+template<typename LocalOperator, typename... V>
 class NewtonSolverTransitionStep
-  : public TransitionSolverStepBase<Vector>
+  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   using GridOperator = Dune::PDELab::GridOperator<typename Base::GridFunctionSpace,
                                                   typename Base::GridFunctionSpace,
@@ -23,7 +23,7 @@ class NewtonSolverTransitionStep
                                                   typename Base::ConstraintsContainer>;
 
   using LinearSolver = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
-  using NewtonSolver = Dune::PDELab::Newton<GridOperator, LinearSolver, Vector>;
+  using NewtonSolver = Dune::PDELab::Newton<GridOperator, LinearSolver, typename Base::Vector>;
 
   NewtonSolverTransitionStep(const Dune::ParameterTree& params)
     : params(params)
@@ -52,7 +52,7 @@ class NewtonSolverTransitionStep
     return localoperator;
   }
 
-  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void pre(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     std::cout << "Building Newton" << std::endl;
     auto gfs = vector->gridFunctionSpaceStorage();
@@ -64,7 +64,7 @@ class NewtonSolverTransitionStep
     newton->setVerbosityLevel(2);
   }
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     std::cout << "Applying Newton Solver!" << std::endl;
     newton->apply();

@@ -9,11 +9,11 @@
 #include<functional>
 
 
-template<typename Vector>
-class ConstraintsTransitionStep : public TransitionSolverStepBase<Vector>
+template<typename... V>
+class ConstraintsTransitionStep : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
   using FunctionSignature = bool(typename Base::GridView::Intersection, typename Base::GridView::Intersection::Geometry::LocalCoordinate);
 
   ConstraintsTransitionStep(std::function<FunctionSignature> func)
@@ -34,7 +34,7 @@ class ConstraintsTransitionStep : public TransitionSolverStepBase<Vector>
 
   virtual ~ConstraintsTransitionStep() {}
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> constraintscontainer) override
+  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> constraintscontainer) override
   {
     auto& gfs = vector->gridFunctionSpace();
     auto bctype = makeBoundaryConditionTreeFromCallables(gfs, funcs);

@@ -4,12 +4,12 @@
 #include<dune/structures/solversteps/base.hh>
 
 
-template<typename Vector>
+template<typename... V>
 class ParameterSetup
-  : public TransitionSolverStepBase<Vector>
+  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   ParameterSetup(std::string name, typename Base::Parameter param)
     : name(name)

@@ -30,19 +30,20 @@
 #include<vector>
 
 
-template<typename Vector>
+template<typename... V>
 class TransitionSolver
 {
   public:
-  using EntitySet = typename TransitionSolverStepBase<Vector>::EntitySet;
-  using ConstraintsContainer = typename Vector::GridFunctionSpace::template ConstraintsContainer<typename Vector::field_type>::Type;
-  using Parameter = typename TransitionSolverStepBase<Vector>::Parameter;
+  using StepBase = TransitionSolverStepBase<V...>;
+  using EntitySet = typename StepBase::EntitySet;
+  using ConstraintsContainer = typename StepBase::ConstraintsContainer;
+  using Parameter = typename StepBase::Parameter;
 
   TransitionSolver(EntitySet es)
     : es(es), steps(0)
   {}
 
-  TransitionSolver(EntitySet es, std::vector<std::shared_ptr<TransitionSolverStepBase<Vector>>> steps)
+  TransitionSolver(EntitySet es, std::vector<std::shared_ptr<StepBase>> steps)
     : es(es)
     , steps(steps)
   {}
@@ -60,7 +61,7 @@ class TransitionSolver
     add(Dune::stackobject_to_shared_ptr(step));
   }
 
-  void apply(std::shared_ptr<Vector> vector, std::shared_ptr<ConstraintsContainer> constraintscontainer)
+  void apply(std::shared_ptr<typename StepBase::Vector> vector, std::shared_ptr<ConstraintsContainer> constraintscontainer)
   {
     // Make sure that all initial parameters are propagated to all steps.
     // This avoids dependencies on the step insertion order
@@ -154,7 +155,7 @@ class TransitionSolver
 
   private:
   EntitySet es;
-  std::vector<std::shared_ptr<TransitionSolverStepBase<Vector>>> steps;
+  std::vector<std::shared_ptr<StepBase>> steps;
   std::map<std::string, Parameter> paramdata;
 };
 

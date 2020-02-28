@@ -8,13 +8,13 @@
 #include<memory>
 
 
-template<typename Vector>
+template<typename... V>
 class ProbeTransitionStep
-  : public TransitionSolverStepBase<Vector>
+  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
-  using DGF = Dune::PDELab::VectorDiscreteGridFunction<typename Base::GridFunctionSpace, Vector>;
+  using Base = TransitionSolverStepBase<V...>;
+  using DGF = Dune::PDELab::VectorDiscreteGridFunction<typename Base::GridFunctionSpace, typename Base::Vector>;
   using Probe = Dune::PDELab::GridFunctionProbe<DGF>;
 
   ProbeTransitionStep(const typename Base::GridView& gv, const Dune::ParameterTree& config)
@@ -24,7 +24,7 @@ class ProbeTransitionStep
 
   virtual ~ProbeTransitionStep() {}
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
     DGF dgf(vector->gridFunctionSpaceStorage(), vector);
     probe.setGridFunction(dgf);

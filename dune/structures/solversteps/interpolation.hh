@@ -11,12 +11,12 @@
 #include<functional>
 
 
-template<typename Vector>
+template<typename... V>
 class InterpolationTransitionStep
-  : public TransitionSolverStepBase<Vector>
+  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
   using FunctionSignature = typename Base::Range(typename Base::Entity, typename Base::GlobalCoordinate);
 
   InterpolationTransitionStep(std::function<FunctionSignature> func)
@@ -37,7 +37,7 @@ class InterpolationTransitionStep
 
   virtual ~InterpolationTransitionStep() {}
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
     auto& gfs = vector->gridFunctionSpace();
     auto gf = makeGridFunctionTreeFromCallables(gfs, funcs);

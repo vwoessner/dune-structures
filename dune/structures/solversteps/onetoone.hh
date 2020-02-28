@@ -7,32 +7,32 @@
 #include<memory>
 
 
-template<typename Vector, int dim>
+template<int dim, typename... V>
 class OneToOneMappingCheckerImpl
- : public TransitionSolverStepBase<Vector>
+ : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   virtual ~OneToOneMappingCheckerImpl() {}
 
-  void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     std::cout << "One-to-one checker not implemented for dimension " << dim << std::endl;
   }
 };
 
 
-template<typename Vector>
-class OneToOneMappingCheckerImpl<Vector, 3>
- : public TransitionSolverStepBase<Vector>
+template<typename... V>
+class OneToOneMappingCheckerImpl<3, V...>
+ : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   virtual ~OneToOneMappingCheckerImpl() {}
 
-  void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     auto& gfs = vector->gridFunctionSpace();
     auto es = gfs.entitySet();
@@ -45,7 +45,7 @@ class OneToOneMappingCheckerImpl<Vector, 3>
 };
 
 
-template<typename Vector>
-using OneToOneMappingChecker = OneToOneMappingCheckerImpl<Vector, TransitionSolverStepBase<Vector>::dim>;
+template<typename... V>
+using OneToOneMappingChecker = OneToOneMappingCheckerImpl<TransitionSolverStepBase<V...>::dim, V...>;
 
 #endif

@@ -10,12 +10,12 @@
 #include<type_traits>
 
 
-template<typename Vector>
+template<typename... V>
 class ContinuousVariationTransitionStep
-  : public StepCollectionStep<Vector>
+  : public StepCollectionStep<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   ContinuousVariationTransitionStep(std::string name, int iterations=5, double start=0.0, double end=1.0)
     : name(name)
@@ -34,7 +34,7 @@ class ContinuousVariationTransitionStep
       step->set_solver(solver_);
   }
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     double val = start;
     for (int i=0; i<iterations; ++i)
@@ -53,12 +53,12 @@ class ContinuousVariationTransitionStep
 };
 
 
-template<typename Vector>
+template<typename... V>
 class DiscreteVariationTransitionStep
-  : public StepCollectionStep<Vector>
+  : public StepCollectionStep<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   DiscreteVariationTransitionStep(std::string name, std::vector<typename Base::Parameter> values)
     : name(name)
@@ -75,7 +75,7 @@ class DiscreteVariationTransitionStep
       step->set_solver(solver_);
   }
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     for (auto val: values)
     {

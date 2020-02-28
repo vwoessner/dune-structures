@@ -12,12 +12,12 @@
 #include<memory>
 
 
-template<typename Vector, typename SLOP, typename TLOP>
+template<typename SLOP, typename TLOP, typename... V>
 class OneStepMethodStep
-  : public TransitionSolverStepBase<Vector>
+  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   using SpatialGridOperator = Dune::PDELab::GridOperator<typename Base::GridFunctionSpace,
                                                          typename Base::GridFunctionSpace,
@@ -41,8 +41,8 @@ class OneStepMethodStep
 
   using InstationaryGridOperator = Dune::PDELab::OneStepGridOperator<SpatialGridOperator, TemporalGridOperator>;
   using LinearSolver = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
-  using NewtonSolver = Dune::PDELab::Newton<InstationaryGridOperator, LinearSolver, Vector>;
-  using OneStepMethod = Dune::PDELab::OneStepMethod<double, InstationaryGridOperator, NewtonSolver, Vector>;
+  using NewtonSolver = Dune::PDELab::Newton<InstationaryGridOperator, LinearSolver, typename Base::Vector>;
+  using OneStepMethod = Dune::PDELab::OneStepMethod<double, InstationaryGridOperator, NewtonSolver, typename Base::Vector>;
 
   OneStepMethodStep()
     : theta(std::make_shared<Dune::PDELab::OneStepThetaParameter<double>>(1.0))
@@ -52,7 +52,7 @@ class OneStepMethodStep
 
   virtual ~OneStepMethodStep() {}
 
-  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void pre(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     auto gfs = vector->gridFunctionSpaceStorage();
     Dune::PDELab::ISTL::BCRSMatrixBackend<> mb(21);
@@ -64,12 +64,12 @@ class OneStepMethodStep
     newton = std::make_shared<NewtonSolver>(*igo, *vector, *linearsolver);
     newton->setVerbosityLevel(2);
 
-    swapvector = std::make_shared<Vector>(*vector);
+    swapvector = std::make_shared<typename Base::Vector>(*vector);
 
     onestepmethod = std::make_shared<OneStepMethod>(*theta, *igo, *newton);
   }
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
     std::cout << "Applying the one step method" << std::endl;
     onestepmethod->apply(time, timestep, *vector, *swapvector);
@@ -114,18 +114,18 @@ class OneStepMethodStep
   std::shared_ptr<NewtonSolver> newton;
   std::shared_ptr<OneStepMethod> onestepmethod;
   std::shared_ptr<Dune::PDELab::OneStepThetaParameter<double>> theta;
-  std::shared_ptr<Vector> swapvector;
+  std::shared_ptr<typename Base::Vector> swapvector;
   double time;
   double timestep;
 };
 
 
-template<typename Vector, typename SLOP, typename TLOP>
+template<typename SLOP, typename TLOP, typename... V>
 class VariableBoundaryOneStepMethodStep
-  : public OneStepMethodStep<Vector, SLOP, TLOP>
+  : public OneStepMethodStep<SLOP, TLOP, V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
   using FunctionSignature = typename Base::Range(typename Base::GlobalCoordinate);
 
   VariableBoundaryOneStepMethodStep(std::function<FunctionSignature> singlefunc)
@@ -146,7 +146,7 @@ class VariableBoundaryOneStepMethodStep
 
   virtual ~VariableBoundaryOneStepMethodStep() {}
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
   {
     auto& gfs = vector->gridFunctionSpace();
     auto func = makeInstationaryGridFunctionTreeFromCallables(*this->solver, gfs, funcs);
@@ -163,15 +163,15 @@ class VariableBoundaryOneStepMethodStep
 };
 
 
-template<typename Vector>
+template<typename... V>
 class InstationarySolverStep
-  : public ContinuousVariationTransitionStep<Vector>
+  : public ContinuousVariationTransitionStep<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   InstationarySolverStep(double Tstart, double Tend, double dt)
-    : ContinuousVariationTransitionStep<Vector>("time")
+    : ContinuousVariationTransitionStep<V...>("time")
     , dt(dt), Tstart(Tstart), Tend(Tend)
   {}
 
@@ -184,7 +184,7 @@ class InstationarySolverStep
     this->solver->introduce_parameter("timestep", dt);
   }
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     std::cout << "Starting time stepping loop" << std::endl;
     double time = Tstart;

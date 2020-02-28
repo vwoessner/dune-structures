@@ -15,7 +15,7 @@
 #include<vector>
 
 
-template<typename>
+template<typename... V>
 class ConstructionContext;
 
 
@@ -69,13 +69,13 @@ std::vector<P> dynamic_list_parse(const Dune::ParameterTree& tree, std::string d
 }
 
 
-template<typename Vector>
+template<typename... V>
 class ConstructionContext
 {
   public:
-  using StepBase = TransitionSolverStepBase<Vector>;
+  using StepBase = TransitionSolverStepBase<V...>;
   using StepBasePointer = std::shared_ptr<StepBase>;
-  using RegisterFunction = std::function<StepBasePointer(ConstructionContext<Vector>&, const Dune::ParameterTree&)>;
+  using RegisterFunction = std::function<StepBasePointer(ConstructionContext<V...>&, const Dune::ParameterTree&)>;
   using Entity = typename StepBase::Entity;
   using Coord = typename StepBase::GlobalCoordinate;
   using LocalCoord = typename Entity::Geometry::LocalCoordinate;
@@ -94,19 +94,19 @@ class ConstructionContext
     , rootconfig(config)
     , es(es)
     , physical(physical)
-    , solver(std::make_unique<TransitionSolver<Vector>>(es))
+    , solver(std::make_unique<TransitionSolver<V...>>(es))
   {
     registerStep("constraints",
                  [](const auto& ctx, const auto& p)
                  {
-                   return std::make_shared<ConstraintsTransitionStep<Vector>>(
-                     get_callable_array<Vector, LocalIntersectionSignature>(*ctx.solver, p.template get<std::string>("functions")));
+                   return std::make_shared<ConstraintsTransitionStep<V...>>(
+                     get_callable_array<LocalIntersectionSignature, V...>(*ctx.solver, p.template get<std::string>("functions")));
                  });
 
     registerStep("continuousvariation",
                  [](auto& ctx, const auto& p)
                  {
-                   auto step = std::make_shared<ContinuousVariationTransitionStep<Vector>>(p.template get<std::string>("name"),
+                   auto step = std::make_shared<ContinuousVariationTransitionStep<V...>>(p.template get<std::string>("name"),
                                                                                            p.template get<int>("iterations"),
                                                                                            p.template get<double>("start"),
                                                                                            p.template get<double>("end"));
@@ -119,7 +119,7 @@ class ConstructionContext
                  [](auto& ctx, const auto& p)
                  {
                    auto values = dynamic_list_parse<typename StepBase::Parameter>(p);
-                   auto step = std::make_shared<DiscreteVariationTransitionStep<Vector>>(p.template get<std::string>("name"), values);
+                   auto step = std::make_shared<DiscreteVariationTransitionStep<V...>>(p.template get<std::string>("name"), values);
                    step->set_solver(ctx.solver);
                    ctx.add_children(step, p);
                    return step;
@@ -131,7 +131,7 @@ class ConstructionContext
                    auto values = dynamic_list_parse<typename StepBase::Parameter>(p);
                    auto key = p.template get<std::string>("key");
                    auto name = p.template get<std::string>("name");
-                   auto step = std::make_shared<DiscreteMaterialVariationTransitionStep<Vector>>(name,
+                   auto step = std::make_shared<DiscreteMaterialVariationTransitionStep<V...>>(name,
                                                                                                  [key](auto& tree, auto param){ tree[key] = std::get<std::string>(param); },
                                                                                                  values);
                    step->set_solver(ctx.solver);
@@ -140,54 +140,54 @@ class ConstructionContext
                  });
 
     registerStep("elasticity",
-                 with_tree<ElasticitySolverStep<Vector>>);
+                 with_tree<ElasticitySolverStep<V...>>);
 
     if constexpr (dim == 2)
       registerStep("fibrereinforcedelasticity",
                    [](auto& ctx, const auto& p)
                    {
-                     return std::make_shared<FibreReinforcedElasticitySolverStep<Vector, 0>>(ctx.rootconfig, p);
+                     return std::make_shared<FibreReinforcedElasticitySolverStep<0, V...>>(ctx.rootconfig, p);
                    });
 
     registerStep("interpolation",
                  [](const auto& ctx, const auto& p)
                  {
-                   return std::make_shared<InterpolationTransitionStep<Vector>>(
-                     get_callable_array<Vector, LocalEntitySignature>(*ctx.solver, p["functions"]));
+                   return std::make_shared<InterpolationTransitionStep<V...>>(
+                     get_callable_array<LocalEntitySignature, V...>(*ctx.solver, p["functions"]));
                  });
 
     registerStep("material",
                  [](const auto& ctx, const auto& p)
                  {
-                   return std::make_shared<MaterialInitialization<Vector>>(ctx.es, ctx.physical, p, ctx.rootconfig);
+                   return std::make_shared<MaterialInitialization<V...>>(ctx.es, ctx.physical, p, ctx.rootconfig);
                  });
 
     registerStep("onetoone",
-                 default_constructed<OneToOneMappingChecker<Vector>>);
+                 default_constructed<OneToOneMappingChecker<V...>>);
 
     registerStep("parameter",
                  [](const auto& ctx, const auto& p)
                  {
                    auto param = dynamic_parse<typename StepBase::Parameter>(p);
-                   return std::make_shared<ParameterSetup<Vector>>(p.template get<std::string>("name"), param);
+                   return std::make_shared<ParameterSetup<V...>>(p.template get<std::string>("name"), param);
                  });
 
     registerStep("probe",
                  [](const auto& ctx, const auto& p)
                  {
-                   return std::make_shared<ProbeTransitionStep<Vector>>(ctx.es.gridView(), p);
+                   return std::make_shared<ProbeTransitionStep<V...>>(ctx.es.gridView(), p);
                  });
 
     registerStep("quasistatic_elasticity",
                  [](const auto& ctx, const auto& p)
                  {
-                   return std::make_shared<QuasiStaticElastoDynamicsSolverStep<Vector>>(ctx.rootconfig);
+                   return std::make_shared<QuasiStaticElastoDynamicsSolverStep<V...>>(ctx.rootconfig);
                  });
 
     registerStep("timeloop",
                  [](auto& ctx, const auto& p)
                  {
-                   auto step = std::make_shared<InstationarySolverStep<Vector>>(p.template get<double>("Tstart"),
+                   auto step = std::make_shared<InstationarySolverStep<V...>>(p.template get<double>("Tstart"),
                                                                                 p.template get<double>("Tend"),
                                                                                 p.template get<double>("dt"));
                    step->set_solver(ctx.solver);
@@ -199,14 +199,14 @@ class ConstructionContext
     registerStep("transformation",
                  [](auto& ctx, const auto& p)
                  {
-                   return std::make_shared<TransformationTransitionStep<Vector>>(get_transformation<Vector, Coord(Coord, Coord)>(*ctx.solver, p.template get<std::string>("functions")));
+                   return std::make_shared<TransformationTransitionStep<V...>>(get_transformation<Coord(Coord, Coord), V...>(*ctx.solver, p.template get<std::string>("functions")));
                  });
     }
 
     registerStep("visualization",
                  [](auto& ctx, const auto& p)
                  {
-                   auto step = std::make_shared<VisualizationStep<Vector>>(p);
+                   auto step = std::make_shared<VisualizationStep<V...>>(p);
                    ctx.add_children(step, p);
                    return step;
                  });
@@ -214,25 +214,25 @@ class ConstructionContext
     registerStep("vis_mpirank",
                  [](auto& ctx, const auto& p)
                  {
-                   return std::make_shared<MPIRankVisualizationStep<Vector>>(ctx.helper);
+                   return std::make_shared<MPIRankVisualizationStep<V...>>(ctx.helper);
                  });
 
     registerStep("vis_physicalentity",
                  [](auto& ctx, const auto& p)
                  {
-                   return std::make_shared<PhysicalEntityVisualizationStep<Vector>>(ctx.physical);
+                   return std::make_shared<PhysicalEntityVisualizationStep<V...>>(ctx.physical);
                  });
 
     registerStep("vis_solution",
-                 default_constructed<SolutionVisualizationStep<Vector>>);
+                 default_constructed<SolutionVisualizationStep<V...>>);
 
     registerStep("vis_vonmises",
-                 default_constructed<VonMisesStressVisualizationStep<Vector>>);
+                 default_constructed<VonMisesStressVisualizationStep<V...>>);
 
     registerStep("vis_fibredistance",
                  [](const auto& ctx, const auto& p)
                  {
-                   return std::make_shared<FibreDistanceVisualizationStep<Vector>>(p, ctx.rootconfig);
+                   return std::make_shared<FibreDistanceVisualizationStep<V...>>(p, ctx.rootconfig);
                  });
   }
 
@@ -273,7 +273,7 @@ class ConstructionContext
     }
   }
 
-  std::shared_ptr<TransitionSolver<Vector>> construct(const Dune::ParameterTree& config)
+  std::shared_ptr<TransitionSolver<V...>> construct(const Dune::ParameterTree& config)
   {
     add_children(solver, config);
     return solver;
@@ -287,7 +287,7 @@ class ConstructionContext
 
   // The stored mapping for each step
   std::map<std::string, RegisterFunction> mapping;
-  std::shared_ptr<TransitionSolver<Vector>> solver;
+  std::shared_ptr<TransitionSolver<V...>> solver;
 };
 
 #endif

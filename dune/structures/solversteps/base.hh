@@ -5,38 +5,43 @@
 
 #include<memory>
 #include<string>
+#include<tuple>
 #include<type_traits>
 #include<variant>
 #include<vector>
 
 
 // Forward declaration of the solver class
-template<typename V>
+template<typename... V>
 class TransitionSolver;
 
 
-template<typename V>
+template<typename... V>
 class TransitionSolverStepBase
 {
   public:
+  using First = typename std::tuple_element<0, std::tuple<V...>>::type;
+
   // Export some types from the PDELab Vector type
-  using Base = TransitionSolverStepBase<V>;
-  using Vector = V;
-  using GridFunctionSpace = typename Vector::GridFunctionSpace;
-  using GridView = typename GridFunctionSpace::Traits::GridViewType;
+  using Base = TransitionSolverStepBase<V...>;
+  using GridView = typename First::GridFunctionSpace::Traits::GridViewType;
   static constexpr int dim = GridView::dimension;
   using Grid = typename GridView::Traits::Grid;
-  using EntitySet = typename GridFunctionSpace::Traits::EntitySet;
+  using EntitySet = typename First::GridFunctionSpace::Traits::EntitySet;
   using ctype = typename Grid::ctype;
   using Entity = typename GridView::template Codim<0>::Entity;
   using GlobalCoordinate = typename Entity::Geometry::GlobalCoordinate;
-  using Range = typename Vector::field_type;
+  using Range = typename First::field_type;
+  using Solver = TransitionSolver<V...>;
+
+  // These need to go away in the transition
+  using Vector = First;
+  using GridFunctionSpace = typename Vector::GridFunctionSpace;
   using ConstraintsContainer = typename GridFunctionSpace::template ConstraintsContainer<Range>::Type;
   using VectorBackend = typename GridFunctionSpace::Traits::Backend;
-  using Solver = TransitionSolver<V>;
 
   // The possible types for parametrization of solver steps
-  using Material = MaterialCollection<typename Base::EntitySet, double>;
+  using Material = MaterialCollection<EntitySet, double>;
   using Parameter = std::variant<bool,
                                  double,
                                  int,
@@ -70,12 +75,12 @@ class TransitionSolverStepBase
 };
 
 
-template<typename Vector>
+template<typename... V>
 class StepCollectionStep
-  : public TransitionSolverStepBase<Vector>
+  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   StepCollectionStep()
     : steps(0)
@@ -96,20 +101,20 @@ class StepCollectionStep
       step->update_parameter(name, param);
   }
 
-  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void pre(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     for (auto step : steps)
       step->pre(vector, cc);
   }
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     for (auto step : steps)
       step->apply(vector, cc);
   }
 
 
-  virtual void post(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void post(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     for (auto step : steps)
       step->post(vector, cc);
@@ -129,16 +134,16 @@ class StepCollectionStep
   }
 
   protected:
-  std::vector<std::shared_ptr<TransitionSolverStepBase<Vector>>> steps;
+  std::vector<std::shared_ptr<TransitionSolverStepBase<V...>>> steps;
 };
 
 
-template<typename Vector, typename BaseT=TransitionSolverStepBase<Vector>>
+template<typename BaseT, typename... V>
 class WrapperStep
-  : public TransitionSolverStepBase<Vector>
+  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   WrapperStep(std::shared_ptr<BaseT> step)
     : step(step)
@@ -157,17 +162,17 @@ class WrapperStep
     step->update_parameter(name, param);
   }
 
-  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void pre(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     step->pre(vector, cc);
   }
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     step->apply(vector, cc);
   }
 
-  virtual void post(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void post(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
   {
     step->post(vector, cc);
   }

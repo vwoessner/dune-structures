@@ -9,12 +9,12 @@
 #include<memory>
 
 
-template<typename Vector>
+template<typename... V>
 class MaterialInitialization
-  : public TransitionSolverStepBase<Vector>
+  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   MaterialInitialization(typename Base::EntitySet es,
       std::shared_ptr<std::vector<int>> physical,
@@ -57,18 +57,18 @@ class MaterialInitialization
 };
 
 
-template<typename Vector>
+template<typename... V>
 class DiscreteMaterialVariationTransitionStep
-  : public DiscreteVariationTransitionStep<Vector>
+  : public DiscreteVariationTransitionStep<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   DiscreteMaterialVariationTransitionStep(
     std::string pname,
     std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator,
     std::vector<typename Base::Parameter> values)
-    : DiscreteVariationTransitionStep<Vector>(pname, values)
+    : DiscreteVariationTransitionStep<V...>(pname, values)
     , pname(pname)
     , modificator(modificator)
   {}
@@ -94,12 +94,12 @@ class DiscreteMaterialVariationTransitionStep
 };
 
 
-template<typename Vector>
+template<typename... V>
 class ContinuousMaterialVariationTransitionStep
-  : public ContinuousVariationTransitionStep<Vector>
+  : public ContinuousVariationTransitionStep<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Base = TransitionSolverStepBase<V...>;
 
   ContinuousMaterialVariationTransitionStep(
     std::string pname,
@@ -107,7 +107,7 @@ class ContinuousMaterialVariationTransitionStep
     int iterations=5,
     double start=0.0,
     double end=1.0)
-    : ContinuousVariationTransitionStep<Vector>(pname, iterations, start, end)
+    : ContinuousVariationTransitionStep<V...>(pname, iterations, start, end)
     , pname(pname)
     , modificator(modificator)
   {}
