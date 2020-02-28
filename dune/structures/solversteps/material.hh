@@ -3,6 +3,7 @@
 
 #include<dune/structures/material.hh>
 #include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/traits.hh>
 #include<dune/structures/solversteps/variation.hh>
 
 #include<functional>
@@ -14,9 +15,9 @@ class MaterialInitialization
   : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
+  using Traits = SimpleStepTraits<V...>;
 
-  MaterialInitialization(typename Base::EntitySet es,
+  MaterialInitialization(typename Traits::EntitySet es,
       std::shared_ptr<std::vector<int>> physical,
       const Dune::ParameterTree& params,
       const Dune::ParameterTree& rootparams
@@ -30,7 +31,7 @@ class MaterialInitialization
 
   virtual ~MaterialInitialization() {}
 
-  virtual void set_solver(std::shared_ptr<typename Base::Solver> solver_) override
+  virtual void set_solver(std::shared_ptr<typename Traits::Solver> solver_) override
   {
     this->solver = solver_;
     this->solver->introduce_parameter("physical", physical);
@@ -38,7 +39,7 @@ class MaterialInitialization
     this->solver->introduce_parameter("material", material);
   }
 
-  virtual void update_parameter(std::string name, typename Base::Parameter param) override
+  virtual void update_parameter(std::string name, typename Traits::Parameter param) override
   {
     if (name == "material_params")
     {
@@ -48,12 +49,12 @@ class MaterialInitialization
   }
 
   protected:
-  typename Base::EntitySet es;
+  typename Traits::EntitySet es;
   std::shared_ptr<std::vector<int>> physical;
   Dune::ParameterTree params;
   Dune::ParameterTree rootparams;
-  std::shared_ptr<typename Base::Material> material;
-  std::shared_ptr<typename Base::Solver> solver;
+  std::shared_ptr<typename Traits::Material> material;
+  std::shared_ptr<typename Traits::Solver> solver;
 };
 
 
@@ -62,12 +63,12 @@ class DiscreteMaterialVariationTransitionStep
   : public DiscreteVariationTransitionStep<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
+  using Traits = SimpleStepTraits<V...>;
 
   DiscreteMaterialVariationTransitionStep(
     std::string pname,
-    std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator,
-    std::vector<typename Base::Parameter> values)
+    std::function<void(Dune::ParameterTree&, typename Traits::Parameter)> modificator,
+    std::vector<typename Traits::Parameter> values)
     : DiscreteVariationTransitionStep<V...>(pname, values)
     , pname(pname)
     , modificator(modificator)
@@ -75,7 +76,7 @@ class DiscreteMaterialVariationTransitionStep
 
   virtual ~DiscreteMaterialVariationTransitionStep() {}
 
-  virtual void update_parameter(std::string name, typename Base::Parameter param) override
+  virtual void update_parameter(std::string name, typename Traits::Parameter param) override
   {
     if (pname == name)
     {
@@ -90,7 +91,7 @@ class DiscreteMaterialVariationTransitionStep
 
   private:
   std::string pname;
-  std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator;
+  std::function<void(Dune::ParameterTree&, typename Traits::Parameter)> modificator;
 };
 
 
@@ -99,11 +100,11 @@ class ContinuousMaterialVariationTransitionStep
   : public ContinuousVariationTransitionStep<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
+  using Traits = SimpleStepTraits<V...>;
 
   ContinuousMaterialVariationTransitionStep(
     std::string pname,
-    std::function<void(Dune::ParameterTree&, typename Base::Parameter)> modificator,
+    std::function<void(Dune::ParameterTree&, typename Traits::Parameter)> modificator,
     int iterations=5,
     double start=0.0,
     double end=1.0)
@@ -114,7 +115,7 @@ class ContinuousMaterialVariationTransitionStep
 
   virtual ~ContinuousMaterialVariationTransitionStep() {}
 
-  virtual void update_parameter(std::string name, typename Base::Parameter param) override
+  virtual void update_parameter(std::string name, typename Traits::Parameter param) override
   {
     if (pname == name)
     {

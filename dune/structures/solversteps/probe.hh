@@ -4,6 +4,7 @@
 #include<dune/common/parametertree.hh>
 #include<dune/pdelab.hh>
 #include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/traits.hh>
 
 #include<memory>
 
@@ -13,18 +14,19 @@ class ProbeTransitionStep
   : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
-  using DGF = Dune::PDELab::VectorDiscreteGridFunction<typename Base::GridFunctionSpace, typename Base::Vector>;
+  using Traits = SimpleStepTraits<V...>;
+
+  using DGF = Dune::PDELab::VectorDiscreteGridFunction<typename Traits::GridFunctionSpace, typename Traits::Vector>;
   using Probe = Dune::PDELab::GridFunctionProbe<DGF>;
 
-  ProbeTransitionStep(const typename Base::GridView& gv, const Dune::ParameterTree& config)
+  ProbeTransitionStep(const typename Traits::GridView& gv, const Dune::ParameterTree& config)
     : config(config)
-    , probe(gv, config.get<typename Base::GlobalCoordinate>("position"))
+    , probe(gv, config.get<typename Traits::GlobalCoordinate>("position"))
   {}
 
   virtual ~ProbeTransitionStep() {}
 
-  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
   {
     DGF dgf(vector->gridFunctionSpaceStorage(), vector);
     probe.setGridFunction(dgf);
@@ -33,7 +35,7 @@ class ProbeTransitionStep
     probe.eval(eval);
 
     if (config.get<bool>("displace", false))
-      eval += config.get<typename Base::GlobalCoordinate>("position");
+      eval += config.get<typename Traits::GlobalCoordinate>("position");
 
     std::cout << "Probe " << config.get<std::string>("name", "") << ": " << eval << std::endl;
   }

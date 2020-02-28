@@ -35,9 +35,10 @@ class TransitionSolver
 {
   public:
   using StepBase = TransitionSolverStepBase<V...>;
-  using EntitySet = typename StepBase::EntitySet;
-  using ConstraintsContainer = typename StepBase::ConstraintsContainer;
-  using Parameter = typename StepBase::Parameter;
+  using StepTraits = SimpleStepTraits<V...>;
+  using EntitySet = typename StepTraits::EntitySet;
+  using ConstraintsContainer = typename StepTraits::ConstraintsContainer;
+  using Parameter = typename StepTraits::Parameter;
 
   TransitionSolver(EntitySet es)
     : es(es), steps(0)
@@ -61,7 +62,7 @@ class TransitionSolver
     add(Dune::stackobject_to_shared_ptr(step));
   }
 
-  void apply(std::shared_ptr<typename StepBase::Vector> vector, std::shared_ptr<ConstraintsContainer> constraintscontainer)
+  void apply(std::shared_ptr<typename StepTraits::Vector> vector, std::shared_ptr<ConstraintsContainer> constraintscontainer)
   {
     // Make sure that all initial parameters are propagated to all steps.
     // This avoids dependencies on the step insertion order

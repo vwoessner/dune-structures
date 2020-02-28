@@ -3,6 +3,7 @@
 
 #include<dune/pdelab.hh>
 #include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/traits.hh>
 
 
 template<typename LocalOperator, typename... V>
@@ -10,20 +11,20 @@ class NewtonSolverTransitionStep
   : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
+  using Traits = SimpleStepTraits<V...>;
 
-  using GridOperator = Dune::PDELab::GridOperator<typename Base::GridFunctionSpace,
-                                                  typename Base::GridFunctionSpace,
+  using GridOperator = Dune::PDELab::GridOperator<typename Traits::GridFunctionSpace,
+                                                  typename Traits::GridFunctionSpace,
                                                   LocalOperator,
                                                   Dune::PDELab::ISTL::BCRSMatrixBackend<>,
-                                                  typename Base::ctype,
-                                                  typename Base::Range,
-                                                  typename Base::Range,
-                                                  typename Base::ConstraintsContainer,
-                                                  typename Base::ConstraintsContainer>;
+                                                  typename Traits::ctype,
+                                                  typename Traits::Range,
+                                                  typename Traits::Range,
+                                                  typename Traits::ConstraintsContainer,
+                                                  typename Traits::ConstraintsContainer>;
 
   using LinearSolver = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
-  using NewtonSolver = Dune::PDELab::Newton<GridOperator, LinearSolver, typename Base::Vector>;
+  using NewtonSolver = Dune::PDELab::Newton<GridOperator, LinearSolver, typename Traits::Vector>;
 
   NewtonSolverTransitionStep(const Dune::ParameterTree& params)
     : params(params)
@@ -52,7 +53,7 @@ class NewtonSolverTransitionStep
     return localoperator;
   }
 
-  virtual void pre(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
   {
     std::cout << "Building Newton" << std::endl;
     auto gfs = vector->gridFunctionSpaceStorage();
@@ -64,7 +65,7 @@ class NewtonSolverTransitionStep
     newton->setVerbosityLevel(2);
   }
 
-  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
   {
     std::cout << "Applying Newton Solver!" << std::endl;
     newton->apply();

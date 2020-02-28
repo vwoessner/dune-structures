@@ -6,6 +6,7 @@
 #include<dune/pdelab.hh>
 #include<dune/structures/material.hh>
 #include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/traits.hh>
 #include<dune/structures/vonmises.hh>
 
 #include<filesystem>
@@ -41,7 +42,7 @@ class VisualizationStepBase
   : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
+  using Traits = SimpleStepTraits<V...>;
 
   void set_parent(VisualizationStep<V...>* parent_)
   {
@@ -58,10 +59,11 @@ class VisualizationStep
   : public StepCollectionStep<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
+  using Traits = SimpleStepTraits<V...>;
+
   using VTKWriter = std::variant<
-      std::shared_ptr<typename VTKWriterChooser<typename Base::Vector, true>::type>,
-      std::shared_ptr<typename VTKWriterChooser<typename Base::Vector, false>::type>>;
+      std::shared_ptr<typename VTKWriterChooser<typename Traits::Vector, true>::type>,
+      std::shared_ptr<typename VTKWriterChooser<typename Traits::Vector, false>::type>>;
 
   VisualizationStep(bool instationary = false,
                     std::string name="output")
@@ -89,7 +91,7 @@ class VisualizationStep
 
   virtual ~VisualizationStep() {}
 
-  virtual void update_parameter(std::string name, typename Base::Parameter param) override
+  virtual void update_parameter(std::string name, typename Traits::Parameter param) override
   {
     if (name == "time")
       time = std::get<double>(param);
@@ -98,15 +100,15 @@ class VisualizationStep
       step->update_parameter(name, param);
   }
 
-  virtual void pre(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
   {
     // Instantiate a VTKWriter instance
     auto gv = vector->gridFunctionSpace().gridView();
 
     if (instationary)
-      vtkwriter = std::make_shared<typename VTKWriterChooser<typename Base::Vector, true>::type>(std::make_shared<typename VTKWriterChooser<typename Base::Vector, false>::type>(gv), name, path, extendpath);
+      vtkwriter = std::make_shared<typename VTKWriterChooser<typename Traits::Vector, true>::type>(std::make_shared<typename VTKWriterChooser<typename Traits::Vector, false>::type>(gv), name, path, extendpath);
     else
-      vtkwriter = std::make_shared<typename VTKWriterChooser<typename Base::Vector, false>::type>(gv);
+      vtkwriter = std::make_shared<typename VTKWriterChooser<typename Traits::Vector, false>::type>(gv);
 
     for (auto step: this->steps)
     {
@@ -117,7 +119,7 @@ class VisualizationStep
     }
   }
 
-  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
   {
     for (auto step: this->steps)
       step->apply(vector, cc);
@@ -125,10 +127,10 @@ class VisualizationStep
     if (instationary)
     {
       std::filesystem::create_directory(std::filesystem::current_path().append(path));
-      std::get<typename VTKWriterChooser<typename Base::Vector, true>::ptype>(vtkwriter)->write(time, Dune::VTK::appendedraw);
+      std::get<typename VTKWriterChooser<typename Traits::Vector, true>::ptype>(vtkwriter)->write(time, Dune::VTK::appendedraw);
     }
     else
-      std::get<typename VTKWriterChooser<typename Base::Vector, false>::ptype>(vtkwriter)->write(name, Dune::VTK::ascii);
+      std::get<typename VTKWriterChooser<typename Traits::Vector, false>::ptype>(vtkwriter)->write(name, Dune::VTK::ascii);
   }
 
   template<typename Container>
@@ -136,12 +138,12 @@ class VisualizationStep
   {
     if (instationary)
       Dune::PDELab::addSolutionToVTKWriter(
-          *(std::get<typename VTKWriterChooser<typename Base::Vector, true>::ptype>(vtkwriter)),
+          *(std::get<typename VTKWriterChooser<typename Traits::Vector, true>::ptype>(vtkwriter)),
           container->gridFunctionSpaceStorage(),
           container);
     else
       Dune::PDELab::addSolutionToVTKWriter(
-          *(std::get<typename VTKWriterChooser<typename Base::Vector, false>::ptype>(vtkwriter)),
+          *(std::get<typename VTKWriterChooser<typename Traits::Vector, false>::ptype>(vtkwriter)),
           container->gridFunctionSpaceStorage(),
           container);
   };
@@ -150,9 +152,9 @@ class VisualizationStep
   void add_celldata(std::shared_ptr<Container> container, std::string name)
   {
     if (instationary)
-      std::get<typename VTKWriterChooser<typename Base::Vector, true>::ptype>(vtkwriter)->addCellData(*container, name);
+      std::get<typename VTKWriterChooser<typename Traits::Vector, true>::ptype>(vtkwriter)->addCellData(*container, name);
     else
-      std::get<typename VTKWriterChooser<typename Base::Vector, false>::ptype>(vtkwriter)->addCellData(*container, name);
+      std::get<typename VTKWriterChooser<typename Traits::Vector, false>::ptype>(vtkwriter)->addCellData(*container, name);
   }
 
   private:
@@ -170,11 +172,11 @@ class SolutionVisualizationStep
   : public VisualizationStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
+  using Traits = SimpleStepTraits<V...>;
 
   virtual ~SolutionVisualizationStep() {}
 
-  virtual void pre(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
   {
     this->parent->add_dataset(vector);
   }
@@ -186,11 +188,11 @@ class MPIRankVisualizationStep
   : public VisualizationStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
+  using Traits = SimpleStepTraits<V...>;
 
   struct RankDummyContainer
   {
-    RankDummyContainer(Dune::MPIHelper& helper, typename Base::GridView gv) : rank(helper.rank()), size_(gv.size(0))
+    RankDummyContainer(Dune::MPIHelper& helper, typename Traits::GridView gv) : rank(helper.rank()), size_(gv.size(0))
     {}
 
     double operator[](std::size_t i) const
@@ -213,7 +215,7 @@ class MPIRankVisualizationStep
 
   virtual ~MPIRankVisualizationStep() {}
 
-  virtual void pre(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
   {
     auto container = std::make_shared<RankDummyContainer>(helper, vector->gridFunctionSpace().gridView());
     this->parent->add_celldata(container, "mpirank");
@@ -229,7 +231,7 @@ class PhysicalEntityVisualizationStep
   : public VisualizationStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
+  using Traits = SimpleStepTraits<V...>;
 
   PhysicalEntityVisualizationStep(std::shared_ptr<std::vector<int>> physical)
     : physical(physical)
@@ -237,7 +239,7 @@ class PhysicalEntityVisualizationStep
 
   virtual ~PhysicalEntityVisualizationStep() {}
 
-  virtual void pre(std::shared_ptr<typename Base::Vector>, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void pre(std::shared_ptr<typename Traits::Vector>, std::shared_ptr<typename Traits::ConstraintsContainer>) override
   {
     this->parent->add_celldata(physical, "gmshPhysical");
   }
@@ -252,31 +254,31 @@ class VonMisesStressVisualizationStep
   : public VisualizationStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
+  using Traits = SimpleStepTraits<V...>;
 
   virtual ~VonMisesStressVisualizationStep() {}
 
-  virtual void update_parameter(std::string name, typename Base::Parameter param) override
+  virtual void update_parameter(std::string name, typename Traits::Parameter param) override
   {
     if (name == "material")
-      material = std::get<std::shared_ptr<typename Base::Material>>(param);
+      material = std::get<std::shared_ptr<typename Traits::Material>>(param);
   }
 
-  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
   {
     auto es = vector->gridFunctionSpace().entitySet();
 
     // A grid function for the stress
-    VonMisesStressGridFunction<typename Base::Vector> stress(*vector, material);
+    VonMisesStressGridFunction<typename Traits::Vector> stress(*vector, material);
 
     // Interpolate the stress into a grid function
-    using P0FEM = Dune::PDELab::P0LocalFiniteElementMap<typename Base::ctype, typename Base::Range, Base::dim>;
-    auto p0fem = std::make_shared<P0FEM>(Dune::GeometryTypes::simplex(Base::dim));
-    using P0GFS = Dune::PDELab::GridFunctionSpace<typename Base::EntitySet, P0FEM, Dune::PDELab::NoConstraints, typename Base::VectorBackend>;
+    using P0FEM = Dune::PDELab::P0LocalFiniteElementMap<typename Traits::ctype, typename Traits::Range, Traits::dim>;
+    auto p0fem = std::make_shared<P0FEM>(Dune::GeometryTypes::simplex(Traits::dim));
+    using P0GFS = Dune::PDELab::GridFunctionSpace<typename Traits::EntitySet, P0FEM, Dune::PDELab::NoConstraints, typename Traits::VectorBackend>;
     auto p0gfs = std::make_shared<P0GFS>(es, p0fem);
     p0gfs->name("vonmises");
     p0gfs->setDataSetType(Dune::PDELab::GridFunctionOutputParameters::Output::cellData);
-    using StressVector = Dune::PDELab::Backend::Vector<P0GFS, typename Base::ctype>;
+    using StressVector = Dune::PDELab::Backend::Vector<P0GFS, typename Traits::ctype>;
     auto stress_container = std::make_shared<StressVector>(p0gfs);
 
     Dune::PDELab::interpolate(stress, *p0gfs, *stress_container);
@@ -284,7 +286,7 @@ class VonMisesStressVisualizationStep
   }
 
   private:
-  std::shared_ptr<typename Base::Material> material;
+  std::shared_ptr<typename Traits::Material> material;
 };
 
 
@@ -293,7 +295,7 @@ class FibreDistanceVisualizationStep
   : public VisualizationStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
+  using Traits = SimpleStepTraits<V...>;
 
   FibreDistanceVisualizationStep(const Dune::ParameterTree& params, const Dune::ParameterTree& rootparams)
     : prestress(rootparams.sub(params.get<std::string>("key")), rootparams)
@@ -301,17 +303,17 @@ class FibreDistanceVisualizationStep
 
   virtual ~FibreDistanceVisualizationStep() {}
 
-  virtual void pre(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
   {
-    if constexpr (Base::dim == 3)
+    if constexpr (Traits::dim == 3)
     {
       auto es = vector->gridFunctionSpace().entitySet();
-      using FEM = Dune::PDELab::PkLocalFiniteElementMap<typename Base::EntitySet, double, typename Base::Range, 1>;
+      using FEM = Dune::PDELab::PkLocalFiniteElementMap<typename Traits::EntitySet, double, typename Traits::Range, 1>;
       auto fem = std::make_shared<FEM>(es);
-      using GFS = Dune::PDELab::GridFunctionSpace<typename Base::EntitySet, FEM, Dune::PDELab::NoConstraints, typename Base::VectorBackend>;
+      using GFS = Dune::PDELab::GridFunctionSpace<typename Traits::EntitySet, FEM, Dune::PDELab::NoConstraints, typename Traits::VectorBackend>;
       auto gfs = std::make_shared<GFS>(es, fem);
       gfs->name("fibredistance");
-      using DistanceVector = Dune::PDELab::Backend::Vector<GFS, typename Base::ctype>;
+      using DistanceVector = Dune::PDELab::Backend::Vector<GFS, typename Traits::ctype>;
       auto container = std::make_shared<DistanceVector>(gfs);
 
       auto lambda = [this](const auto& e, const auto& x){ return this->prestress.distance_to_minimum(e, x); };
@@ -322,7 +324,7 @@ class FibreDistanceVisualizationStep
   }
 
   private:
-  CurvedFibrePrestress<typename Base::GridView, double> prestress;
+  CurvedFibrePrestress<typename Traits::GridView, double> prestress;
 };
 
 #endif

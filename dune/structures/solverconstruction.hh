@@ -20,14 +20,14 @@ class ConstructionContext;
 
 
 template<typename Step>
-std::shared_ptr<TransitionSolverStepBase<typename Step::Base::Vector>> default_constructed(const ConstructionContext<typename Step::Base::Vector>&, const Dune::ParameterTree&)
+std::shared_ptr<TransitionSolverStepBase<typename Step::Traits::Vector>> default_constructed(const ConstructionContext<typename Step::Traits::Vector>&, const Dune::ParameterTree&)
 {
   return std::make_shared<Step>();
 }
 
 
 template<typename Step>
-std::shared_ptr<TransitionSolverStepBase<typename Step::Base::Vector>> with_tree(const ConstructionContext<typename Step::Base::Vector>&, const Dune::ParameterTree& tree)
+std::shared_ptr<TransitionSolverStepBase<typename Step::Traits::Vector>> with_tree(const ConstructionContext<typename Step::Traits::Vector>&, const Dune::ParameterTree& tree)
 {
   return std::make_shared<Step>(tree);
 }
@@ -76,19 +76,20 @@ class ConstructionContext
   using StepBase = TransitionSolverStepBase<V...>;
   using StepBasePointer = std::shared_ptr<StepBase>;
   using RegisterFunction = std::function<StepBasePointer(ConstructionContext<V...>&, const Dune::ParameterTree&)>;
-  using Entity = typename StepBase::Entity;
-  using Coord = typename StepBase::GlobalCoordinate;
+  using StepTraits = SimpleStepTraits<V...>;
+  using Entity = typename StepTraits::Entity;
+  using Coord = typename StepTraits::GlobalCoordinate;
   using LocalCoord = typename Entity::Geometry::LocalCoordinate;
-  using Intersection = typename StepBase::GridView::Intersection;
+  using Intersection = typename StepTraits::GridView::Intersection;
   using IntersectionLocalCoord = typename Intersection::Geometry::LocalCoordinate;
-  static constexpr int dim = StepBase::dim;
+  static constexpr int dim = StepTraits::dim;
 
   using LocalEntitySignature = double(Entity, LocalCoord);
   using LocalIntersectionSignature = bool(Intersection, IntersectionLocalCoord);
 
   ConstructionContext(Dune::MPIHelper& helper,
                       const Dune::ParameterTree& config,
-                      typename StepBase::EntitySet es,
+                      typename StepTraits::EntitySet es,
                       std::shared_ptr<std::vector<int>> physical)
     : helper(helper)
     , rootconfig(config)
@@ -118,7 +119,7 @@ class ConstructionContext
     registerStep("discretevariation",
                  [](auto& ctx, const auto& p)
                  {
-                   auto values = dynamic_list_parse<typename StepBase::Parameter>(p);
+                   auto values = dynamic_list_parse<typename StepTraits::Parameter>(p);
                    auto step = std::make_shared<DiscreteVariationTransitionStep<V...>>(p.template get<std::string>("name"), values);
                    step->set_solver(ctx.solver);
                    ctx.add_children(step, p);
@@ -128,7 +129,7 @@ class ConstructionContext
     registerStep("discretematerialvariation",
                  [](auto& ctx, const auto& p)
                  {
-                   auto values = dynamic_list_parse<typename StepBase::Parameter>(p);
+                   auto values = dynamic_list_parse<typename StepTraits::Parameter>(p);
                    auto key = p.template get<std::string>("key");
                    auto name = p.template get<std::string>("name");
                    auto step = std::make_shared<DiscreteMaterialVariationTransitionStep<V...>>(name,
@@ -168,7 +169,7 @@ class ConstructionContext
     registerStep("parameter",
                  [](const auto& ctx, const auto& p)
                  {
-                   auto param = dynamic_parse<typename StepBase::Parameter>(p);
+                   auto param = dynamic_parse<typename StepTraits::Parameter>(p);
                    return std::make_shared<ParameterSetup<V...>>(p.template get<std::string>("name"), param);
                  });
 
@@ -282,7 +283,7 @@ class ConstructionContext
   // The reference members that might be needed for construction of steps
   Dune::MPIHelper& helper;
   const Dune::ParameterTree& rootconfig;
-  typename StepBase::EntitySet es;
+  typename StepTraits::EntitySet es;
   std::shared_ptr<std::vector<int>> physical;
 
   // The stored mapping for each step

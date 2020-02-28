@@ -4,6 +4,7 @@
 
 #include<dune/pdelab.hh>
 #include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/traits.hh>
 
 #include<functional>
 
@@ -53,8 +54,9 @@ template<typename... V>
 class TransformationTransitionStep : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
-  static constexpr int dim = Base::dim;
+  using Traits = SimpleStepTraits<V...>;
+
+  static constexpr int dim = Traits::dim;
   using GridFunction = TransformationGridFunction<V...>;
 
   using FunctionSignature = Dune::FieldVector<double, dim>(Dune::FieldVector<double, dim>, Dune::FieldVector<double, dim>);
@@ -66,10 +68,10 @@ class TransformationTransitionStep : public TransitionSolverStepBase<V...>
 
   virtual ~TransformationTransitionStep() {}
 
-  virtual void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
   {
     std::cout << "Transforming solution!" << std::endl;
-    TransformationGridFunction<typename Base::Vector> trafo(func, *vector);
+    TransformationGridFunction<typename Traits::Vector> trafo(func, *vector);
     Dune::PDELab::interpolate(trafo, vector->gridFunctionSpace(), *vector);
   }
 

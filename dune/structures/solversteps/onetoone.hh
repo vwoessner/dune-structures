@@ -3,6 +3,7 @@
 
 #include<dune/structures/onetoone.hh>
 #include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/traits.hh>
 
 #include<memory>
 
@@ -12,11 +13,11 @@ class OneToOneMappingCheckerImpl
  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
+  using Traits = SimpleStepTraits<V...>;
 
   virtual ~OneToOneMappingCheckerImpl() {}
 
-  void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
   {
     std::cout << "One-to-one checker not implemented for dimension " << dim << std::endl;
   }
@@ -28,11 +29,11 @@ class OneToOneMappingCheckerImpl<3, V...>
  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<V...>;
+  using Traits = SimpleStepTraits<V...>;
 
   virtual ~OneToOneMappingCheckerImpl() {}
 
-  void apply(std::shared_ptr<typename Base::Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
   {
     auto& gfs = vector->gridFunctionSpace();
     auto es = gfs.entitySet();
@@ -46,6 +47,6 @@ class OneToOneMappingCheckerImpl<3, V...>
 
 
 template<typename... V>
-using OneToOneMappingChecker = OneToOneMappingCheckerImpl<TransitionSolverStepBase<V...>::dim, V...>;
+using OneToOneMappingChecker = OneToOneMappingCheckerImpl<SimpleStepTraits<V...>::dim, V...>;
 
 #endif

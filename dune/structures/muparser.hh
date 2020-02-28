@@ -5,6 +5,7 @@
 #include<dune/grid/concepts/intersection.hh>
 #include<dune/structures/utilities.hh>
 #include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/traits.hh>
 
 #include<muParser.h>
 #include<string>
@@ -127,9 +128,9 @@ std::function<Signature> get_transformation(TransitionSolver<Vector...>& solver,
 
 template<typename Signature, typename... Vector>
 std::array<std::function<Signature>,
-           Dune::TypeTree::TreeInfo<typename TransitionSolverStepBase<Vector...>::GridFunctionSpace>::leafCount> get_callable_array(TransitionSolver<Vector...>& solver, std::string expr)
+           Dune::TypeTree::TreeInfo<typename SimpleStepTraits<Vector...>::GridFunctionSpace>::leafCount> get_callable_array(TransitionSolver<Vector...>& solver, std::string expr)
 {
-  using GFS = typename TransitionSolverStepBase<Vector...>::GridFunctionSpace;
+  using GFS = typename SimpleStepTraits<Vector...>::GridFunctionSpace;
   constexpr auto len = Dune::TypeTree::TreeInfo<GFS>::leafCount;
   std::array<std::function<Signature>, len> result;
 
