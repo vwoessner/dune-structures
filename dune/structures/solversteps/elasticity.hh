@@ -12,11 +12,11 @@
 
 template<typename... V>
 class ElasticitySolverStep
-  : public WrapperStep<NewtonSolverTransitionStep<typename OperatorSwitch<typename SimpleStepTraits<V...>::GridFunctionSpace,
-                                                                          SimpleStepTraits<V...>::dim>::Elasticity, V...>, V...>
+  : public WrapperStep<NewtonSolverTransitionStep<typename OperatorSwitch<typename VectorStepTraits<0, V...>::GridFunctionSpace,
+                                                                          VectorStepTraits<0, V...>::dim>::Elasticity, V...>, V...>
 {
   public:
-  using Traits = SimpleStepTraits<V...>;
+  using Traits = VectorStepTraits<0, V...>;
 
   static constexpr int dim = Traits::dim;
   using LocalOperator = typename OperatorSwitch<typename Traits::GridFunctionSpace, dim>::Elasticity;
@@ -84,14 +84,14 @@ class ElasticitySolverStep
 
 template<typename... V>
 class QuasiStaticElastoDynamicsSolverStep
-  : public WrapperStep<OneStepMethodStep<typename OperatorSwitch<typename SimpleStepTraits<V...>::GridFunctionSpace,
-                                                                 SimpleStepTraits<V...>::dim>::Elasticity,
-                                         typename OperatorSwitch<typename SimpleStepTraits<V...>::GridFunctionSpace,
-                                                                 SimpleStepTraits<V...>::dim>::Mass,
+  : public WrapperStep<OneStepMethodStep<typename OperatorSwitch<typename VectorStepTraits<0, V...>::GridFunctionSpace,
+                                                                 VectorStepTraits<0, V...>::dim>::Elasticity,
+                                         typename OperatorSwitch<typename VectorStepTraits<0, V...>::GridFunctionSpace,
+                                                                 VectorStepTraits<0, V...>::dim>::Mass,
                                          V...>, V...>
 {
   public:
-  using Traits = SimpleStepTraits<V...>;
+  using Traits = VectorStepTraits<0, V...>;
 
   using SpatialLocalOperator = typename OperatorSwitch<typename Traits::GridFunctionSpace,
                                                        Traits::dim>::Elasticity;

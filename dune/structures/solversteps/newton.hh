@@ -11,7 +11,7 @@ class NewtonSolverTransitionStep
   : public TransitionSolverStepBase<V...>
 {
   public:
-  using Traits = SimpleStepTraits<V...>;
+  using Traits = VectorStepTraits<0, V...>;
 
   using GridOperator = Dune::PDELab::GridOperator<typename Traits::GridFunctionSpace,
                                                   typename Traits::GridFunctionSpace,

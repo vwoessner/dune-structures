@@ -29,7 +29,7 @@ class OneToOneMappingCheckerImpl<3, V...>
  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Traits = SimpleStepTraits<V...>;
+  using Traits = VectorStepTraits<0, V...>;
 
   virtual ~OneToOneMappingCheckerImpl() {}
 

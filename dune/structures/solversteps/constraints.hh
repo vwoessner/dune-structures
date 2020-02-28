@@ -15,7 +15,7 @@ class ConstraintsTransitionStep
   : public TransitionSolverStepBase<V...>
 {
   public:
-  using Traits = SimpleStepTraits<V...>;
+  using Traits = VectorStepTraits<0, V...>;
   using FunctionSignature = bool(typename Traits::GridView::Intersection, typename Traits::GridView::Intersection::Geometry::LocalCoordinate);
 
   ConstraintsTransitionStep(std::function<FunctionSignature> func)

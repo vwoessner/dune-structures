@@ -15,19 +15,17 @@
 #include<variant>
 
 
-template<typename Vector, bool instationary>
+template<typename GV, bool instationary>
 struct VTKWriterChooser
 {
-  using GV = typename Vector::GridFunctionSpace::Traits::GridViewType;
   using type = Dune::VTKWriter<GV>;
   using ptype = std::shared_ptr<type>;
 };
 
 
-template<typename Vector>
-struct VTKWriterChooser<Vector, true>
+template<typename GV>
+struct VTKWriterChooser<GV, true>
 {
-  using GV = typename Vector::GridFunctionSpace::Traits::GridViewType;
   using type = Dune::VTKSequenceWriter<GV>;
   using ptype = std::shared_ptr<type>;
 };
@@ -62,8 +60,8 @@ class VisualizationStep
   using Traits = SimpleStepTraits<V...>;
 
   using VTKWriter = std::variant<
-      std::shared_ptr<typename VTKWriterChooser<typename Traits::Vector, true>::type>,
-      std::shared_ptr<typename VTKWriterChooser<typename Traits::Vector, false>::type>>;
+      std::shared_ptr<typename VTKWriterChooser<typename Traits::GridView, true>::type>,
+      std::shared_ptr<typename VTKWriterChooser<typename Traits::GridView, false>::type>>;
 
   VisualizationStep(bool instationary = false,
                     std::string name="output")
@@ -107,9 +105,9 @@ class VisualizationStep
     auto gv = vector->gridFunctionSpace().gridView();
 
     if (instationary)
-      vtkwriter = std::make_shared<typename VTKWriterChooser<typename Traits::Vector, true>::type>(std::make_shared<typename VTKWriterChooser<typename Traits::Vector, false>::type>(gv), name, path, extendpath);
+      vtkwriter = std::make_shared<typename VTKWriterChooser<typename Traits::GridView, true>::type>(std::make_shared<typename VTKWriterChooser<typename Traits::GridView, false>::type>(gv), name, path, extendpath);
     else
-      vtkwriter = std::make_shared<typename VTKWriterChooser<typename Traits::Vector, false>::type>(gv);
+      vtkwriter = std::make_shared<typename VTKWriterChooser<typename Traits::GridView, false>::type>(gv);
 
     for (auto step: this->steps)
     {
@@ -128,10 +126,10 @@ class VisualizationStep
     if (instationary)
     {
       std::filesystem::create_directory(std::filesystem::current_path().append(path));
-      std::get<typename VTKWriterChooser<typename Traits::Vector, true>::ptype>(vtkwriter)->write(time, Dune::VTK::appendedraw);
+      std::get<typename VTKWriterChooser<typename Traits::GridView, true>::ptype>(vtkwriter)->write(time, Dune::VTK::appendedraw);
     }
     else
-      std::get<typename VTKWriterChooser<typename Traits::Vector, false>::ptype>(vtkwriter)->write(name, Dune::VTK::ascii);
+      std::get<typename VTKWriterChooser<typename Traits::GridView, false>::ptype>(vtkwriter)->write(name, Dune::VTK::ascii);
   }
 
   template<typename Container>
@@ -139,12 +137,12 @@ class VisualizationStep
   {
     if (instationary)
       Dune::PDELab::addSolutionToVTKWriter(
-          *(std::get<typename VTKWriterChooser<typename Traits::Vector, true>::ptype>(vtkwriter)),
+          *(std::get<typename VTKWriterChooser<typename Traits::GridView, true>::ptype>(vtkwriter)),
           container->gridFunctionSpaceStorage(),
           container);
     else
       Dune::PDELab::addSolutionToVTKWriter(
-          *(std::get<typename VTKWriterChooser<typename Traits::Vector, false>::ptype>(vtkwriter)),
+          *(std::get<typename VTKWriterChooser<typename Traits::GridView, false>::ptype>(vtkwriter)),
           container->gridFunctionSpaceStorage(),
           container);
   };
@@ -153,9 +151,9 @@ class VisualizationStep
   void add_celldata(std::shared_ptr<Container> container, std::string name)
   {
     if (instationary)
-      std::get<typename VTKWriterChooser<typename Traits::Vector, true>::ptype>(vtkwriter)->addCellData(*container, name);
+      std::get<typename VTKWriterChooser<typename Traits::GridView, true>::ptype>(vtkwriter)->addCellData(*container, name);
     else
-      std::get<typename VTKWriterChooser<typename Traits::Vector, false>::ptype>(vtkwriter)->addCellData(*container, name);
+      std::get<typename VTKWriterChooser<typename Traits::GridView, false>::ptype>(vtkwriter)->addCellData(*container, name);
   }
 
   private:
@@ -173,7 +171,7 @@ class SolutionVisualizationStep
   : public VisualizationStepBase<V...>
 {
   public:
-  using Traits = SimpleStepTraits<V...>;
+  using Traits = VectorStepTraits<0, V...>;
 
   virtual ~SolutionVisualizationStep() {}
 
@@ -257,7 +255,7 @@ class VonMisesStressVisualizationStep
   : public VisualizationStepBase<V...>
 {
   public:
-  using Traits = SimpleStepTraits<V...>;
+  using Traits = VectorStepTraits<0, V...>;
 
   virtual ~VonMisesStressVisualizationStep() {}
 
@@ -299,7 +297,7 @@ class FibreDistanceVisualizationStep
   : public VisualizationStepBase<V...>
 {
   public:
-  using Traits = SimpleStepTraits<V...>;
+  using Traits = VectorStepTraits<0, V...>;
 
   FibreDistanceVisualizationStep(const Dune::ParameterTree& params, const Dune::ParameterTree& rootparams)
     : prestress(rootparams.sub(params.get<std::string>("key")), rootparams)

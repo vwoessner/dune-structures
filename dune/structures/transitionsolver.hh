@@ -45,7 +45,6 @@ class TransitionSolver
   using StepBase = TransitionSolverStepBase<V...>;
   using StepTraits = SimpleStepTraits<V...>;
   using EntitySet = typename StepTraits::EntitySet;
-  using ConstraintsContainer = typename StepTraits::ConstraintsContainer;
   using Parameter = typename StepTraits::Parameter;
 
   TransitionSolver(EntitySet es)

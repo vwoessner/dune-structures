@@ -14,7 +14,7 @@ class ProbeTransitionStep
   : public TransitionSolverStepBase<V...>
 {
   public:
-  using Traits = SimpleStepTraits<V...>;
+  using Traits = VectorStepTraits<0, V...>;
 
   using DGF = Dune::PDELab::VectorDiscreteGridFunction<typename Traits::GridFunctionSpace, typename Traits::Vector>;
   using Probe = Dune::PDELab::GridFunctionProbe<DGF>;

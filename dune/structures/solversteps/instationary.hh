@@ -18,7 +18,7 @@ class OneStepMethodStep
   : public TransitionSolverStepBase<V...>
 {
   public:
-  using Traits = SimpleStepTraits<V...>;
+  using Traits = VectorStepTraits<0, V...>;
 
   using SpatialGridOperator = Dune::PDELab::GridOperator<typename Traits::GridFunctionSpace,
                                                          typename Traits::GridFunctionSpace,
@@ -129,7 +129,7 @@ class VariableBoundaryOneStepMethodStep
   : public OneStepMethodStep<SLOP, TLOP, V...>
 {
   public:
-  using Traits = SimpleStepTraits<V...>;
+  using Traits = VectorStepTraits<0, V...>;
 
   using FunctionSignature = typename Traits::Range(typename Traits::GlobalCoordinate);
 

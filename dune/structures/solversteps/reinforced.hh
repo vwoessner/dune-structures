@@ -8,10 +8,10 @@
 
 template<std::size_t num_fibres, typename... V>
 class FibreReinforcedElasticitySolverStep
-  : public WrapperStep<NewtonSolverTransitionStep<FibreReinforcedBulkOperator<typename SimpleStepTraits<V...>::GridFunctionSpace, SimpleStepTraits<V...>::dim>, V...>, V...>
+  : public WrapperStep<NewtonSolverTransitionStep<FibreReinforcedBulkOperator<typename VectorStepTraits<0, V...>::GridFunctionSpace, VectorStepTraits<0, V...>::dim>, V...>, V...>
 {
   public:
-  using Traits = SimpleStepTraits<V...>;
+  using Traits = VectorStepTraits<0, V...>;
 
   static constexpr int dim = Traits::dim;
   using LocalOperator = FibreReinforcedBulkOperator<typename Traits::GridFunctionSpace, dim>;

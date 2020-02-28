@@ -17,7 +17,7 @@ class InterpolationTransitionStep
   : public TransitionSolverStepBase<V...>
 {
   public:
-  using Traits = SimpleStepTraits<V...>;
+  using Traits = VectorStepTraits<0, V...>;
 
   using FunctionSignature = typename Traits::Range(typename Traits::Entity, typename Traits::GlobalCoordinate);
 

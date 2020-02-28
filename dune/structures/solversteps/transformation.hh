@@ -54,7 +54,7 @@ template<typename... V>
 class TransformationTransitionStep : public TransitionSolverStepBase<V...>
 {
   public:
-  using Traits = SimpleStepTraits<V...>;
+  using Traits = VectorStepTraits<0, V...>;
 
   static constexpr int dim = Traits::dim;
   using GridFunction = TransformationGridFunction<V...>;

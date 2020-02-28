@@ -128,9 +128,9 @@ std::function<Signature> get_transformation(TransitionSolver<Vector...>& solver,
 
 template<typename Signature, typename... Vector>
 std::array<std::function<Signature>,
-           Dune::TypeTree::TreeInfo<typename SimpleStepTraits<Vector...>::GridFunctionSpace>::leafCount> get_callable_array(TransitionSolver<Vector...>& solver, std::string expr)
+           Dune::TypeTree::TreeInfo<typename VectorStepTraits<0, Vector...>::GridFunctionSpace>::leafCount> get_callable_array(TransitionSolver<Vector...>& solver, std::string expr)
 {
-  using GFS = typename SimpleStepTraits<Vector...>::GridFunctionSpace;
+  using GFS = typename VectorStepTraits<0, Vector...>::GridFunctionSpace;
   constexpr auto len = Dune::TypeTree::TreeInfo<GFS>::leafCount;
   std::array<std::function<Signature>, len> result;
 

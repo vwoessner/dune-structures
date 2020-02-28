@@ -19,15 +19,15 @@ template<typename... V>
 class ConstructionContext;
 
 
-template<typename Step>
-std::shared_ptr<TransitionSolverStepBase<typename Step::Traits::Vector>> default_constructed(const ConstructionContext<typename Step::Traits::Vector>&, const Dune::ParameterTree&)
+template<typename Step, typename... V>
+std::shared_ptr<TransitionSolverStepBase<V...>> default_constructed(const ConstructionContext<V...>&, const Dune::ParameterTree&)
 {
   return std::make_shared<Step>();
 }
 
 
-template<typename Step>
-std::shared_ptr<TransitionSolverStepBase<typename Step::Traits::Vector>> with_tree(const ConstructionContext<typename Step::Traits::Vector>&, const Dune::ParameterTree& tree)
+template<typename Step, typename... V>
+std::shared_ptr<TransitionSolverStepBase<V...>> with_tree(const ConstructionContext<V...>&, const Dune::ParameterTree& tree)
 {
   return std::make_shared<Step>(tree);
 }
@@ -141,7 +141,7 @@ class ConstructionContext
                  });
 
     registerStep("elasticity",
-                 with_tree<ElasticitySolverStep<V...>>);
+                 with_tree<ElasticitySolverStep<V...>, V...>);
 
     if constexpr (dim == 2)
       registerStep("fibrereinforcedelasticity",
@@ -164,7 +164,7 @@ class ConstructionContext
                  });
 
     registerStep("onetoone",
-                 default_constructed<OneToOneMappingChecker<V...>>);
+                 default_constructed<OneToOneMappingChecker<V...>, V...>);
 
     registerStep("parameter",
                  [](const auto& ctx, const auto& p)
@@ -225,10 +225,10 @@ class ConstructionContext
                  });
 
     registerStep("vis_solution",
-                 default_constructed<SolutionVisualizationStep<V...>>);
+                 default_constructed<SolutionVisualizationStep<V...>, V...>);
 
     registerStep("vis_vonmises",
-                 default_constructed<VonMisesStressVisualizationStep<V...>>);
+                 default_constructed<VonMisesStressVisualizationStep<V...>, V...>);
 
     registerStep("vis_fibredistance",
                  [](const auto& ctx, const auto& p)
