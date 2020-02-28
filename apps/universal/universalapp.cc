@@ -17,7 +17,10 @@ void apply(Dune::MPIHelper& helper, const Dune::ParameterTree& params, char** ar
   ConstructionContext<V> ctx(helper, params, es, physical);
   auto solver = ctx.construct(params.sub("solver"));
 
-  solver->apply(x, cc);
+  solver->setVectors(x);
+  solver->setConstraintsContainers(cc);
+
+  solver->apply();
 }
 
 

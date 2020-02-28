@@ -100,9 +100,10 @@ class VisualizationStep
       step->update_parameter(name, param);
   }
 
-  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void pre() override
   {
     // Instantiate a VTKWriter instance
+    auto vector = this->solver->getVector();
     auto gv = vector->gridFunctionSpace().gridView();
 
     if (instationary)
@@ -115,14 +116,14 @@ class VisualizationStep
       auto vsp = dynamic_cast<VisualizationStepBase<V...>*>(step.get());
       if (vsp)
         vsp->set_parent(this);
-      step->pre(vector, cc);
+      step->pre();
     }
   }
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void apply() override
   {
     for (auto step: this->steps)
-      step->apply(vector, cc);
+      step->apply();
 
     if (instationary)
     {
@@ -176,8 +177,9 @@ class SolutionVisualizationStep
 
   virtual ~SolutionVisualizationStep() {}
 
-  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
+  virtual void pre() override
   {
+    auto vector = this->solver->getVector();
     this->parent->add_dataset(vector);
   }
 };
@@ -215,8 +217,9 @@ class MPIRankVisualizationStep
 
   virtual ~MPIRankVisualizationStep() {}
 
-  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
+  virtual void pre() override
   {
+    auto vector = this->solver->getVector();
     auto container = std::make_shared<RankDummyContainer>(helper, vector->gridFunctionSpace().gridView());
     this->parent->add_celldata(container, "mpirank");
   }
@@ -239,7 +242,7 @@ class PhysicalEntityVisualizationStep
 
   virtual ~PhysicalEntityVisualizationStep() {}
 
-  virtual void pre(std::shared_ptr<typename Traits::Vector>, std::shared_ptr<typename Traits::ConstraintsContainer>) override
+  virtual void pre() override
   {
     this->parent->add_celldata(physical, "gmshPhysical");
   }
@@ -264,8 +267,9 @@ class VonMisesStressVisualizationStep
       material = std::get<std::shared_ptr<typename Traits::Material>>(param);
   }
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
+  virtual void apply() override
   {
+    auto vector = this->solver->getVector();
     auto es = vector->gridFunctionSpace().entitySet();
 
     // A grid function for the stress
@@ -303,10 +307,11 @@ class FibreDistanceVisualizationStep
 
   virtual ~FibreDistanceVisualizationStep() {}
 
-  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
+  virtual void pre() override
   {
     if constexpr (Traits::dim == 3)
     {
+      auto vector = this->solver->getVector();
       auto es = vector->gridFunctionSpace().entitySet();
       using FEM = Dune::PDELab::PkLocalFiniteElementMap<typename Traits::EntitySet, double, typename Traits::Range, 1>;
       auto fem = std::make_shared<FEM>(es);

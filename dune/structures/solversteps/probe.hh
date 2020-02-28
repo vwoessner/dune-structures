@@ -26,8 +26,9 @@ class ProbeTransitionStep
 
   virtual ~ProbeTransitionStep() {}
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
+  virtual void apply() override
   {
+    auto vector = this->solver->getVector();
     DGF dgf(vector->gridFunctionSpaceStorage(), vector);
     probe.setGridFunction(dgf);
 

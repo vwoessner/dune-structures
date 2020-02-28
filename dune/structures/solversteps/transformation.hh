@@ -68,9 +68,10 @@ class TransformationTransitionStep : public TransitionSolverStepBase<V...>
 
   virtual ~TransformationTransitionStep() {}
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
+  virtual void apply() override
   {
     std::cout << "Transforming solution!" << std::endl;
+    auto vector = this->solver->getVector();
     TransformationGridFunction<typename Traits::Vector> trafo(func, *vector);
     Dune::PDELab::interpolate(trafo, vector->gridFunctionSpace(), *vector);
   }

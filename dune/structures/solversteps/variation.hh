@@ -35,7 +35,7 @@ class ContinuousVariationTransitionStep
       step->set_solver(solver_);
   }
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void apply() override
   {
     double val = start;
     for (int i=0; i<iterations; ++i)
@@ -43,7 +43,7 @@ class ContinuousVariationTransitionStep
       val += (end - start) / iterations;
       this->solver->update_parameter(name, val);
       for (auto step : this->steps)
-        step->apply(vector, cc);
+        step->apply();
     }
   }
 
@@ -76,13 +76,13 @@ class DiscreteVariationTransitionStep
       step->set_solver(solver_);
   }
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void apply() override
   {
     for (auto val: values)
     {
       this->solver->update_parameter(name, val);
       for (auto step : this->steps)
-        step->apply(vector, cc);
+        step->apply();
     }
   }
 

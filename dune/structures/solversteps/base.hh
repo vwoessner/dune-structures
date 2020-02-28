@@ -22,13 +22,13 @@ class TransitionSolverStepBase
     solver = solver_;
   }
 
-  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc)
+  virtual void pre()
   {}
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc)
+  virtual void apply()
   {}
 
-  virtual void post(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc)
+  virtual void post()
   {}
 
   virtual void update_parameter(std::string name, typename Traits::Parameter param)
@@ -65,23 +65,23 @@ class StepCollectionStep
       step->update_parameter(name, param);
   }
 
-  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void pre() override
   {
     for (auto step : steps)
-      step->pre(vector, cc);
+      step->pre();
   }
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void apply() override
   {
     for (auto step : steps)
-      step->apply(vector, cc);
+      step->apply();
   }
 
 
-  virtual void post(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void post() override
   {
     for (auto step : steps)
-      step->post(vector, cc);
+      step->post();
   }
 
   template<typename STEP>
@@ -126,19 +126,19 @@ class WrapperStep
     step->update_parameter(name, param);
   }
 
-  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void pre() override
   {
-    step->pre(vector, cc);
+    step->pre();
   }
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void apply() override
   {
-    step->apply(vector, cc);
+    step->apply();
   }
 
-  virtual void post(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void post() override
   {
-    step->post(vector, cc);
+    step->post();
   }
 
   protected:

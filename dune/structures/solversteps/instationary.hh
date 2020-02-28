@@ -53,8 +53,10 @@ class OneStepMethodStep
 
   virtual ~OneStepMethodStep() {}
 
-  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void pre() override
   {
+    auto vector = this->solver->getVector();
+    auto cc = this->solver->getConstraintsContainer();
     auto gfs = vector->gridFunctionSpaceStorage();
     Dune::PDELab::ISTL::BCRSMatrixBackend<> mb(21);
     sgo = std::make_shared<SpatialGridOperator>(*gfs, *cc, *gfs, *cc, *slop, mb);
@@ -70,9 +72,10 @@ class OneStepMethodStep
     onestepmethod = std::make_shared<OneStepMethod>(*theta, *igo, *newton);
   }
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
+  virtual void apply() override
   {
     std::cout << "Applying the one step method" << std::endl;
+    auto vector = this->solver->getVector();
     onestepmethod->apply(time, timestep, *vector, *swapvector);
     vector.swap(swapvector);
   }
@@ -148,8 +151,9 @@ class VariableBoundaryOneStepMethodStep
 
   virtual ~VariableBoundaryOneStepMethodStep() {}
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
+  virtual void apply() override
   {
+    auto vector = this->solver->getVector();
     auto& gfs = vector->gridFunctionSpace();
     auto func = makeInstationaryGridFunctionTreeFromCallables(*this->solver, gfs, funcs);
 
@@ -186,7 +190,7 @@ class InstationarySolverStep
     this->solver->introduce_parameter("timestep", dt);
   }
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void apply() override
   {
     std::cout << "Starting time stepping loop" << std::endl;
     double time = Tstart;
@@ -198,7 +202,7 @@ class InstationarySolverStep
 
       // Apply the solver
       for (auto step : this->steps)
-        step->apply(vector, cc);
+        step->apply();
 
       time += dt;
     }

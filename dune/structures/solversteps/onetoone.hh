@@ -17,7 +17,7 @@ class OneToOneMappingCheckerImpl
 
   virtual ~OneToOneMappingCheckerImpl() {}
 
-  void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  void apply() override
   {
     std::cout << "One-to-one checker not implemented for dimension " << dim << std::endl;
   }
@@ -33,8 +33,9 @@ class OneToOneMappingCheckerImpl<3, V...>
 
   virtual ~OneToOneMappingCheckerImpl() {}
 
-  void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  void apply() override
   {
+    auto vector = this->solver->getVector();
     auto& gfs = vector->gridFunctionSpace();
     auto es = gfs.entitySet();
 

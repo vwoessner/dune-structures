@@ -39,9 +39,10 @@ class FibreReinforcedElasticitySolverStep
     this->step->update_parameter(name, param);
   }
 
-  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void pre() override
   {
     // Create the local operator for the bulk problem
+    auto vector = this->solver->getVector();
     auto gfs = vector->gridFunctionSpaceStorage();
     lop = std::make_shared<LocalOperator>(gfs, rootparams, params, material);
     force = std::make_shared<typename Traits::Vector>(*gfs, 0.0);
@@ -50,11 +51,12 @@ class FibreReinforcedElasticitySolverStep
     lop->setCoefficientTraction(gfs, traction);
 
     this->step->set_localoperator(lop);
-    this->step->pre(vector, cc);
+    this->step->pre();
   }
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void apply() override
   {
+    auto vector = this->solver->getVector();
     auto gfs = vector->gridFunctionSpaceStorage();
 
     // Interpolate the force vector
@@ -65,7 +67,7 @@ class FibreReinforcedElasticitySolverStep
     auto traction_gf = makeGridFunctionTreeFromCallables(*gfs, get_callable_array<double(typename Traits::Entity, typename Traits::GlobalCoordinate), V...>(*(this->solver), params.get<std::string>("traction", "0.0")));
     Dune::PDELab::interpolate(traction_gf, *gfs, *traction);
 
-    this->step->apply(vector, cc);
+    this->step->apply();
   }
 
   private:

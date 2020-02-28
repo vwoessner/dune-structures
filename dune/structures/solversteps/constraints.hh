@@ -36,8 +36,10 @@ class ConstraintsTransitionStep
 
   virtual ~ConstraintsTransitionStep() {}
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> constraintscontainer) override
+  virtual void apply() override
   {
+    auto vector = this->solver->getVector();
+    auto constraintscontainer = this->solver->getConstraintsContainer();
     auto& gfs = vector->gridFunctionSpace();
     auto bctype = makeBoundaryConditionTreeFromCallables(gfs, funcs);
     Dune::PDELab::constraints(bctype, gfs, *constraintscontainer);

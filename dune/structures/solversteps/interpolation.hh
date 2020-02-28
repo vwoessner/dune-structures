@@ -39,8 +39,9 @@ class InterpolationTransitionStep
 
   virtual ~InterpolationTransitionStep() {}
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer>) override
+  virtual void apply() override
   {
+    auto vector = this->solver->getVector();
     auto& gfs = vector->gridFunctionSpace();
     auto gf = makeGridFunctionTreeFromCallables(gfs, funcs);
 

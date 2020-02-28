@@ -44,8 +44,9 @@ class ElasticitySolverStep
     this->step->update_parameter(name, param);
   }
 
-  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void pre() override
   {
+    auto vector = this->solver->getVector();
     auto gfs = vector->gridFunctionSpaceStorage();
     auto lop = std::make_shared<LocalOperator>(*gfs, *gfs, params, material);
     force = std::make_shared<typename Traits::Vector>(*gfs, 0.0);
@@ -53,11 +54,13 @@ class ElasticitySolverStep
     lop->setCoefficientForce(gfs, force);
     lop->setCoefficientTraction(gfs, traction);
     this->step->set_localoperator(lop);
-    this->step->pre(vector, cc);
+    this->step->pre();
   }
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void apply() override
   {
+    auto vector = this->solver->getVector();
+    auto constraintscontainer = this->solver->getConstraintsContainer();
     auto gfs = vector->gridFunctionSpaceStorage();
 
     // Interpolate the force vector
@@ -68,7 +71,7 @@ class ElasticitySolverStep
     auto traction_gf = makeGridFunctionTreeFromCallables(*gfs, get_callable_array<double(typename Traits::Entity, typename Traits::GlobalCoordinate), V...>(*(this->solver), params.get<std::string>("traction", "0.0")));
     Dune::PDELab::interpolate(traction_gf, *gfs, *traction);
 
-    this->step->apply(vector, cc);
+    this->step->apply();
   }
 
   private:
@@ -119,12 +122,13 @@ class QuasiStaticElastoDynamicsSolverStep
     this->step->update_parameter(name, param);
   }
 
-  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void pre() override
   {
+    auto vector = this->solver->getVector();
     auto& gfs = vector->gridFunctionSpace();
     this->step->set_spatial_localoperator(std::make_shared<SpatialLocalOperator>(gfs, gfs, params, material));
     this->step->set_temporal_localoperator(std::make_shared<TemporalLocalOperator>(gfs, gfs, params));
-    this->step->pre(vector, cc);
+    this->step->pre();
   }
 
   private:

@@ -53,9 +53,11 @@ class NewtonSolverTransitionStep
     return localoperator;
   }
 
-  virtual void pre(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void pre() override
   {
     std::cout << "Building Newton" << std::endl;
+    auto vector = this->solver->getVector();
+    auto cc = this->solver->getConstraintsContainer();
     auto gfs = vector->gridFunctionSpaceStorage();
     Dune::PDELab::ISTL::BCRSMatrixBackend<> mb(21);
     gridoperator = std::make_shared<GridOperator>(*gfs, *cc, *gfs, *cc, *localoperator, mb);
@@ -65,7 +67,7 @@ class NewtonSolverTransitionStep
     newton->setVerbosityLevel(2);
   }
 
-  virtual void apply(std::shared_ptr<typename Traits::Vector> vector, std::shared_ptr<typename Traits::ConstraintsContainer> cc) override
+  virtual void apply() override
   {
     std::cout << "Applying Newton Solver!" << std::endl;
     newton->apply();
