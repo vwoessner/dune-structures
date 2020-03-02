@@ -166,18 +166,18 @@ class VisualizationStep
 };
 
 
-template<typename... V>
+template<std::size_t i, typename... V>
 class SolutionVisualizationStep
   : public VisualizationStepBase<V...>
 {
   public:
-  using Traits = VectorStepTraits<0, V...>;
+  using Traits = VectorStepTraits<i, V...>;
 
   virtual ~SolutionVisualizationStep() {}
 
   virtual void pre() override
   {
-    auto vector = this->solver->getVector();
+    auto vector = this->solver->template getVector<i>();
     this->parent->add_dataset(vector);
   }
 };
@@ -250,12 +250,12 @@ class PhysicalEntityVisualizationStep
 };
 
 
-template<typename... V>
+template<std::size_t i, typename... V>
 class VonMisesStressVisualizationStep
   : public VisualizationStepBase<V...>
 {
   public:
-  using Traits = VectorStepTraits<0, V...>;
+  using Traits = VectorStepTraits<i, V...>;
 
   virtual ~VonMisesStressVisualizationStep() {}
 
@@ -267,7 +267,7 @@ class VonMisesStressVisualizationStep
 
   virtual void apply() override
   {
-    auto vector = this->solver->getVector();
+    auto vector = this->solver->template getVector<i>();
     auto es = vector->gridFunctionSpace().entitySet();
 
     // A grid function for the stress

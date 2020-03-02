@@ -6,12 +6,12 @@
 #include<dune/structures/solversteps/traits.hh>
 
 
-template<std::size_t num_fibres, typename... V>
+template<std::size_t i, typename... V>
 class FibreReinforcedElasticitySolverStep
-  : public WrapperStep<NewtonSolverTransitionStep<FibreReinforcedBulkOperator<typename VectorStepTraits<0, V...>::GridFunctionSpace, VectorStepTraits<0, V...>::dim>, V...>, V...>
+  : public WrapperStep<NewtonSolverTransitionStep<FibreReinforcedBulkOperator<typename VectorStepTraits<i, V...>::GridFunctionSpace, VectorStepTraits<i, V...>::dim>, V...>, V...>
 {
   public:
-  using Traits = VectorStepTraits<0, V...>;
+  using Traits = VectorStepTraits<i, V...>;
 
   static constexpr int dim = Traits::dim;
   using LocalOperator = FibreReinforcedBulkOperator<typename Traits::GridFunctionSpace, dim>;
@@ -42,7 +42,7 @@ class FibreReinforcedElasticitySolverStep
   virtual void pre() override
   {
     // Create the local operator for the bulk problem
-    auto vector = this->solver->getVector();
+    auto vector = this->solver->template getVector<i>();
     auto gfs = vector->gridFunctionSpaceStorage();
     lop = std::make_shared<LocalOperator>(gfs, rootparams, params, material);
     force = std::make_shared<typename Traits::Vector>(*gfs, 0.0);
@@ -56,7 +56,7 @@ class FibreReinforcedElasticitySolverStep
 
   virtual void apply() override
   {
-    auto vector = this->solver->getVector();
+    auto vector = this->solver->template getVector<i>();
     auto gfs = vector->gridFunctionSpaceStorage();
 
     // Interpolate the force vector

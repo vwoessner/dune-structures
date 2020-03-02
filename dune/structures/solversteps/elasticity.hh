@@ -10,13 +10,13 @@
 #include<dune/structures/solversteps/traits.hh>
 
 
-template<typename... V>
+template<std::size_t i, typename... V>
 class ElasticitySolverStep
-  : public WrapperStep<NewtonSolverTransitionStep<typename OperatorSwitch<typename VectorStepTraits<0, V...>::GridFunctionSpace,
-                                                                          VectorStepTraits<0, V...>::dim>::Elasticity, V...>, V...>
+  : public WrapperStep<NewtonSolverTransitionStep<typename OperatorSwitch<typename VectorStepTraits<i, V...>::GridFunctionSpace,
+                                                                          VectorStepTraits<i, V...>::dim>::Elasticity, V...>, V...>
 {
   public:
-  using Traits = VectorStepTraits<0, V...>;
+  using Traits = VectorStepTraits<i, V...>;
 
   static constexpr int dim = Traits::dim;
   using LocalOperator = typename OperatorSwitch<typename Traits::GridFunctionSpace, dim>::Elasticity;
@@ -46,7 +46,7 @@ class ElasticitySolverStep
 
   virtual void pre() override
   {
-    auto vector = this->solver->getVector();
+    auto vector = this->solver->template getVector<i>();
     auto gfs = vector->gridFunctionSpaceStorage();
     auto lop = std::make_shared<LocalOperator>(*gfs, *gfs, params, material);
     force = std::make_shared<typename Traits::Vector>(*gfs, 0.0);
@@ -59,8 +59,8 @@ class ElasticitySolverStep
 
   virtual void apply() override
   {
-    auto vector = this->solver->getVector();
-    auto constraintscontainer = this->solver->getConstraintsContainer();
+    auto vector = this->solver->template getVector<i>();
+    auto constraintscontainer = this->solver->template getConstraintsContainer<i>();
     auto gfs = vector->gridFunctionSpaceStorage();
 
     // Interpolate the force vector
@@ -82,16 +82,16 @@ class ElasticitySolverStep
 };
 
 
-template<typename... V>
+template<std::size_t i, typename... V>
 class QuasiStaticElastoDynamicsSolverStep
-  : public WrapperStep<OneStepMethodStep<typename OperatorSwitch<typename VectorStepTraits<0, V...>::GridFunctionSpace,
-                                                                 VectorStepTraits<0, V...>::dim>::Elasticity,
-                                         typename OperatorSwitch<typename VectorStepTraits<0, V...>::GridFunctionSpace,
-                                                                 VectorStepTraits<0, V...>::dim>::Mass,
+  : public WrapperStep<OneStepMethodStep<typename OperatorSwitch<typename VectorStepTraits<i, V...>::GridFunctionSpace,
+                                                                 VectorStepTraits<i, V...>::dim>::Elasticity,
+                                         typename OperatorSwitch<typename VectorStepTraits<i, V...>::GridFunctionSpace,
+                                                                 VectorStepTraits<i, V...>::dim>::Mass,
                                          V...>, V...>
 {
   public:
-  using Traits = VectorStepTraits<0, V...>;
+  using Traits = VectorStepTraits<i, V...>;
 
   using SpatialLocalOperator = typename OperatorSwitch<typename Traits::GridFunctionSpace,
                                                        Traits::dim>::Elasticity;
@@ -124,7 +124,7 @@ class QuasiStaticElastoDynamicsSolverStep
 
   virtual void pre() override
   {
-    auto vector = this->solver->getVector();
+    auto vector = this->solver->template getVector<i>();
     auto& gfs = vector->gridFunctionSpace();
     this->step->set_spatial_localoperator(std::make_shared<SpatialLocalOperator>(gfs, gfs, params, material));
     this->step->set_temporal_localoperator(std::make_shared<TemporalLocalOperator>(gfs, gfs, params));

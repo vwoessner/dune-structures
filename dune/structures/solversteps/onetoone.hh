@@ -8,7 +8,7 @@
 #include<memory>
 
 
-template<int dim, typename... V>
+template<int dim, std::size_t i, typename... V>
 class OneToOneMappingCheckerImpl
  : public TransitionSolverStepBase<V...>
 {
@@ -24,18 +24,18 @@ class OneToOneMappingCheckerImpl
 };
 
 
-template<typename... V>
-class OneToOneMappingCheckerImpl<3, V...>
+template<std::size_t i, typename... V>
+class OneToOneMappingCheckerImpl<3, i, V...>
  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Traits = VectorStepTraits<0, V...>;
+  using Traits = VectorStepTraits<i, V...>;
 
   virtual ~OneToOneMappingCheckerImpl() {}
 
   void apply() override
   {
-    auto vector = this->solver->getVector();
+    auto vector = this->solver->template getVector<i>();
     auto& gfs = vector->gridFunctionSpace();
     auto es = gfs.entitySet();
 
@@ -47,7 +47,7 @@ class OneToOneMappingCheckerImpl<3, V...>
 };
 
 
-template<typename... V>
-using OneToOneMappingChecker = OneToOneMappingCheckerImpl<SimpleStepTraits<V...>::dim, V...>;
+template<std::size_t i, typename... V>
+using OneToOneMappingChecker = OneToOneMappingCheckerImpl<SimpleStepTraits<V...>::dim, i, V...>;
 
 #endif

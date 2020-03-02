@@ -10,12 +10,12 @@
 #include<functional>
 
 
-template<typename... V>
+template<std::size_t i, typename... V>
 class ConstraintsTransitionStep
   : public TransitionSolverStepBase<V...>
 {
   public:
-  using Traits = VectorStepTraits<0, V...>;
+  using Traits = VectorStepTraits<i, V...>;
   using FunctionSignature = bool(typename Traits::GridView::Intersection, typename Traits::GridView::Intersection::Geometry::LocalCoordinate);
 
   ConstraintsTransitionStep(std::function<FunctionSignature> func)
@@ -38,8 +38,8 @@ class ConstraintsTransitionStep
 
   virtual void apply() override
   {
-    auto vector = this->solver->getVector();
-    auto constraintscontainer = this->solver->getConstraintsContainer();
+    auto vector = this->solver->template getVector<i>();
+    auto constraintscontainer = this->solver->template getConstraintsContainer<i>();
     auto& gfs = vector->gridFunctionSpace();
     auto bctype = makeBoundaryConditionTreeFromCallables(gfs, funcs);
     Dune::PDELab::constraints(bctype, gfs, *constraintscontainer);

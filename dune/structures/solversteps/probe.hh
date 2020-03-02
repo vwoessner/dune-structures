@@ -9,12 +9,12 @@
 #include<memory>
 
 
-template<typename... V>
+template<std::size_t i, typename... V>
 class ProbeTransitionStep
   : public TransitionSolverStepBase<V...>
 {
   public:
-  using Traits = VectorStepTraits<0, V...>;
+  using Traits = VectorStepTraits<i, V...>;
 
   using DGF = Dune::PDELab::VectorDiscreteGridFunction<typename Traits::GridFunctionSpace, typename Traits::Vector>;
   using Probe = Dune::PDELab::GridFunctionProbe<DGF>;
@@ -28,7 +28,7 @@ class ProbeTransitionStep
 
   virtual void apply() override
   {
-    auto vector = this->solver->getVector();
+    auto vector = this->solver->template getVector<i>();
     DGF dgf(vector->gridFunctionSpaceStorage(), vector);
     probe.setGridFunction(dgf);
 

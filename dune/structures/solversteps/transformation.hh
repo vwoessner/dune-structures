@@ -50,11 +50,11 @@ class TransformationGridFunction
 };
 
 
-template<typename... V>
+template<std::size_t i, typename... V>
 class TransformationTransitionStep : public TransitionSolverStepBase<V...>
 {
   public:
-  using Traits = VectorStepTraits<0, V...>;
+  using Traits = VectorStepTraits<i, V...>;
 
   static constexpr int dim = Traits::dim;
   using GridFunction = TransformationGridFunction<V...>;
@@ -71,7 +71,7 @@ class TransformationTransitionStep : public TransitionSolverStepBase<V...>
   virtual void apply() override
   {
     std::cout << "Transforming solution!" << std::endl;
-    auto vector = this->solver->getVector();
+    auto vector = this->solver->template getVector<i>();
     TransformationGridFunction<typename Traits::Vector> trafo(func, *vector);
     Dune::PDELab::interpolate(trafo, vector->gridFunctionSpace(), *vector);
   }

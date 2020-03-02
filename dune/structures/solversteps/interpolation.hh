@@ -12,12 +12,12 @@
 #include<functional>
 
 
-template<typename... V>
+template<std::size_t i, typename... V>
 class InterpolationTransitionStep
   : public TransitionSolverStepBase<V...>
 {
   public:
-  using Traits = VectorStepTraits<0, V...>;
+  using Traits = VectorStepTraits<i, V...>;
 
   using FunctionSignature = typename Traits::Range(typename Traits::Entity, typename Traits::GlobalCoordinate);
 
@@ -41,7 +41,7 @@ class InterpolationTransitionStep
 
   virtual void apply() override
   {
-    auto vector = this->solver->getVector();
+    auto vector = this->solver->template getVector<i>();
     auto& gfs = vector->gridFunctionSpace();
     auto gf = makeGridFunctionTreeFromCallables(gfs, funcs);
 
