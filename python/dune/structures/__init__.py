@@ -1,3 +1,6 @@
+#Make sure that monnkey patches are triggered
+import dune.structures.codegen
+
 from dune.structures.adhesion import deshpande_adhesion
 
 from dune.structures.elasticity import (elasticity_form,
