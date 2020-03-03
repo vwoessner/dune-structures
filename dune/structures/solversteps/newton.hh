@@ -13,9 +13,10 @@ class NewtonSolverTransitionStep
   public:
   using Traits = VectorStepTraits<0, V...>;
 
+  using VirtLocalOperator = AbstractLocalOperatorInterface<typename Traits::GridFunctionSpace, typename Traits::GridFunctionSpace>;
   using GridOperator = Dune::PDELab::GridOperator<typename Traits::GridFunctionSpace,
                                                   typename Traits::GridFunctionSpace,
-                                                  LocalOperator,
+                                                  VirtLocalOperator,
                                                   Dune::PDELab::ISTL::BCRSMatrixBackend<>,
                                                   typename Traits::ctype,
                                                   typename Traits::Range,
@@ -48,7 +49,7 @@ class NewtonSolverTransitionStep
     localoperator = lop;
   }
 
-  std::shared_ptr<LocalOperator> get_localoperator()
+  std::shared_ptr<VirtLocalOperator> get_localoperator()
   {
     return localoperator;
   }
@@ -75,7 +76,7 @@ class NewtonSolverTransitionStep
 
   protected:
   Dune::ParameterTree params;
-  std::shared_ptr<LocalOperator> localoperator;
+  std::shared_ptr<VirtLocalOperator> localoperator;
   std::shared_ptr<LinearSolver> linearsolver;
   std::shared_ptr<GridOperator> gridoperator;
   std::shared_ptr<NewtonSolver> newton;

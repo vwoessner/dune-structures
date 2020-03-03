@@ -7,6 +7,7 @@ from dune.codegen.ufl.modified_terminals import Restriction
 from dune.codegen.generation import (base_class,
                                      class_member,
                                      constructor_parameter,
+                                     delete_cache_items,
                                      hook,
                                      include_file,
                                      initializer_list,
@@ -173,7 +174,7 @@ def define_material_class(name):
 @class_member(classtag="operator")
 def setter_material_class(name):
     _type = "std::shared_ptr<ElasticMaterialBase<typename {}::Traits::EntitySet, {}>>".format(lop_template_ansatz_gfs(), type_floatingpoint())
-    return ["void setMaterial({} {}_)".format(_type, name),
+    return ["void setMaterial({} {}_) override".format(_type, name),
             "{",
             "  {} = {}_;".format(name, name),
             "}"
@@ -200,9 +201,10 @@ def using_from_baseclass(_type):
 
 
 # Add the abstract base class for local operators from dune-structures
-@hook('after_visit')
-def baseclass_hook(visitor):
+@hook('operator_class_extraction')
+def baseclass_hook():
     gfsu = lop_template_ansatz_gfs()
     gfsv = lop_template_test_gfs()
     include_file('dune/structures/operatorinterface.hh', filetag="operatorfile")
+    delete_cache_items("baseclass")
     base_class('AbstractLocalOperatorInterface<{}, {}>'.format(gfsu, gfsv), classtag="operator")
