@@ -161,14 +161,14 @@ class TransitionSolver
     return es;
   }
 
-  void setVectors(const std::shared_ptr<V>&... vectors_)
+  void setVectors(const std::tuple<std::shared_ptr<V>...>& vectors_)
   {
-    vectors = {vectors_...};
+    vectors = vectors_;
   }
 
-  void setConstraintsContainers(const std::shared_ptr<typename VectorToConstraintsContainer<V>::type>&... containers_)
+  void setConstraintsContainers(const std::tuple<std::shared_ptr<typename VectorToConstraintsContainer<V>::type>...>& containers_)
   {
-    constraints_containers = {containers_...};
+    constraints_containers = containers_;
   }
 
   template<std::size_t i=0>

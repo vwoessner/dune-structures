@@ -171,6 +171,7 @@ def define_material_class(name):
     setter_material_class(name)
     return "{} {};".format(_type, name)
 
+
 @class_member(classtag="operator")
 def setter_material_class(name):
     _type = "std::shared_ptr<ElasticMaterialBase<typename {}::Traits::EntitySet, {}>>".format(lop_template_ansatz_gfs(), type_floatingpoint())

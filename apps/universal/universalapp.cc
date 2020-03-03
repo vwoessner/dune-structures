@@ -6,6 +6,8 @@
 #include<dune/structures/gridconstruction.hh>
 #include<dune/structures/solverconstruction.hh>
 
+#include<memory>
+
 
 template<int dim, int degree>
 void apply(Dune::MPIHelper& helper, const Dune::ParameterTree& params, char** argv)
@@ -15,10 +17,20 @@ void apply(Dune::MPIHelper& helper, const Dune::ParameterTree& params, char** ar
   using V = typename std::remove_reference<decltype(*x)>::type;
 
   ConstructionContext<V> ctx(helper, params, es, physical);
-  auto solver = ctx.construct(params.sub("solver"));
+  ctx.setVectors(x);
+  ctx.setConstraintsContainers(cc);
 
-  solver->setVectors(x);
-  solver->setConstraintsContainers(cc);
+
+  ctx.template registerOperator<0>("elasticity",
+      [](const auto& ctx, const auto& p)
+      {
+        auto vec = ctx.template getVector<0>();
+        auto gfs = vec->gridFunctionSpaceStorage();
+        return std::make_shared<typename OperatorSwitch<typename V::GridFunctionSpace, dim>::Elasticity>
+            (*gfs, *gfs, p, nullptr);
+      });
+
+  auto solver = ctx.construct(params.sub("solver"));
 
   solver->apply();
 }

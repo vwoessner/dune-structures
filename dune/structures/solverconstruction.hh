@@ -87,6 +87,16 @@ class ConstructionContext
   using LocalEntitySignature = double(Entity, LocalCoord);
   using LocalIntersectionSignature = bool(Intersection, IntersectionLocalCoord);
 
+  template<std::size_t i>
+  using OperatorBase = AbstractLocalOperatorInterface<typename VectorStepTraits<i, V...>::GridFunctionSpace,
+                                                      typename VectorStepTraits<i, V...>::GridFunctionSpace>;
+
+  template<std::size_t i>
+  using OperatorBasePointer = std::shared_ptr<OperatorBase<i>>;
+
+  template<std::size_t i>
+  using OperatorRegisterFunction = std::function<OperatorBasePointer<i>(ConstructionContext<V...>&, const Dune::ParameterTree&)>;
+
   ConstructionContext(Dune::MPIHelper& helper,
                       const Dune::ParameterTree& config,
                       typename StepTraits::EntitySet es,
@@ -263,6 +273,12 @@ class ConstructionContext
                  });
   }
 
+  template<std::size_t i, typename Func>
+  void registerOperator(std::string identifier, Func&& func)
+  {
+    operator_mapping<i>[identifier] = func;
+  }
+
   template<typename Func>
   void registerVectorStep(std::string identifier, Func&& func)
   {
@@ -291,6 +307,13 @@ class ConstructionContext
       identifier = identifier + "_" + std::to_string(vector_name_to_index[config.get<std::string>("vector", "solution")]);
     return mapping[identifier](*this, config);
   }
+
+  template<std::size_t i>
+  OperatorBasePointer<i> construct_operator(std::string operatorname, const Dune::ParameterTree& config)
+  {
+    return operator_mapping<i>[operatorname](*this, config);
+  }
+
 
   template<typename ROOT>
   void add_children(std::shared_ptr<ROOT> root, const Dune::ParameterTree& config)
@@ -321,7 +344,31 @@ class ConstructionContext
   std::shared_ptr<TransitionSolver<V...>> construct(const Dune::ParameterTree& config)
   {
     add_children(solver, config);
+    solver->setVectors(vectors);
+    solver->setConstraintsContainers(constraints_containers);
     return solver;
+  }
+
+  void setVectors(const std::shared_ptr<V>&... vectors_)
+  {
+    vectors = {vectors_...};
+  }
+
+  void setConstraintsContainers(const std::shared_ptr<typename VectorToConstraintsContainer<V>::type>&... containers_)
+  {
+    constraints_containers = {containers_...};
+  }
+
+  template<std::size_t i=0>
+  auto getVector() const
+  {
+    return std::get<i>(vectors);
+  }
+
+  template<std::size_t i=0>
+  auto getConstraintsContainer() const
+  {
+    return std::get<i>(constraints_containers);
   }
 
   // The reference members that might be needed for construction of steps
@@ -330,11 +377,22 @@ class ConstructionContext
   typename StepTraits::EntitySet es;
   std::shared_ptr<std::vector<int>> physical;
 
+  // The vectors and constraints containers
+  std::tuple<std::shared_ptr<V>...> vectors;
+  std::tuple<std::shared_ptr<typename VectorToConstraintsContainer<V>::type>...> constraints_containers;
+
   // The stored mapping for each step
   std::map<std::string, RegisterFunction> mapping;
   std::shared_ptr<TransitionSolver<V...>> solver;
   std::map<std::string, std::size_t> vector_name_to_index;
   std::map<std::string, bool> is_vector;
+
+  template<std::size_t i>
+  static std::map<std::string, OperatorRegisterFunction<i>> operator_mapping;
 };
+
+template<typename... V>
+template<std::size_t i>
+std::map<std::string, typename ConstructionContext<V...>::template OperatorRegisterFunction<i>> ConstructionContext<V...>::operator_mapping;
 
 #endif
