@@ -87,16 +87,6 @@ class ConstructionContext
   using LocalEntitySignature = double(Entity, LocalCoord);
   using LocalIntersectionSignature = bool(Intersection, IntersectionLocalCoord);
 
-  template<std::size_t i>
-  using OperatorBase = AbstractLocalOperatorInterface<typename VectorStepTraits<i, V...>::GridFunctionSpace,
-                                                      typename VectorStepTraits<i, V...>::GridFunctionSpace>;
-
-  template<std::size_t i>
-  using OperatorBasePointer = std::shared_ptr<OperatorBase<i>>;
-
-  template<std::size_t i>
-  using OperatorRegisterFunction = std::function<OperatorBasePointer<i>(ConstructionContext<V...>&, const Dune::ParameterTree&)>;
-
   ConstructionContext(Dune::MPIHelper& helper,
                       const Dune::ParameterTree& config,
                       typename StepTraits::EntitySet es,
@@ -163,18 +153,24 @@ class ConstructionContext
                    return step;
                  });
 
-    registerVectorStep("elasticity",
+    registerVectorStep("elasticity_operator",
                  [](auto i, const auto& ctx, const auto& p)
                  {
-                   return std::make_shared<ElasticitySolverStep<i, V...>>(p);
+                   return std::make_shared<ElasticityOperatorStep<i, V...>>(p);
+                 });
+
+    registerVectorStep("elasticity_mass_operator",
+                 [](auto i, const auto& ctx, const auto& p)
+                 {
+                   return std::make_shared<ElasticityMassOperatorStep<i, V...>>(p);
                  });
 
     if constexpr (dim == 2)
-      registerVectorStep("fibrereinforcedelasticity",
-                   [](auto i, auto& ctx, const auto& p)
-                   {
-                     return std::make_shared<FibreReinforcedElasticitySolverStep<i, V...>>(ctx.rootconfig, p);
-                   });
+      registerVectorStep("fibre_operator",
+                  [](auto i, auto& ctx, const auto& p)
+                  {
+                    return std::make_shared<FibreReinforcedElasticitySolverStep<i, V...>>(ctx.rootconfig, p);
+                  });
 
 
     registerVectorStep("interpolation",
@@ -188,6 +184,12 @@ class ConstructionContext
                  [](const auto& ctx, const auto& p)
                  {
                    return std::make_shared<MaterialInitialization<V...>>(ctx.es, ctx.physical, p, ctx.rootconfig);
+                 });
+
+    registerVectorStep("newton",
+                 [](auto i, auto& ctx, const auto& p)
+                 {
+                   return std::make_shared<NewtonSolverTransitionStep<i, V...>>(p);
                  });
 
     registerVectorStep("onetoone",
@@ -207,12 +209,6 @@ class ConstructionContext
                  [](auto i, const auto& ctx, const auto& p)
                  {
                    return std::make_shared<ProbeTransitionStep<i, V...>>(ctx.es.gridView(), p);
-                 });
-
-    registerVectorStep("quasistatic_elasticity",
-                 [](auto i, const auto& ctx, const auto& p)
-                 {
-                   return std::make_shared<QuasiStaticElastoDynamicsSolverStep<i, V...>>(ctx.rootconfig);
                  });
 
     registerStep("timeloop",
@@ -273,12 +269,6 @@ class ConstructionContext
                  });
   }
 
-  template<std::size_t i, typename Func>
-  void registerOperator(std::string identifier, Func&& func)
-  {
-    operator_mapping<i>[identifier] = func;
-  }
-
   template<typename Func>
   void registerVectorStep(std::string identifier, Func&& func)
   {
@@ -308,13 +298,6 @@ class ConstructionContext
     return mapping[identifier](*this, config);
   }
 
-  template<std::size_t i>
-  OperatorBasePointer<i> construct_operator(std::string operatorname, const Dune::ParameterTree& config)
-  {
-    return operator_mapping<i>[operatorname](*this, config);
-  }
-
-
   template<typename ROOT>
   void add_children(std::shared_ptr<ROOT> root, const Dune::ParameterTree& config)
   {
@@ -343,9 +326,9 @@ class ConstructionContext
 
   std::shared_ptr<TransitionSolver<V...>> construct(const Dune::ParameterTree& config)
   {
-    add_children(solver, config);
     solver->setVectors(vectors);
     solver->setConstraintsContainers(constraints_containers);
+    add_children(solver, config);
     return solver;
   }
 
@@ -386,13 +369,6 @@ class ConstructionContext
   std::shared_ptr<TransitionSolver<V...>> solver;
   std::map<std::string, std::size_t> vector_name_to_index;
   std::map<std::string, bool> is_vector;
-
-  template<std::size_t i>
-  static std::map<std::string, OperatorRegisterFunction<i>> operator_mapping;
 };
-
-template<typename... V>
-template<std::size_t i>
-std::map<std::string, typename ConstructionContext<V...>::template OperatorRegisterFunction<i>> ConstructionContext<V...>::operator_mapping;
 
 #endif

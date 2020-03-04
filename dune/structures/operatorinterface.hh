@@ -15,7 +15,7 @@
 #include<dune/structures/material.hh>
 
 
-template<typename GFSU, typename GFSV>
+template<typename GFSU, typename GFSV=GFSU>
 class AbstractLocalOperatorInterface
   : public Dune::PDELab::LocalOperatorDefaultFlags
   , public Dune::PDELab::InstationaryLocalOperatorDefaultMethods<double>

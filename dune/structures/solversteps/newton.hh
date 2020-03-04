@@ -6,14 +6,14 @@
 #include<dune/structures/solversteps/traits.hh>
 
 
-template<typename LocalOperator, typename... V>
+template<std::size_t i, typename... V>
 class NewtonSolverTransitionStep
   : public TransitionSolverStepBase<V...>
 {
   public:
-  using Traits = VectorStepTraits<0, V...>;
+  using Traits = VectorStepTraits<i, V...>;
 
-  using VirtLocalOperator = AbstractLocalOperatorInterface<typename Traits::GridFunctionSpace, typename Traits::GridFunctionSpace>;
+  using VirtLocalOperator = AbstractLocalOperatorInterface<typename Traits::GridFunctionSpace>;
   using GridOperator = Dune::PDELab::GridOperator<typename Traits::GridFunctionSpace,
                                                   typename Traits::GridFunctionSpace,
                                                   VirtLocalOperator,
@@ -29,43 +29,26 @@ class NewtonSolverTransitionStep
 
   NewtonSolverTransitionStep(const Dune::ParameterTree& params)
     : params(params)
-    , localoperator(0)
-  {}
-
-  NewtonSolverTransitionStep(const Dune::ParameterTree& params, LocalOperator& localoperator)
-    : params(params)
-    , localoperator(Dune::stackobject_to_shared_ptr(localoperator))
-  {}
-
-  NewtonSolverTransitionStep(const Dune::ParameterTree& params, std::shared_ptr<LocalOperator> localoperator)
-    : params(params)
-    , localoperator(localoperator)
   {}
 
   virtual ~NewtonSolverTransitionStep() {}
 
-  void set_localoperator(std::shared_ptr<LocalOperator> lop)
+  virtual void update_parameter(std::string name, typename Traits::Parameter param) override
   {
-    localoperator = lop;
-  }
-
-  std::shared_ptr<VirtLocalOperator> get_localoperator()
-  {
-    return localoperator;
-  }
-
-  virtual void pre() override
-  {
-    std::cout << "Building Newton" << std::endl;
-    auto vector = this->solver->getVector();
-    auto cc = this->solver->getConstraintsContainer();
-    auto gfs = vector->gridFunctionSpaceStorage();
-    Dune::PDELab::ISTL::BCRSMatrixBackend<> mb(21);
-    gridoperator = std::make_shared<GridOperator>(*gfs, *cc, *gfs, *cc, *localoperator, mb);
-    linearsolver = std::make_shared<LinearSolver>(0);
-    newton = std::make_shared<NewtonSolver>(*gridoperator, *vector, *linearsolver);
-    newton->setParameters(params);
-    newton->setVerbosityLevel(2);
+    if (name == params.get<std::string>("operator"))
+    {
+      // The operator changed - rebuild the Newton solver object!
+      auto vector = this->solver->template getVector<i>();
+      auto cc = this->solver->template getConstraintsContainer<i>();
+      auto gfs = vector->gridFunctionSpaceStorage();
+      auto localoperator = this->solver->template param<std::shared_ptr<VirtLocalOperator>>(params.get<std::string>("operator"));
+      Dune::PDELab::ISTL::BCRSMatrixBackend<> mb(21);
+      gridoperator = std::make_shared<GridOperator>(*gfs, *cc, *gfs, *cc, *localoperator, mb);
+      linearsolver = std::make_shared<LinearSolver>(0);
+      newton = std::make_shared<NewtonSolver>(*gridoperator, *vector, *linearsolver);
+      newton->setParameters(params);
+      newton->setVerbosityLevel(2);
+    }
   }
 
   virtual void apply() override
@@ -76,7 +59,6 @@ class NewtonSolverTransitionStep
 
   protected:
   Dune::ParameterTree params;
-  std::shared_ptr<VirtLocalOperator> localoperator;
   std::shared_ptr<LinearSolver> linearsolver;
   std::shared_ptr<GridOperator> gridoperator;
   std::shared_ptr<NewtonSolver> newton;

@@ -44,7 +44,8 @@ class SimpleStepTraits
                                  std::string,
                                  std::shared_ptr<Material>,
                                  std::shared_ptr<std::vector<int>>,
-                                 Dune::ParameterTree>;
+                                 Dune::ParameterTree,
+                                 std::shared_ptr<AbstractLocalOperatorInterface<typename V::GridFunctionSpace>>...>;
 
 };
 

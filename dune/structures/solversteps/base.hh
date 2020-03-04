@@ -101,48 +101,4 @@ class StepCollectionStep
   std::vector<std::shared_ptr<TransitionSolverStepBase<V...>>> steps;
 };
 
-
-template<typename BaseT, typename... V>
-class WrapperStep
-  : public TransitionSolverStepBase<V...>
-{
-  public:
-  using Traits = SimpleStepTraits<V...>;
-
-  WrapperStep(std::shared_ptr<BaseT> step)
-    : step(step)
-  {}
-
-  virtual ~WrapperStep() {}
-
-  virtual void set_solver(std::shared_ptr<typename Traits::Solver> solver_) override
-  {
-    this->solver = solver_;
-    this->step->set_solver(solver_);
-  }
-
-  virtual void update_parameter(std::string name, typename Traits::Parameter param) override
-  {
-    step->update_parameter(name, param);
-  }
-
-  virtual void pre() override
-  {
-    step->pre();
-  }
-
-  virtual void apply() override
-  {
-    step->apply();
-  }
-
-  virtual void post() override
-  {
-    step->post();
-  }
-
-  protected:
-  std::shared_ptr<BaseT> step;
-};
-
 #endif

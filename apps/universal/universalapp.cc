@@ -20,16 +20,6 @@ void apply(Dune::MPIHelper& helper, const Dune::ParameterTree& params, char** ar
   ctx.setVectors(x);
   ctx.setConstraintsContainers(cc);
 
-
-  ctx.template registerOperator<0>("elasticity",
-      [](const auto& ctx, const auto& p)
-      {
-        auto vec = ctx.template getVector<0>();
-        auto gfs = vec->gridFunctionSpaceStorage();
-        return std::make_shared<typename OperatorSwitch<typename V::GridFunctionSpace, dim>::Elasticity>
-            (*gfs, *gfs, p, nullptr);
-      });
-
   auto solver = ctx.construct(params.sub("solver"));
 
   solver->apply();
