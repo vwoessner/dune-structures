@@ -192,6 +192,12 @@ class ConstructionContext
                    return std::make_shared<NewtonSolverTransitionStep<i, V...>>(p);
                  });
 
+    registerVectorStep("onestep",
+                 [](auto i, auto& ctx, const auto& p)
+                 {
+                   return std::make_shared<OneStepMethodStep<i, V...>>(p);
+                 });
+
     registerVectorStep("onetoone",
                  [](auto i, const auto& ctx, const auto& p)
                  {

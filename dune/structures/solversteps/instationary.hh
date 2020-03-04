@@ -21,7 +21,19 @@ class OneStepMethodStep
   using Traits = VectorStepTraits<i, V...>;
 
   using VirtLocalOperator = AbstractLocalOperatorInterface<typename Traits::GridFunctionSpace>;
-  using InstationaryGridOperator = Dune::PDELab::OneStepGridOperator<VirtLocalOperator, VirtLocalOperator>;
+
+
+  using GridOperator = Dune::PDELab::GridOperator<typename Traits::GridFunctionSpace,
+                                                  typename Traits::GridFunctionSpace,
+                                                  VirtLocalOperator,
+                                                  Dune::PDELab::ISTL::BCRSMatrixBackend<>,
+                                                  typename Traits::ctype,
+                                                  typename Traits::Range,
+                                                  typename Traits::Range,
+                                                  typename Traits::ConstraintsContainer,
+                                                  typename Traits::ConstraintsContainer>;
+
+  using InstationaryGridOperator = Dune::PDELab::OneStepGridOperator<GridOperator, GridOperator>;
 
   using LinearSolver = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
   using NewtonSolver = Dune::PDELab::Newton<InstationaryGridOperator, LinearSolver, typename Traits::Vector>;
@@ -57,8 +69,10 @@ class OneStepMethodStep
       auto cc = this->solver->template getConstraintsContainer<i>();
       auto gfs = vector->gridFunctionSpaceStorage();
       Dune::PDELab::ISTL::BCRSMatrixBackend<> mb(21);
-      auto sgo = this->solver->template param<std::shared_ptr<VirtLocalOperator>>(params.template get<std::string>("spatial_operator"));
-      auto tgo = this->solver->template param<std::shared_ptr<VirtLocalOperator>>(params.template get<std::string>("temporal_operator"));
+      auto slop = this->solver->template param<std::shared_ptr<VirtLocalOperator>>(params.template get<std::string>("spatial_operator"));
+      auto tlop = this->solver->template param<std::shared_ptr<VirtLocalOperator>>(params.template get<std::string>("temporal_operator"));
+      auto sgo = std::make_shared<GridOperator>(*gfs, *cc, *gfs, *cc, *slop, mb);
+      auto tgo = std::make_shared<GridOperator>(*gfs, *cc, *gfs, *cc, *tlop, mb);
       igo = std::make_shared<InstationaryGridOperator>(*sgo, *tgo);
 
       linearsolver = std::make_shared<LinearSolver>(0);
@@ -70,7 +84,9 @@ class OneStepMethodStep
   }
 
   protected:
-  std::shared_ptr<VirtLocalOperator> igo;
+  std::shared_ptr<GridOperator> sgo;
+  std::shared_ptr<GridOperator> tgo;
+  std::shared_ptr<InstationaryGridOperator> igo;
   std::shared_ptr<LinearSolver> linearsolver;
   std::shared_ptr<NewtonSolver> newton;
   std::shared_ptr<OneStepMethod> onestepmethod;
