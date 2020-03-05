@@ -7,200 +7,101 @@
 #include<dune/structures/solversteps/instationary.hh>
 #include<dune/structures/solversteps/material.hh>
 #include<dune/structures/solversteps/newton.hh>
+#include<dune/structures/solversteps/traits.hh>
 
 
-template<typename Vector>
-class ElasticitySolverStep
-  : public WrapperStep<Vector,
-                       NewtonSolverTransitionStep<Vector, typename OperatorSwitch<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                                                  TransitionSolverStepBase<Vector>::dim>::Elasticity>>
+template<std::size_t i, typename... V>
+class ElasticityOperatorStep
+  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
-  static constexpr int dim = Base::dim;
-  using LocalOperator = typename OperatorSwitch<typename Base::GridFunctionSpace, dim>::Elasticity;
+  using Traits = VectorStepTraits<i, V...>;
 
-  ElasticitySolverStep(const Dune::ParameterTree& params)
-    : WrapperStep<Vector, NewtonSolverTransitionStep<Vector, LocalOperator>>(std::make_shared<NewtonSolverTransitionStep<Vector, LocalOperator>>(params))
-    , params(params)
+  static constexpr int dim = Traits::dim;
+  using BaseOperator = AbstractLocalOperatorInterface<typename Traits::GridFunctionSpace>;
+  using LocalOperator = typename OperatorSwitch<typename Traits::GridFunctionSpace, dim>::Elasticity;
+
+  ElasticityOperatorStep(const Dune::ParameterTree& params)
+    : params(params)
   {}
 
-  virtual ~ElasticitySolverStep() {}
+  virtual ~ElasticityOperatorStep() {}
 
-  virtual void update_parameter(std::string name, typename Base::Parameter param) override
+  virtual void set_solver(std::shared_ptr<typename Traits::Solver> solver_) override
   {
-    if (name == "material")
-    {
-      material = std::get<std::shared_ptr<typename Base::Material>>(param);
+    this->solver = solver_;
 
-      // I strongly dislike this lifetime dependencies, but Update parameter is available
-      // very early right now - the LocalOperator might not even be constructed.
-      auto lop = this->step->get_localoperator();
-      if (lop != nullptr)
-        lop->setMaterial(material);
-    }
-
-    this->step->update_parameter(name, param);
-  }
-
-  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
-  {
+    // Construct the local operator...
+    auto vector = this->solver->template getVector<i>();
     auto gfs = vector->gridFunctionSpaceStorage();
+    auto material = this->solver->template param<std::shared_ptr<typename Traits::Material>>("material");
     auto lop = std::make_shared<LocalOperator>(*gfs, *gfs, params, material);
-    force = std::make_shared<Vector>(*gfs, 0.0);
-    traction = std::make_shared<Vector>(*gfs, 0.0);
-    lop->setCoefficientForce(gfs, force);
-    lop->setCoefficientTraction(gfs, traction);
-    this->step->set_localoperator(lop);
-    this->step->pre(vector, cc);
-  }
-
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
-  {
-    auto gfs = vector->gridFunctionSpaceStorage();
+    auto force = std::make_shared<typename Traits::Vector>(*gfs, 0.0);
+    auto traction = std::make_shared<typename Traits::Vector>(*gfs, 0.0);
 
     // Interpolate the force vector
-    auto force_gf = makeGridFunctionTreeFromCallables(*gfs, get_callable_array<Vector, double(typename Base::Entity, typename Base::GlobalCoordinate)>(*(this->solver), params.get<std::string>("force", "0.0")));
+    auto force_gf = makeGridFunctionTreeFromCallables(*gfs, get_callable_array<double(typename Traits::Entity, typename Traits::GlobalCoordinate), V...>(*(this->solver), params.get<std::string>("force", "0.0")));
     Dune::PDELab::interpolate(force_gf, *gfs, *force);
 
     // Interpolate the traction vector
-    auto traction_gf = makeGridFunctionTreeFromCallables(*gfs, get_callable_array<Vector, double(typename Base::Entity, typename Base::GlobalCoordinate)>(*(this->solver), params.get<std::string>("traction", "0.0")));
+    auto traction_gf = makeGridFunctionTreeFromCallables(*gfs, get_callable_array<double(typename Traits::Entity, typename Traits::GlobalCoordinate), V...>(*(this->solver), params.get<std::string>("traction", "0.0")));
     Dune::PDELab::interpolate(traction_gf, *gfs, *traction);
 
-    this->step->apply(vector, cc);
+    lop->setCoefficientForce(gfs, force);
+    lop->setCoefficientTraction(gfs, traction);
+
+    // ... and register it in the parameter system
+    this->solver->template introduce_parameter<std::shared_ptr<BaseOperator>>("elasticity_operator", lop);
   }
 
-  private:
-  std::shared_ptr<typename Base::Material> material;
-  std::shared_ptr<Vector> force;
-  std::shared_ptr<Vector> traction;
-  Dune::ParameterTree params;
-};
-
-
-template<typename Vector>
-class QuasiStaticElastoDynamicsSolverStep
-  : public WrapperStep<Vector, OneStepMethodStep<Vector,
-                                                 typename OperatorSwitch<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                                         TransitionSolverStepBase<Vector>::dim>::Elasticity,
-                                                 typename OperatorSwitch<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                                         TransitionSolverStepBase<Vector>::dim>::Mass>
-    >
-{
-  public:
-  using Base = TransitionSolverStepBase<Vector>;
-  using SpatialLocalOperator = typename OperatorSwitch<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                       Base::dim>::Elasticity;
-
-  using TemporalLocalOperator = typename OperatorSwitch<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                        Base::dim>::Mass;
-
-  QuasiStaticElastoDynamicsSolverStep(const Dune::ParameterTree& rootparams)
-    : WrapperStep<Vector, OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>(std::make_shared<OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>())
-    , params(rootparams)
-  {}
-
-  virtual ~QuasiStaticElastoDynamicsSolverStep() override {}
-
-  virtual void update_parameter(std::string name, typename Base::Parameter param) override
+  virtual void update_parameter(std::string name, typename Traits::Parameter param) override
   {
     if (name == "material")
     {
-      material = std::get<std::shared_ptr<typename Base::Material>>(param);
-
-      // I strongly dislike this lifetime dependencies, but Update parameter is available
-      // very early right now - the LocalOperator might not even be constructed.
-      auto lop = this->step->get_spatial_localoperator();
-      if (lop != nullptr)
-        lop->setMaterial(material);
+      auto material = std::get<std::shared_ptr<typename Traits::Material>>(param);
+      this->solver->template param<std::shared_ptr<BaseOperator>>("elasticity_operator")->setMaterial(material);
     }
-
-    this->step->update_parameter(name, param);
-  }
-
-  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
-  {
-    auto& gfs = vector->gridFunctionSpace();
-    this->step->set_spatial_localoperator(std::make_shared<SpatialLocalOperator>(gfs, gfs, params, material));
-    this->step->set_temporal_localoperator(std::make_shared<TemporalLocalOperator>(gfs, gfs, params));
-    this->step->pre(vector, cc);
   }
 
   private:
-  std::shared_ptr<typename Base::Material> material;
   Dune::ParameterTree params;
 };
 
 
-/*
-template<typename Vector>
-class ElastoDynamicsSolverStep
-  :  public WrapperStep<Vector, OneStepMethodStep<Vector,
-                                         ElastoDynamicsSpatialOperator<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                                       typename TransitionSolverStepBase<Vector>::GridFunctionSpace>,
-                                         ElastoDynamicsTemporalOperator<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                                        typename TransitionSolverStepBase<Vector>::GridFunctionSpace>
-                                         >>
+template<std::size_t i, typename... V>
+class ElasticityMassOperatorStep
+  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Traits = VectorStepTraits<i, V...>;
 
-  using SpatialLocalOperator = ElastoDynamicsSpatialOperator<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                             typename TransitionSolverStepBase<Vector>::GridFunctionSpace>;
+  using BaseOperator = AbstractLocalOperatorInterface<typename Traits::GridFunctionSpace>;
+  using TemporalLocalOperator = typename OperatorSwitch<typename Traits::GridFunctionSpace,
+                                                        Traits::dim>::Mass;
 
-  using TemporalLocalOperator = ElastoDynamicsTemporalOperator<typename TransitionSolverStepBase<Vector>::GridFunctionSpace,
-                                                               typename TransitionSolverStepBase<Vector>::GridFunctionSpace>;
-
-  ElastoDynamicsSolverStep(const Dune::ParameterTree& rootparams)
-    : WrapperStep<Vector, OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>(std::make_shared<OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>())
-    , params(rootparams)
+  ElasticityMassOperatorStep(const Dune::ParameterTree& params)
+    : params(params)
   {}
 
-  template<typename... FUNCS>
-  ElastoDynamicsSolverStep(const Dune::ParameterTree& rootparams,
-                           const FUNCS&... funcs)
-   : WrapperStep<Vector, OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>(std::make_shared<VariableBoundaryOneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>(funcs...))
-  , params(rootparams)
-  {}
+  virtual ~ElasticityMassOperatorStep() override {}
 
-  template<typename... FUNCS>
-  ElastoDynamicsSolverStep(const Dune::ParameterTree& rootparams,
-                           const std::array<std::function<typename VariableBoundaryOneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>::FunctionSignature>,
-                                            Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount>& funcs)
-   : WrapperStep<Vector, OneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>(std::make_shared<VariableBoundaryOneStepMethodStep<Vector, SpatialLocalOperator, TemporalLocalOperator>>(funcs))
-   , params(rootparams)
-  {}
-
-  virtual ~ElastoDynamicsSolverStep() {}
-
-  virtual void update_parameter(std::string name, typename Base::Parameter param) override
+  virtual void set_solver(std::shared_ptr<typename Traits::Solver> solver_) override
   {
-    if (name == "material")
-    {
-      material = std::get<std::shared_ptr<typename Base::Material>>(param);
+    this->solver = solver_;
 
-      // I strongly dislike this lifetime dependencies, but Update parameter is available
-      // very early right now - the LocalOperator might not even be constructed.
-      auto lop = this->step->get_spatial_localoperator();
-      if (lop != nullptr)
-        lop->setMaterial(material);
-    }
+    // Construct the local operator...
+    auto vector = this->solver->template getVector<i>();
+    auto gfs = vector->gridFunctionSpaceStorage();
+    auto lop = std::make_shared<TemporalLocalOperator>(*gfs, *gfs, params);
 
-    this->step->update_parameter(name, param);
-  }
-
-  virtual void pre(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
-  {
-    auto& gfs = vector->gridFunctionSpace();
-    this->step->set_spatial_localoperator(std::make_shared<SpatialLocalOperator>(gfs, gfs, params, material));
-    this->step->set_temporal_localoperator(std::make_shared<TemporalLocalOperator>(gfs, gfs, params));
-    this->step->pre(vector, cc);
+    // ... and register it in the parameter system
+    this->solver->template introduce_parameter<std::shared_ptr<BaseOperator>>("elasticity_mass_operator", lop);
   }
 
   private:
-  std::shared_ptr<typename Base::Material> material;
+  std::shared_ptr<typename Traits::Material> material;
   Dune::ParameterTree params;
 };
-*/
+
 
 #endif

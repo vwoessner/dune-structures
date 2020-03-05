@@ -27,22 +27,31 @@
 
 #include<map>
 #include<memory>
+#include<tuple>
 #include<vector>
 
 
 template<typename Vector>
+struct VectorToConstraintsContainer
+{
+  using type = typename Vector::GridFunctionSpace::template ConstraintsContainer<typename Vector::field_type>::Type;
+};
+
+
+template<typename... V>
 class TransitionSolver
 {
   public:
-  using EntitySet = typename TransitionSolverStepBase<Vector>::EntitySet;
-  using ConstraintsContainer = typename Vector::GridFunctionSpace::template ConstraintsContainer<typename Vector::field_type>::Type;
-  using Parameter = typename TransitionSolverStepBase<Vector>::Parameter;
+  using StepBase = TransitionSolverStepBase<V...>;
+  using StepTraits = SimpleStepTraits<V...>;
+  using EntitySet = typename StepTraits::EntitySet;
+  using Parameter = typename StepTraits::Parameter;
 
   TransitionSolver(EntitySet es)
     : es(es), steps(0)
   {}
 
-  TransitionSolver(EntitySet es, std::vector<std::shared_ptr<TransitionSolverStepBase<Vector>>> steps)
+  TransitionSolver(EntitySet es, std::vector<std::shared_ptr<StepBase>> steps)
     : es(es)
     , steps(steps)
   {}
@@ -60,7 +69,7 @@ class TransitionSolver
     add(Dune::stackobject_to_shared_ptr(step));
   }
 
-  void apply(std::shared_ptr<Vector> vector, std::shared_ptr<ConstraintsContainer> constraintscontainer)
+  void apply()
   {
     // Make sure that all initial parameters are propagated to all steps.
     // This avoids dependencies on the step insertion order
@@ -71,13 +80,13 @@ class TransitionSolver
     }
 
     for (auto step : steps)
-      step->pre(vector, constraintscontainer);
+      step->pre();
 
     for (auto step : steps)
-      step->apply(vector, constraintscontainer);
+      step->apply();
 
     for (auto step : steps)
-     step->post(vector, constraintscontainer);
+     step->post();
   }
 
   template<typename T>
@@ -152,10 +161,34 @@ class TransitionSolver
     return es;
   }
 
+  void setVectors(const std::tuple<std::shared_ptr<V>...>& vectors_)
+  {
+    vectors = vectors_;
+  }
+
+  void setConstraintsContainers(const std::tuple<std::shared_ptr<typename VectorToConstraintsContainer<V>::type>...>& containers_)
+  {
+    constraints_containers = containers_;
+  }
+
+  template<std::size_t i=0>
+  auto getVector()
+  {
+    return std::get<i>(vectors);
+  }
+
+  template<std::size_t i=0>
+  auto getConstraintsContainer()
+  {
+    return std::get<i>(constraints_containers);
+  }
+
   private:
   EntitySet es;
-  std::vector<std::shared_ptr<TransitionSolverStepBase<Vector>>> steps;
+  std::vector<std::shared_ptr<StepBase>> steps;
   std::map<std::string, Parameter> paramdata;
+  std::tuple<std::shared_ptr<V>...> vectors;
+  std::tuple<std::shared_ptr<typename VectorToConstraintsContainer<V>::type>...> constraints_containers;
 };
 
 #endif

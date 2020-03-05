@@ -4,8 +4,11 @@ These do the interfacing to our C++ abstraction of heterogeneous materials.
 
 from dune.codegen.ufl.execution import Coefficient
 from dune.codegen.ufl.modified_terminals import Restriction
-from dune.codegen.generation import (class_member,
+from dune.codegen.generation import (base_class,
+                                     class_member,
                                      constructor_parameter,
+                                     delete_cache_items,
+                                     hook,
                                      include_file,
                                      initializer_list,
                                      instruction,
@@ -17,9 +20,10 @@ from dune.codegen.pdelab.geometry import (enforce_boundary_restriction,
                                           name_element_geometry_wrapper,
                                           world_dimension,
                                           )
-from dune.codegen.pdelab.localoperator import lop_template_ansatz_gfs
+from dune.codegen.pdelab.localoperator import lop_template_ansatz_gfs, lop_template_test_gfs
 from dune.codegen.loopy.target import dtype_floatingpoint, type_floatingpoint
 from dune.codegen.tools import maybe_wrap_subscript
+import dune.codegen
 import pymbolic.primitives as prim
 import loopy as lp
 import numpy as np
@@ -167,11 +171,41 @@ def define_material_class(name):
     setter_material_class(name)
     return "{} {};".format(_type, name)
 
+
 @class_member(classtag="operator")
 def setter_material_class(name):
     _type = "std::shared_ptr<ElasticMaterialBase<typename {}::Traits::EntitySet, {}>>".format(lop_template_ansatz_gfs(), type_floatingpoint())
-    return ["void setMaterial({} {}_)".format(_type, name),
+    return ["void setMaterial({} {}_) override".format(_type, name),
             "{",
             "  {} = {}_;".format(name, name),
             "}"
             ]
+
+
+# Monkey-patch construct_signature to drop template parameters
+def notemplate_construct_signature(types, args, name):
+    for _type in types:
+        using_from_baseclass(_type)
+    func = "void {}({}) const override".format(name, ", ".join("{}{}& {}".format("const " if c else "", t, a) for t, (c, a) in zip(types, args)))
+    return [func]
+
+
+dune.codegen.pdelab.signatures.construct_signature = notemplate_construct_signature
+
+
+@class_member(classtag="operator")
+def using_from_baseclass(_type):
+    gfsu = lop_template_ansatz_gfs()
+    gfsv = lop_template_test_gfs()
+    base = 'AbstractLocalOperatorInterface<{}, {}>'.format(gfsu, gfsv)
+    return "using {} = typename {}::{};".format(_type, base, _type)
+
+
+# Add the abstract base class for local operators from dune-structures
+@hook('operator_class_extraction')
+def baseclass_hook():
+    gfsu = lop_template_ansatz_gfs()
+    gfsv = lop_template_test_gfs()
+    include_file('dune/structures/operatorinterface.hh', filetag="operatorfile")
+    delete_cache_items("baseclass")
+    base_class('AbstractLocalOperatorInterface<{}, {}>'.format(gfsu, gfsv), classtag="operator")

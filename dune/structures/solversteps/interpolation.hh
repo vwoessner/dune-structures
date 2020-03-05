@@ -5,19 +5,21 @@
 #include<dune/pdelab/gridfunctionspace/tags.hh>
 #include<dune/structures/callableadapters.hh>
 #include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/traits.hh>
 #include<dune/typetree/simpletransformationdescriptors.hh>
 #include<dune/typetree/utility.hh>
 
 #include<functional>
 
 
-template<typename Vector>
+template<std::size_t i, typename... V>
 class InterpolationTransitionStep
-  : public TransitionSolverStepBase<Vector>
+  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
-  using FunctionSignature = typename Base::Range(typename Base::Entity, typename Base::GlobalCoordinate);
+  using Traits = VectorStepTraits<i, V...>;
+
+  using FunctionSignature = typename Traits::Range(typename Traits::Entity, typename Traits::GlobalCoordinate);
 
   InterpolationTransitionStep(std::function<FunctionSignature> func)
   {
@@ -25,20 +27,21 @@ class InterpolationTransitionStep
   }
 
   template<typename... FUNCS,
-           typename std::enable_if<Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount == sizeof...(FUNCS), int>::type = 0>
+           typename std::enable_if<Dune::TypeTree::TreeInfo<typename Traits::GridFunctionSpace>::leafCount == sizeof...(FUNCS), int>::type = 0>
   InterpolationTransitionStep(FUNCS... funcs) : funcs{funcs...}
   {}
 
   InterpolationTransitionStep(const std::array<std::function<FunctionSignature>,
-                                               Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount
+                                               Dune::TypeTree::TreeInfo<typename Traits::GridFunctionSpace>::leafCount
                                                >& funcs)
     : funcs(funcs)
   {}
 
   virtual ~InterpolationTransitionStep() {}
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer>) override
+  virtual void apply() override
   {
+    auto vector = this->solver->template getVector<i>();
     auto& gfs = vector->gridFunctionSpace();
     auto gf = makeGridFunctionTreeFromCallables(gfs, funcs);
 
@@ -49,7 +52,7 @@ class InterpolationTransitionStep
   private:
   // Store the lambdas
   std::array<std::function<FunctionSignature>,
-             Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount
+             Dune::TypeTree::TreeInfo<typename Traits::GridFunctionSpace>::leafCount
              > funcs;
 };
 

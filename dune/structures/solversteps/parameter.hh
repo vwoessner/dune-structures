@@ -2,23 +2,24 @@
 #define DUNE_STRUCTURES_SOLVERSTEPS_PARAMETER_HH
 
 #include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/traits.hh>
 
 
-template<typename Vector>
+template<typename... V>
 class ParameterSetup
-  : public TransitionSolverStepBase<Vector>
+  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Traits = SimpleStepTraits<V...>;
 
-  ParameterSetup(std::string name, typename Base::Parameter param)
+  ParameterSetup(std::string name, typename Traits::Parameter param)
     : name(name)
     , param(param)
   {}
 
   virtual ~ParameterSetup() {}
 
-  virtual void set_solver(std::shared_ptr<typename Base::Solver> solver_) override
+  virtual void set_solver(std::shared_ptr<typename Traits::Solver> solver_) override
   {
     this->solver = solver_;
     this->solver->introduce_parameter(name, param);
@@ -26,7 +27,7 @@ class ParameterSetup
 
   private:
   std::string name;
-  typename Base::Parameter param;
+  typename Traits::Parameter param;
 };
 
 #endif

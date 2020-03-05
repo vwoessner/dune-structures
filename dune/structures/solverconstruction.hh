@@ -15,19 +15,19 @@
 #include<vector>
 
 
-template<typename>
+template<typename... V>
 class ConstructionContext;
 
 
-template<typename Step>
-std::shared_ptr<TransitionSolverStepBase<typename Step::Base::Vector>> default_constructed(const ConstructionContext<typename Step::Base::Vector>&, const Dune::ParameterTree&)
+template<typename Step, typename... V>
+std::shared_ptr<TransitionSolverStepBase<V...>> default_constructed(const ConstructionContext<V...>&, const Dune::ParameterTree&)
 {
   return std::make_shared<Step>();
 }
 
 
-template<typename Step>
-std::shared_ptr<TransitionSolverStepBase<typename Step::Base::Vector>> with_tree(const ConstructionContext<typename Step::Base::Vector>&, const Dune::ParameterTree& tree)
+template<typename Step, typename... V>
+std::shared_ptr<TransitionSolverStepBase<V...>> with_tree(const ConstructionContext<V...>&, const Dune::ParameterTree& tree)
 {
   return std::make_shared<Step>(tree);
 }
@@ -69,44 +69,58 @@ std::vector<P> dynamic_list_parse(const Dune::ParameterTree& tree, std::string d
 }
 
 
-template<typename Vector>
+template<typename... V>
 class ConstructionContext
 {
   public:
-  using StepBase = TransitionSolverStepBase<Vector>;
+  using StepBase = TransitionSolverStepBase<V...>;
   using StepBasePointer = std::shared_ptr<StepBase>;
-  using RegisterFunction = std::function<StepBasePointer(ConstructionContext<Vector>&, const Dune::ParameterTree&)>;
-  using Entity = typename StepBase::Entity;
-  using Coord = typename StepBase::GlobalCoordinate;
+  using RegisterFunction = std::function<StepBasePointer(ConstructionContext<V...>&, const Dune::ParameterTree&)>;
+  using StepTraits = SimpleStepTraits<V...>;
+  using Entity = typename StepTraits::Entity;
+  using Coord = typename StepTraits::GlobalCoordinate;
   using LocalCoord = typename Entity::Geometry::LocalCoordinate;
-  using Intersection = typename StepBase::GridView::Intersection;
+  using Intersection = typename StepTraits::GridView::Intersection;
   using IntersectionLocalCoord = typename Intersection::Geometry::LocalCoordinate;
-  static constexpr int dim = StepBase::dim;
+  static constexpr int dim = StepTraits::dim;
 
   using LocalEntitySignature = double(Entity, LocalCoord);
   using LocalIntersectionSignature = bool(Intersection, IntersectionLocalCoord);
 
   ConstructionContext(Dune::MPIHelper& helper,
                       const Dune::ParameterTree& config,
-                      typename StepBase::EntitySet es,
+                      typename StepTraits::EntitySet es,
                       std::shared_ptr<std::vector<int>> physical)
     : helper(helper)
     , rootconfig(config)
     , es(es)
     , physical(physical)
-    , solver(std::make_unique<TransitionSolver<Vector>>(es))
+    , solver(std::make_unique<TransitionSolver<V...>>(es))
   {
-    registerStep("constraints",
-                 [](const auto& ctx, const auto& p)
+    // Parse
+    {
+      auto vecstr = config.get<std::string>("vectors", "solution");
+      auto vectors  = str_split(vecstr);
+
+      std::size_t i = 0;
+      for (auto vec: vectors)
+      {
+        str_trim(vec);
+        vector_name_to_index[vec] = i++;
+      }
+    }
+
+    registerVectorStep("constraints",
+                 [](auto i, const auto& ctx, const auto& p)
                  {
-                   return std::make_shared<ConstraintsTransitionStep<Vector>>(
-                     get_callable_array<Vector, LocalIntersectionSignature>(*ctx.solver, p.template get<std::string>("functions")));
+                   return std::make_shared<ConstraintsTransitionStep<i, V...>>(
+                     get_callable_array<LocalIntersectionSignature, V...>(*ctx.solver, p.template get<std::string>("functions")));
                  });
 
     registerStep("continuousvariation",
                  [](auto& ctx, const auto& p)
                  {
-                   auto step = std::make_shared<ContinuousVariationTransitionStep<Vector>>(p.template get<std::string>("name"),
+                   auto step = std::make_shared<ContinuousVariationTransitionStep<V...>>(p.template get<std::string>("name"),
                                                                                            p.template get<int>("iterations"),
                                                                                            p.template get<double>("start"),
                                                                                            p.template get<double>("end"));
@@ -118,8 +132,8 @@ class ConstructionContext
     registerStep("discretevariation",
                  [](auto& ctx, const auto& p)
                  {
-                   auto values = dynamic_list_parse<typename StepBase::Parameter>(p);
-                   auto step = std::make_shared<DiscreteVariationTransitionStep<Vector>>(p.template get<std::string>("name"), values);
+                   auto values = dynamic_list_parse<typename StepTraits::Parameter>(p);
+                   auto step = std::make_shared<DiscreteVariationTransitionStep<V...>>(p.template get<std::string>("name"), values);
                    step->set_solver(ctx.solver);
                    ctx.add_children(step, p);
                    return step;
@@ -128,10 +142,10 @@ class ConstructionContext
     registerStep("discretematerialvariation",
                  [](auto& ctx, const auto& p)
                  {
-                   auto values = dynamic_list_parse<typename StepBase::Parameter>(p);
+                   auto values = dynamic_list_parse<typename StepTraits::Parameter>(p);
                    auto key = p.template get<std::string>("key");
                    auto name = p.template get<std::string>("name");
-                   auto step = std::make_shared<DiscreteMaterialVariationTransitionStep<Vector>>(name,
+                   auto step = std::make_shared<DiscreteMaterialVariationTransitionStep<V...>>(name,
                                                                                                  [key](auto& tree, auto param){ tree[key] = std::get<std::string>(param); },
                                                                                                  values);
                    step->set_solver(ctx.solver);
@@ -139,55 +153,74 @@ class ConstructionContext
                    return step;
                  });
 
-    registerStep("elasticity",
-                 with_tree<ElasticitySolverStep<Vector>>);
+    registerVectorStep("elasticity_operator",
+                 [](auto i, const auto& ctx, const auto& p)
+                 {
+                   return std::make_shared<ElasticityOperatorStep<i, V...>>(p);
+                 });
+
+    registerVectorStep("elasticity_mass_operator",
+                 [](auto i, const auto& ctx, const auto& p)
+                 {
+                   return std::make_shared<ElasticityMassOperatorStep<i, V...>>(p);
+                 });
 
     if constexpr (dim == 2)
-      registerStep("fibrereinforcedelasticity",
-                   [](auto& ctx, const auto& p)
-                   {
-                     return std::make_shared<FibreReinforcedElasticitySolverStep<Vector, 0>>(ctx.rootconfig, p);
-                   });
+      registerVectorStep("fibre_operator",
+                  [](auto i, auto& ctx, const auto& p)
+                  {
+                    return std::make_shared<FibreReinforcedElasticitySolverStep<i, V...>>(ctx.rootconfig, p);
+                  });
 
-    registerStep("interpolation",
-                 [](const auto& ctx, const auto& p)
+
+    registerVectorStep("interpolation",
+                 [](auto i, const auto& ctx, const auto& p)
                  {
-                   return std::make_shared<InterpolationTransitionStep<Vector>>(
-                     get_callable_array<Vector, LocalEntitySignature>(*ctx.solver, p["functions"]));
+                   return std::make_shared<InterpolationTransitionStep<i, V...>>(
+                     get_callable_array<LocalEntitySignature, V...>(*ctx.solver, p["functions"]));
                  });
 
     registerStep("material",
                  [](const auto& ctx, const auto& p)
                  {
-                   return std::make_shared<MaterialInitialization<Vector>>(ctx.es, ctx.physical, p, ctx.rootconfig);
+                   return std::make_shared<MaterialInitialization<V...>>(ctx.es, ctx.physical, p, ctx.rootconfig);
                  });
 
-    registerStep("onetoone",
-                 default_constructed<OneToOneMappingChecker<Vector>>);
+    registerVectorStep("newton",
+                 [](auto i, auto& ctx, const auto& p)
+                 {
+                   return std::make_shared<NewtonSolverTransitionStep<i, V...>>(p);
+                 });
+
+    registerVectorStep("onestep",
+                 [](auto i, auto& ctx, const auto& p)
+                 {
+                   return std::make_shared<OneStepMethodStep<i, V...>>(p);
+                 });
+
+    registerVectorStep("onetoone",
+                 [](auto i, const auto& ctx, const auto& p)
+                 {
+                   return std::make_shared<OneToOneMappingChecker<i, V...>>();
+                 });
 
     registerStep("parameter",
                  [](const auto& ctx, const auto& p)
                  {
-                   auto param = dynamic_parse<typename StepBase::Parameter>(p);
-                   return std::make_shared<ParameterSetup<Vector>>(p.template get<std::string>("name"), param);
+                   auto param = dynamic_parse<typename StepTraits::Parameter>(p);
+                   return std::make_shared<ParameterSetup<V...>>(p.template get<std::string>("name"), param);
                  });
 
-    registerStep("probe",
-                 [](const auto& ctx, const auto& p)
+    registerVectorStep("probe",
+                 [](auto i, const auto& ctx, const auto& p)
                  {
-                   return std::make_shared<ProbeTransitionStep<Vector>>(ctx.es.gridView(), p);
-                 });
-
-    registerStep("quasistatic_elasticity",
-                 [](const auto& ctx, const auto& p)
-                 {
-                   return std::make_shared<QuasiStaticElastoDynamicsSolverStep<Vector>>(ctx.rootconfig);
+                   return std::make_shared<ProbeTransitionStep<i, V...>>(ctx.es.gridView(), p);
                  });
 
     registerStep("timeloop",
                  [](auto& ctx, const auto& p)
                  {
-                   auto step = std::make_shared<InstationarySolverStep<Vector>>(p.template get<double>("Tstart"),
+                   auto step = std::make_shared<InstationarySolverStep<V...>>(p.template get<double>("Tstart"),
                                                                                 p.template get<double>("Tend"),
                                                                                 p.template get<double>("dt"));
                    step->set_solver(ctx.solver);
@@ -196,17 +229,17 @@ class ConstructionContext
                  });
 
     if constexpr (false) {
-    registerStep("transformation",
-                 [](auto& ctx, const auto& p)
+    registerVectorStep("transformation",
+                 [](auto i, auto& ctx, const auto& p)
                  {
-                   return std::make_shared<TransformationTransitionStep<Vector>>(get_transformation<Vector, Coord(Coord, Coord)>(*ctx.solver, p.template get<std::string>("functions")));
+                   return std::make_shared<TransformationTransitionStep<i, V...>>(get_transformation<Coord(Coord, Coord), V...>(*ctx.solver, p.template get<std::string>("functions")));
                  });
     }
 
     registerStep("visualization",
                  [](auto& ctx, const auto& p)
                  {
-                   auto step = std::make_shared<VisualizationStep<Vector>>(p);
+                   auto step = std::make_shared<VisualizationStep<V...>>(p);
                    ctx.add_children(step, p);
                    return step;
                  });
@@ -214,36 +247,60 @@ class ConstructionContext
     registerStep("vis_mpirank",
                  [](auto& ctx, const auto& p)
                  {
-                   return std::make_shared<MPIRankVisualizationStep<Vector>>(ctx.helper);
+                   return std::make_shared<MPIRankVisualizationStep<V...>>(ctx.helper);
                  });
 
     registerStep("vis_physicalentity",
                  [](auto& ctx, const auto& p)
                  {
-                   return std::make_shared<PhysicalEntityVisualizationStep<Vector>>(ctx.physical);
+                   return std::make_shared<PhysicalEntityVisualizationStep<V...>>(ctx.physical);
                  });
 
-    registerStep("vis_solution",
-                 default_constructed<SolutionVisualizationStep<Vector>>);
+    registerVectorStep("vis_solution",
+                 [](auto i, const auto& ctx, const auto& p)
+                 {
+                   return std::make_shared<SolutionVisualizationStep<i, V...>>();
+                 });
 
-    registerStep("vis_vonmises",
-                 default_constructed<VonMisesStressVisualizationStep<Vector>>);
+    registerVectorStep("vis_vonmises",
+                 [](auto i, const auto& ctx, const auto& p)
+                 {
+                   return std::make_shared<VonMisesStressVisualizationStep<i, V...>>();
+                 });
 
     registerStep("vis_fibredistance",
                  [](const auto& ctx, const auto& p)
                  {
-                   return std::make_shared<FibreDistanceVisualizationStep<Vector>>(p, ctx.rootconfig);
+                   return std::make_shared<FibreDistanceVisualizationStep<V...>>(p, ctx.rootconfig);
                  });
   }
 
-  void registerStep(std::string identifier, RegisterFunction func)
+  template<typename Func>
+  void registerVectorStep(std::string identifier, Func&& func)
   {
-    mapping[identifier] = func;
+    is_vector[identifier] = true;
+    Dune::Hybrid::forEach(Dune::Hybrid::integralRange(std::integral_constant<std::size_t, 0>{},
+                                                      std::integral_constant<std::size_t, sizeof...(V)>{}),
+                          [this, identifier, func](auto i){
+                            auto subident = identifier + "_" + std::to_string(i);
+                            this->mapping[subident] = [i, func](auto& ctx, const auto& p){
+                              return func(i, ctx, p);
+                            };
+                          });
+  }
+
+  template<typename Func>
+  void registerStep(std::string identifier, Func&& func)
+  {
+    is_vector[identifier] = false;
+    mapping[identifier] = std::forward<Func>(func);
   }
 
   StepBasePointer construct_step(std::string stepname, const Dune::ParameterTree& config)
   {
     auto identifier = config.get<std::string>("type", stepname);
+    if (is_vector[identifier])
+      identifier = identifier + "_" + std::to_string(vector_name_to_index[config.get<std::string>("vector", "solution")]);
     return mapping[identifier](*this, config);
   }
 
@@ -273,21 +330,51 @@ class ConstructionContext
     }
   }
 
-  std::shared_ptr<TransitionSolver<Vector>> construct(const Dune::ParameterTree& config)
+  std::shared_ptr<TransitionSolver<V...>> construct(const Dune::ParameterTree& config)
   {
+    solver->setVectors(vectors);
+    solver->setConstraintsContainers(constraints_containers);
     add_children(solver, config);
     return solver;
+  }
+
+  void setVectors(const std::shared_ptr<V>&... vectors_)
+  {
+    vectors = {vectors_...};
+  }
+
+  void setConstraintsContainers(const std::shared_ptr<typename VectorToConstraintsContainer<V>::type>&... containers_)
+  {
+    constraints_containers = {containers_...};
+  }
+
+  template<std::size_t i=0>
+  auto getVector() const
+  {
+    return std::get<i>(vectors);
+  }
+
+  template<std::size_t i=0>
+  auto getConstraintsContainer() const
+  {
+    return std::get<i>(constraints_containers);
   }
 
   // The reference members that might be needed for construction of steps
   Dune::MPIHelper& helper;
   const Dune::ParameterTree& rootconfig;
-  typename StepBase::EntitySet es;
+  typename StepTraits::EntitySet es;
   std::shared_ptr<std::vector<int>> physical;
+
+  // The vectors and constraints containers
+  std::tuple<std::shared_ptr<V>...> vectors;
+  std::tuple<std::shared_ptr<typename VectorToConstraintsContainer<V>::type>...> constraints_containers;
 
   // The stored mapping for each step
   std::map<std::string, RegisterFunction> mapping;
-  std::shared_ptr<TransitionSolver<Vector>> solver;
+  std::shared_ptr<TransitionSolver<V...>> solver;
+  std::map<std::string, std::size_t> vector_name_to_index;
+  std::map<std::string, bool> is_vector;
 };
 
 #endif

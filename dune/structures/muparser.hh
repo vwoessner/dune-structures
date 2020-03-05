@@ -4,30 +4,32 @@
 #include<dune/common/fvector.hh>
 #include<dune/grid/concepts/intersection.hh>
 #include<dune/structures/utilities.hh>
+#include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/traits.hh>
 
 #include<muParser.h>
 #include<string>
 
 
 // Forward declaration of the transition solver class
-template<typename V>
+template<typename... V>
 class TransitionSolver;
 
 
-template<typename Vector, typename Signature>
+template<typename Signature, typename... Vector>
 class MuParserCallable
 {};
 
 
-template<typename Vector, typename R, typename E, typename D>
-class MuParserCallable<Vector, R(E, D)>
+template<typename R, typename E, typename D, typename... Vector>
+class MuParserCallable<R(E, D), Vector...>
 {
   public:
   using Range = R;
   using Domain = D;
   using Global = typename E::Geometry::GlobalCoordinate;
 
-  MuParserCallable(TransitionSolver<Vector>& solver, std::string expr)
+  MuParserCallable(TransitionSolver<Vector...>& solver, std::string expr)
     : position(std::make_shared<Global>(0.0))
     , current_physical(std::make_shared<double>(0))
     , indexset(solver.entitySet().indexSet())
@@ -63,27 +65,27 @@ class MuParserCallable<Vector, R(E, D)>
   mu::Parser parser;
   std::shared_ptr<Global> position;
   std::shared_ptr<double> current_physical;
-  const typename TransitionSolver<Vector>::EntitySet::Traits::IndexSet& indexset;
+  const typename TransitionSolver<Vector...>::EntitySet::Traits::IndexSet& indexset;
   std::shared_ptr<std::vector<int>> physical_info;
 
 };
 
 
-template<typename Vector, typename Signature>
+template<typename Signature, typename... Vector>
 class MuParserTransformation
 {};
 
 
-template<typename Vector, typename R>
-class MuParserTransformation<Vector, R(R, R)>
-  : public MuParserCallable<Vector, R(R)>
+template<typename R, typename... Vector>
+class MuParserTransformation<R(R, R), Vector...>
+  : public MuParserCallable<R(R), Vector...>
 {
   public:
   using Range = R;
   using Domain = R;
 
-  MuParserTransformation(TransitionSolver<Vector>& solver, std::string expr)
-    : MuParserCallable<Vector, R(R)>(solver, expr)
+  MuParserTransformation(TransitionSolver<Vector...>& solver, std::string expr)
+    : MuParserCallable<R(R), Vector...>(solver, expr)
     , solution(std::make_shared<Domain>(0.0))
   {
     define_solution_variables();
@@ -110,33 +112,33 @@ class MuParserTransformation<Vector, R(R, R)>
 };
 
 
-template<typename Vector, typename Signature>
-std::function<Signature> get_callable(TransitionSolver<Vector>& solver, std::string expr)
+template<typename Signature, typename... Vector>
+std::function<Signature> get_callable(TransitionSolver<Vector...>& solver, std::string expr)
 {
-  return MuParserCallable<Vector, Signature>(solver, expr);
+  return MuParserCallable<Signature, Vector...>(solver, expr);
 }
 
 
-template<typename Vector, typename Signature>
-std::function<Signature> get_transformation(TransitionSolver<Vector>& solver, std::string expr)
+template<typename Signature, typename... Vector>
+std::function<Signature> get_transformation(TransitionSolver<Vector...>& solver, std::string expr)
 {
-  return MuParserTransformation<Vector, Signature>(solver, expr);
+  return MuParserTransformation<Signature, Vector...>(solver, expr);
 }
 
 
-template<typename Vector, typename Signature>
+template<typename Signature, typename... Vector>
 std::array<std::function<Signature>,
-           Dune::TypeTree::TreeInfo<typename Vector::GridFunctionSpace>::leafCount> get_callable_array(TransitionSolver<Vector>& solver, std::string expr)
+           Dune::TypeTree::TreeInfo<typename VectorStepTraits<0, Vector...>::GridFunctionSpace>::leafCount> get_callable_array(TransitionSolver<Vector...>& solver, std::string expr)
 {
-  using GFS = typename Vector::GridFunctionSpace;
+  using GFS = typename VectorStepTraits<0, Vector...>::GridFunctionSpace;
   constexpr auto len = Dune::TypeTree::TreeInfo<GFS>::leafCount;
   std::array<std::function<Signature>, len> result;
 
   auto exprs = str_split(expr);
   if (exprs.size() == 1)
-    result.fill(get_callable<Vector, Signature>(solver, exprs[0]));
+    result.fill(get_callable<Signature, Vector...>(solver, exprs[0]));
   else
-    std::transform(exprs.begin(), exprs.end(), result.begin(), [&solver](auto it){ return get_callable<Vector, Signature>(solver, it); });
+    std::transform(exprs.begin(), exprs.end(), result.begin(), [&solver](auto it){ return get_callable<Signature, Vector...>(solver, it); });
 
   return std::move(result);
 }

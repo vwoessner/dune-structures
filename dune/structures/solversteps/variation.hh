@@ -4,18 +4,19 @@
 #include<dune/common/parametertree.hh>
 #include<dune/common/shared_ptr.hh>
 #include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/traits.hh>
 
 #include<memory>
 #include<vector>
 #include<type_traits>
 
 
-template<typename Vector>
+template<typename... V>
 class ContinuousVariationTransitionStep
-  : public StepCollectionStep<Vector>
+  : public StepCollectionStep<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Traits = SimpleStepTraits<V...>;
 
   ContinuousVariationTransitionStep(std::string name, int iterations=5, double start=0.0, double end=1.0)
     : name(name)
@@ -26,7 +27,7 @@ class ContinuousVariationTransitionStep
 
   virtual ~ContinuousVariationTransitionStep() {}
 
-  virtual void set_solver(std::shared_ptr<typename Base::Solver> solver_) override
+  virtual void set_solver(std::shared_ptr<typename Traits::Solver> solver_) override
   {
     this->solver = solver_;
     this->solver->introduce_parameter(name, start);
@@ -34,7 +35,7 @@ class ContinuousVariationTransitionStep
       step->set_solver(solver_);
   }
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void apply() override
   {
     double val = start;
     for (int i=0; i<iterations; ++i)
@@ -42,7 +43,7 @@ class ContinuousVariationTransitionStep
       val += (end - start) / iterations;
       this->solver->update_parameter(name, val);
       for (auto step : this->steps)
-        step->apply(vector, cc);
+        step->apply();
     }
   }
 
@@ -53,21 +54,21 @@ class ContinuousVariationTransitionStep
 };
 
 
-template<typename Vector>
+template<typename... V>
 class DiscreteVariationTransitionStep
-  : public StepCollectionStep<Vector>
+  : public StepCollectionStep<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
+  using Traits = SimpleStepTraits<V...>;
 
-  DiscreteVariationTransitionStep(std::string name, std::vector<typename Base::Parameter> values)
+  DiscreteVariationTransitionStep(std::string name, std::vector<typename Traits::Parameter> values)
     : name(name)
     , values(values)
   {}
 
   virtual ~DiscreteVariationTransitionStep() {}
 
-  virtual void set_solver(std::shared_ptr<typename Base::Solver> solver_) override
+  virtual void set_solver(std::shared_ptr<typename Traits::Solver> solver_) override
   {
     this->solver = solver_;
     this->solver->introduce_parameter(name, values[0]);
@@ -75,19 +76,19 @@ class DiscreteVariationTransitionStep
       step->set_solver(solver_);
   }
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> cc) override
+  virtual void apply() override
   {
     for (auto val: values)
     {
       this->solver->update_parameter(name, val);
       for (auto step : this->steps)
-        step->apply(vector, cc);
+        step->apply();
     }
   }
 
   private:
   std::string name;
-  std::vector<typename Base::Parameter> values;
+  std::vector<typename Traits::Parameter> values;
 };
 
 #endif

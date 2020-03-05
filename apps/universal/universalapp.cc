@@ -6,6 +6,8 @@
 #include<dune/structures/gridconstruction.hh>
 #include<dune/structures/solverconstruction.hh>
 
+#include<memory>
+
 
 template<int dim, int degree>
 void apply(Dune::MPIHelper& helper, const Dune::ParameterTree& params, char** argv)
@@ -15,9 +17,12 @@ void apply(Dune::MPIHelper& helper, const Dune::ParameterTree& params, char** ar
   using V = typename std::remove_reference<decltype(*x)>::type;
 
   ConstructionContext<V> ctx(helper, params, es, physical);
+  ctx.setVectors(x);
+  ctx.setConstraintsContainers(cc);
+
   auto solver = ctx.construct(params.sub("solver"));
 
-  solver->apply(x, cc);
+  solver->apply();
 }
 
 

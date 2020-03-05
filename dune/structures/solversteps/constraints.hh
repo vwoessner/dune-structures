@@ -5,16 +5,18 @@
 #include<dune/pdelab.hh>
 #include<dune/structures/callableadapters.hh>
 #include<dune/structures/solversteps/base.hh>
+#include<dune/structures/solversteps/traits.hh>
 
 #include<functional>
 
 
-template<typename Vector>
-class ConstraintsTransitionStep : public TransitionSolverStepBase<Vector>
+template<std::size_t i, typename... V>
+class ConstraintsTransitionStep
+  : public TransitionSolverStepBase<V...>
 {
   public:
-  using Base = TransitionSolverStepBase<Vector>;
-  using FunctionSignature = bool(typename Base::GridView::Intersection, typename Base::GridView::Intersection::Geometry::LocalCoordinate);
+  using Traits = VectorStepTraits<i, V...>;
+  using FunctionSignature = bool(typename Traits::GridView::Intersection, typename Traits::GridView::Intersection::Geometry::LocalCoordinate);
 
   ConstraintsTransitionStep(std::function<FunctionSignature> func)
   {
@@ -22,20 +24,22 @@ class ConstraintsTransitionStep : public TransitionSolverStepBase<Vector>
   }
 
   template<typename... FUNCS,
-           typename std::enable_if<Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount == sizeof...(FUNCS), int>::type = 0>
+           typename std::enable_if<Dune::TypeTree::TreeInfo<typename Traits::GridFunctionSpace>::leafCount == sizeof...(FUNCS), int>::type = 0>
   ConstraintsTransitionStep(FUNCS... funcs) : funcs{funcs...}
   {}
 
   ConstraintsTransitionStep(const std::array<std::function<FunctionSignature>,
-                                             Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount
+                                             Dune::TypeTree::TreeInfo<typename Traits::GridFunctionSpace>::leafCount
                                              >& funcs)
     : funcs(funcs)
   {}
 
   virtual ~ConstraintsTransitionStep() {}
 
-  virtual void apply(std::shared_ptr<Vector> vector, std::shared_ptr<typename Base::ConstraintsContainer> constraintscontainer) override
+  virtual void apply() override
   {
+    auto vector = this->solver->template getVector<i>();
+    auto constraintscontainer = this->solver->template getConstraintsContainer<i>();
     auto& gfs = vector->gridFunctionSpace();
     auto bctype = makeBoundaryConditionTreeFromCallables(gfs, funcs);
     Dune::PDELab::constraints(bctype, gfs, *constraintscontainer);
@@ -45,7 +49,7 @@ class ConstraintsTransitionStep : public TransitionSolverStepBase<Vector>
   private:
   // Store the lambdas
   std::array<std::function<FunctionSignature>,
-             Dune::TypeTree::TreeInfo<typename Base::GridFunctionSpace>::leafCount
+             Dune::TypeTree::TreeInfo<typename Traits::GridFunctionSpace>::leafCount
              > funcs;
 };
 
