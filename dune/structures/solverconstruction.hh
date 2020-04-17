@@ -180,6 +180,12 @@ class ConstructionContext
                      get_callable_array<LocalEntitySignature, V...>(*ctx.solver, p["functions"]));
                  });
 
+    registerVectorStep("linearsolver",
+                 [](auto i, const auto& ctx, const auto& p)
+                 {
+                   return std::make_shared<LinearSolverStep<i, V...>>(p);
+                 });
+
     registerStep("material",
                  [](const auto& ctx, const auto& p)
                  {
