@@ -10,7 +10,6 @@
 
 #include<dune/geometry/affinegeometry.hh>
 #include<dune/pdelab.hh>
-#include<dune/pdelab/localoperator/sum.hh>
 #include<dune/structures/elasticity.hh>
 #include<dune/structures/material.hh>
 #include<array>
@@ -500,7 +499,6 @@ class FibreReinforcedBulkOperator
   using BaseOperator = AbstractLocalOperatorInterface<GFS>;
   using BulkOperator = typename OperatorSwitch<GFS, dim>::Elasticity;
   using FibreOperator = EulerBernoulli2DLocalOperator<GFS>;
-  using SumOperator = Dune::PDELab::InstationarySumLocalOperator<std::tuple<BulkOperator, FibreOperator>>;
 
   using EG = typename BaseOperator::EG;
   using IG = typename BaseOperator::IG;
