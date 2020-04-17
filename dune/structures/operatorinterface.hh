@@ -21,8 +21,10 @@ class AbstractLocalOperatorInterface
   , public Dune::PDELab::InstationaryLocalOperatorDefaultMethods<double>
   , public Dune::PDELab::NumericalJacobianVolume<AbstractLocalOperatorInterface<GFSU, GFSV>>
   , public Dune::PDELab::NumericalJacobianBoundary<AbstractLocalOperatorInterface<GFSU, GFSV>>
+  , public Dune::PDELab::NumericalJacobianSkeleton<AbstractLocalOperatorInterface<GFSU, GFSV>>
   , public Dune::PDELab::FullVolumePattern
   , public Dune::PDELab::FullBoundaryPattern
+  , public Dune::PDELab::FullSkeletonPattern
 {
   public:
   using EG = Dune::PDELab::ElementGeometry<typename GFSU::Traits::GridView::template Codim<0>::Entity>;
@@ -39,14 +41,19 @@ class AbstractLocalOperatorInterface
   // Quite unfortunate (and preventing this base class from going into PDELab)
   enum { doAlphaBoundary = true };
   enum { doAlphaVolume = true };
+  enum { doAlphaSkeleton = true };
 
   enum { doPatternVolume = true };
   enum { doPatternBoundary = true };
+  enum { doPatternSkeleton = true };
 
   virtual void alpha_volume(const EG&, const LFSU&, const X&, const LFSV&, R&) const
   {}
 
   virtual void alpha_boundary(const IG&, const LFSU&, const X&, const LFSV&, R&) const
+  {}
+
+  virtual void alpha_skeleton(const IG&, const LFSU&, const X&, const LFSV&, const LFSU&, const X&, const LFSV&, R&, R&) const
   {}
 
   // I am not really happy to have this in here, but dont care too much

@@ -49,7 +49,9 @@ class StraightFibre
 
   virtual GlobalCoordinate tangent(double t) const override
   {
-    return dir;
+    GlobalCoordinate tang(dir);
+    tang /= tang.two_norm();
+    return tang;
   }
 
   private:
@@ -324,7 +326,7 @@ class EulerBernoulli2DLocalOperator
         for (std::size_t c=0; c<2; ++c)
           for (std::size_t d=0; d<2; ++d)
             for (std::size_t i=0; i<child_0.size(); ++i)
-              d1u[c][d] = x(child(lfsu, c), i) * basis.jacobian(i, d);
+              d1u[c][d] += x(child(lfsu, c), i) * basis.jacobian(i, d);
 
         // And finally the hessian of the displacement
         std::array<Dune::FieldMatrix<double, 2, 2>, 2> d2u{0.0, 0.0};
@@ -332,7 +334,7 @@ class EulerBernoulli2DLocalOperator
           for (std::size_t d0=0; d0<2; ++d0)
             for (std::size_t d1=0; d1<2; ++d1)
               for (std::size_t i=0; i<child_0.size(); ++i)
-                d2u[c][d0][d1] = x(child(lfsu, c), i) * basis.hessian(i, d0, d1);
+                d2u[c][d0][d1] += x(child(lfsu, c), i) * basis.hessian(i, d0, d1);
 
         // Evaluate the jacobian inverse transposed
         auto jit = cellgeo.jacobianInverseTransposed(pos);
@@ -346,21 +348,22 @@ class EulerBernoulli2DLocalOperator
         auto dtut = ((d1u[1][1] * jit[1][1] + d1u[1][0] * jit[1][0]) * t[1] + (d1u[0][1] * jit[1][1] + d1u[0][0] * jit[1][0]) * t[0]) * t[1] + ((d1u[1][1] * jit[0][1] + d1u[1][0] * jit[0][0]) * t[1] + (d1u[0][1] * jit[0][1] + d1u[0][0] * jit[0][0]) * t[0]) * t[0];
         auto dt2un = ((t[0] * (jit[1][1] * (jit[1][1] * d2u[1][1][1] + jit[1][0] * d2u[1][1][0]) + jit[1][0] * (jit[1][1] * d2u[1][0][1] + jit[1][0] * d2u[1][0][0])) + (jit[1][1] * (jit[1][1] * d2u[0][1][1] + jit[1][0] * d2u[0][1][0]) + jit[1][0] * (jit[1][1] * d2u[0][0][1] + jit[1][0] * d2u[0][0][0])) * (-1) * t[1]) * t[1] + (t[0] * (jit[0][1] * (jit[1][1] * d2u[1][1][1] + jit[1][0] * d2u[1][1][0]) + jit[0][0] * (jit[1][1] * d2u[1][0][1] + jit[1][0] * d2u[1][0][0])) + (jit[0][1] * (jit[1][1] * d2u[0][1][1] + jit[1][0] * d2u[0][1][0]) + jit[0][0] * (jit[1][1] * d2u[0][0][1] + jit[1][0] * d2u[0][0][0])) * (-1) * t[1]) * t[0]) * t[1] + ((t[0] * (jit[1][1] * (jit[0][1] * d2u[1][1][1] + jit[0][0] * d2u[1][1][0]) + jit[1][0] * (jit[0][1] * d2u[1][0][1] + jit[0][0] * d2u[1][0][0])) + (jit[1][1] * (jit[0][1] * d2u[0][1][1] + jit[0][0] * d2u[0][1][0]) + jit[1][0] * (jit[0][1] * d2u[0][0][1] + jit[0][0] * d2u[0][0][0])) * (-1) * t[1]) * t[1] + (t[0] * (jit[0][1] * (jit[0][1] * d2u[1][1][1] + jit[0][0] * d2u[1][1][0]) + jit[0][0] * (jit[0][1] * d2u[1][0][1] + jit[0][0] * d2u[1][0][0])) + (jit[0][1] * (jit[0][1] * d2u[0][1][1] + jit[0][0] * d2u[0][1][0]) + jit[0][0] * (jit[0][1] * d2u[0][0][1] + jit[0][0] * d2u[0][0][0])) * (-1) * t[1]) * t[0]) * t[0];
 
-//        std::cout << "dtut = " << dtut << " dt2ut = " << dt2ut << std::endl;
         for (std::size_t i=0; i<child_0.size(); ++i)
         {
-          auto dtvt = ((jit[1][1] * basis.jacobian(i, 1) + jit[1][0] * basis.jacobian(i, 0)) * t[1] + (jit[1][1] * basis.jacobian(i, 1) + jit[1][0] * basis.jacobian(i, 0)) * t[0]) * t[1] + ((jit[0][1] * basis.jacobian(i, 1) + jit[0][0] * basis.jacobian(i, 0)) * t[1] + (jit[0][1] * basis.jacobian(i, 1) + jit[0][0] * basis.jacobian(i, 0)) * t[0]) * t[0];
-          auto dt2vn = ((t[0] * (jit[1][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) + (jit[1][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[0] * (jit[0][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) + (jit[0][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * (-1) * t[1]) * t[0]) * t[1] + ((t[0] * (jit[1][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) + (jit[1][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[0] * (jit[0][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) + (jit[0][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * (-1) * t[1]) * t[0]) * t[0];
+          auto dtvt_0 = t[1] * (jit[1][1] * basis.jacobian(i, 1) + jit[1][0] * basis.jacobian(i, 0)) * t[0] + t[0] * (jit[0][1] * basis.jacobian(i, 1) + jit[0][0] * basis.jacobian(i, 0)) * t[0];
+          auto dtvt_1 = t[1] * (jit[1][1] * basis.jacobian(i, 1) + jit[1][0] * basis.jacobian(i, 0)) * t[1] + t[0] * (jit[0][1] * basis.jacobian(i, 1) + jit[0][0] * basis.jacobian(i, 0)) * t[1];
+          auto dt2vn_0 = (t[1] * (jit[1][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * (-1) * t[1] + t[0] * (jit[0][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[1] * (jit[1][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * (-1) * t[1] + t[0] * (jit[0][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * (-1) * t[1]) * t[0];
+          auto dt2vn_1 = (t[1] * t[0] * (jit[1][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) + t[0] * t[0] * (jit[0][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0)))) * t[1] + (t[1] * t[0] * (jit[1][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) + t[0] * t[0] * (jit[0][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0)))) * t[0];
 
           // TODO: Get these from somewhere
-          auto E = 1e6;
+          auto E = 1e8;
           auto d = 0.1;
           auto A = d;
           auto I = (d*d*d) / 12.0;
           Dune::FieldVector<double, 2> force{0.0, -1.0};
 
-          for (std::size_t k=0; k<2; ++k)
-            r.accumulate(lfsu.child(k), i, (E*A*dtut*dtvt + E*I*dt2un*dt2vn - A*force[k]*basis.function(i)) * ip.weight() * global_linegeo.integrationElement(ip.position()));
+          r.accumulate(lfsu.child(0), i, (E*A*dtut*dtvt_0 + E*I*dt2un*dt2vn_0 - A*force[0]*basis.function(i)) * ip.weight() * global_linegeo.integrationElement(ip.position()));
+          r.accumulate(lfsu.child(1), i, (E*A*dtut*dtvt_1 + E*I*dt2un*dt2vn_1 - A*force[1]*basis.function(i)) * ip.weight() * global_linegeo.integrationElement(ip.position()));
         }
       }
     }
@@ -420,8 +423,8 @@ class EulerBernoulli2DLocalOperator
         for (std::size_t d=0; d<2; ++d)
           for (std::size_t i=0; i<child_0.size(); ++i)
           {
-            d1u_s[c][d] = x_s(child(lfsu_s, c), i) * basis_s.jacobian(i, d);
-            d1u_n[c][d] = x_n(child(lfsu_n, c), i) * basis_n.jacobian(i, d);
+            d1u_s[c][d] += x_s(child(lfsu_s, c), i) * basis_s.jacobian(i, d);
+            d1u_n[c][d] += x_n(child(lfsu_n, c), i) * basis_n.jacobian(i, d);
           }
 
       // And finally the hessian of the displacement
@@ -431,8 +434,8 @@ class EulerBernoulli2DLocalOperator
           for (std::size_t d1=0; d1<2; ++d1)
             for (std::size_t i=0; i<child_0.size(); ++i)
             {
-              d2u_s[c][d0][d1] = x_s(child(lfsu_s, c), i) * basis_s.hessian(i, d0, d1);
-              d2u_n[c][d0][d1] = x_n(child(lfsu_n, c), i) * basis_n.hessian(i, d0, d1);
+              d2u_s[c][d0][d1] += x_s(child(lfsu_s, c), i) * basis_s.hessian(i, d0, d1);
+              d2u_n[c][d0][d1] += x_n(child(lfsu_n, c), i) * basis_n.hessian(i, d0, d1);
             }
 
       // Evaluate the jacobian inverse transposed in inside/outside cell
@@ -449,24 +452,30 @@ class EulerBernoulli2DLocalOperator
 
       for (std::size_t i=0; i<child_0.size(); ++i)
       {
-        auto dtvn_n = (t[0] * (jit_s[1][1] * basis_s.jacobian(i, 1) + jit_s[1][0] * basis_s.jacobian(i, 0)) + (jit_s[1][1] * basis_s.jacobian(i, 1) + jit_s[1][0] * basis_s.jacobian(i, 0)) * (-1) * t[1]) * t[1] + (t[0] * (jit_s[0][1] * basis_s.jacobian(i, 1) + jit_s[0][0] * basis_s.jacobian(i, 0)) + (jit_s[0][1] * basis_s.jacobian(i, 1) + jit_s[0][0] * basis_s.jacobian(i, 0)) * (-1) * t[1]) * t[0];
-        auto dtvn_s = (t[0] * (jit_n[1][1] * basis_n.jacobian(i, 1) + jit_n[1][0] * basis_n.jacobian(i, 0)) + (jit_n[1][1] * basis_n.jacobian(i, 1) + jit_n[1][0] * basis_n.jacobian(i, 0)) * (-1) * t[1]) * t[1] + (t[0] * (jit_n[0][1] * basis_n.jacobian(i, 1) + jit_n[0][0] * basis_n.jacobian(i, 0)) + (jit_n[0][1] * basis_n.jacobian(i, 1) + jit_n[0][0] * basis_n.jacobian(i, 0)) * (-1) * t[1]) * t[0];
-        auto dt2vn_n = ((t[0] * (jit_s[1][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0))) + (jit_s[1][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[0] * (jit_s[0][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0))) + (jit_s[0][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1]) * t[0]) * t[1] + ((t[0] * (jit_s[1][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0))) + (jit_s[1][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[0] * (jit_s[0][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0))) + (jit_s[0][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1]) * t[0]) * t[0];
-        auto dt2vn_s = ((t[0] * (jit_n[1][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0))) + (jit_n[1][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[0] * (jit_n[0][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0))) + (jit_n[0][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0))) * (-1) * t[1]) * t[0]) * t[1] + ((t[0] * (jit_n[1][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0))) + (jit_n[1][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[0] * (jit_n[0][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0))) + (jit_n[0][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0))) * (-1) * t[1]) * t[0]) * t[0];
+        auto dtvn_n_0 = t[1] * (jit_s[1][1] * basis_s.jacobian(i, 1) + jit_s[1][0] * basis_s.jacobian(i, 0)) * (-1) * t[1] + t[0] * (jit_s[0][1] * basis_s.jacobian(i, 1) + jit_s[0][0] * basis_s.jacobian(i, 0)) * (-1) * t[1];
+        auto dtvn_n_1 = t[1] * t[0] * (jit_s[1][1] * basis_s.jacobian(i, 1) + jit_s[1][0] * basis_s.jacobian(i, 0)) + t[0] * t[0] * (jit_s[0][1] * basis_s.jacobian(i, 1) + jit_s[0][0] * basis_s.jacobian(i, 0));
+
+        auto dtvn_s_0 = t[1] * (jit_n[1][1] * basis_n.jacobian(i, 1) + jit_n[1][0] * basis_n.jacobian(i, 0)) * (-1) * t[1] + t[0] * (jit_n[0][1] * basis_n.jacobian(i, 1) + jit_n[0][0] * basis_n.jacobian(i, 0)) * (-1) * t[1];
+        auto dtvn_s_1 = t[1] * t[0] * (jit_n[1][1] * basis_n.jacobian(i, 1) + jit_n[1][0] * basis_n.jacobian(i, 0)) + t[0] * t[0] * (jit_n[0][1] * basis_n.jacobian(i, 1) + jit_n[0][0] * basis_n.jacobian(i, 0));
+
+        auto dt2vn_n_0 = (t[1] * (jit_s[1][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1] + t[0] * (jit_s[0][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[1] * (jit_s[1][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1] + t[0] * (jit_s[0][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1]) * t[0];
+        auto dt2vn_n_1 = (t[1] * t[0] * (jit_s[1][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0))) + t[0] * t[0] * (jit_s[0][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0)))) * t[1] + (t[1] * t[0] * (jit_s[1][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0))) + t[0] * t[0] * (jit_s[0][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0)))) * t[0];
+
+        auto dt2vn_s_0 = (t[1] * (jit_n[1][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0))) * (-1) * t[1] + t[0] * (jit_n[0][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[1] * (jit_n[1][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0))) * (-1) * t[1] + t[0] * (jit_n[0][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0))) * (-1) * t[1]) * t[0];
+        auto dt2vn_s_1 = (t[1] * t[0] * (jit_n[1][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0))) + t[0] * t[0] * (jit_n[0][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0)))) * t[1] + (t[1] * t[0] * (jit_n[1][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0))) + t[0] * t[0] * (jit_n[0][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0)))) * t[0];
 
         // TODO: Get these from somewhere
-        auto E = 1e6;
+        auto E = 1e8;
         auto d = 0.1;
         auto A = d;
         auto I = (d*d*d) / 12.0;
-        Dune::FieldVector<double, 2> force{0.0, -1.0};
         auto beta = 1.0;
 
-        for (std::size_t k=0; k<2; ++k)
-        {
-          r_s.accumulate(lfsu_s.child(k), i, -E*I*(-sk_dt2un*dtvn_s - dt2vn_s * sk_dtun + beta*sk_dtun*dtvn_s));
-          r_n.accumulate(lfsu_s.child(k), i,  E*I*(-sk_dt2un*dtvn_n - dt2vn_n * sk_dtun + beta*sk_dtun*dtvn_n));
-        }
+        r_s.accumulate(lfsu_s.child(0), i, -E*I*(-sk_dt2un*dtvn_s_0 - dt2vn_s_0 * sk_dtun + beta*sk_dtun*dtvn_s_0));
+        r_s.accumulate(lfsu_s.child(1), i, -E*I*(-sk_dt2un*dtvn_s_1 - dt2vn_s_1 * sk_dtun + beta*sk_dtun*dtvn_s_1));
+
+        r_n.accumulate(lfsu_s.child(0), i,  E*I*(-sk_dt2un*dtvn_n_0 - dt2vn_n_0 * sk_dtun + beta*sk_dtun*dtvn_n_0));
+        r_n.accumulate(lfsu_s.child(1), i,  E*I*(-sk_dt2un*dtvn_n_1 - dt2vn_n_1 * sk_dtun + beta*sk_dtun*dtvn_n_1));
       }
     }
   }
@@ -485,14 +494,20 @@ class EulerBernoulli2DLocalOperator
 
 template<typename GFS, int dim>
 class FibreReinforcedBulkOperator
-  : public Dune::PDELab::InstationarySumLocalOperator<
-             std::tuple<typename OperatorSwitch<GFS, dim>::Elasticity,
-                        EulerBernoulli2DLocalOperator<GFS>>>
+  : public AbstractLocalOperatorInterface<GFS>
 {
   public:
+  using BaseOperator = AbstractLocalOperatorInterface<GFS>;
   using BulkOperator = typename OperatorSwitch<GFS, dim>::Elasticity;
   using FibreOperator = EulerBernoulli2DLocalOperator<GFS>;
-  using BaseT = Dune::PDELab::InstationarySumLocalOperator<std::tuple<BulkOperator, FibreOperator>>;
+  using SumOperator = Dune::PDELab::InstationarySumLocalOperator<std::tuple<BulkOperator, FibreOperator>>;
+
+  using EG = typename BaseOperator::EG;
+  using IG = typename BaseOperator::IG;
+  using LFSU = typename BaseOperator::LFSU;
+  using LFSV = typename BaseOperator::LFSV;
+  using X = typename BaseOperator::X;
+  using R = typename BaseOperator::R;
 
   FibreReinforcedBulkOperator(std::shared_ptr<const GFS> gfs,
                               const Dune::ParameterTree& rootparams,
@@ -500,10 +515,9 @@ class FibreReinforcedBulkOperator
                               std::shared_ptr<ElasticMaterialBase<typename GFS::Traits::EntitySet, double>> material)
     : bulkoperator(*gfs, *gfs, params, material)
     , fibreoperator(rootparams, params, gfs)
-  {
-    this->template setSummand<0>(bulkoperator);
-    this->template setSummand<1>(fibreoperator);
-  }
+  {}
+
+  virtual ~FibreReinforcedBulkOperator() = default;
 
   template<typename CGFS, typename CVEC>
   void setCoefficientForce(std::shared_ptr<CGFS> gfs, std::shared_ptr<CVEC> force)
@@ -520,6 +534,23 @@ class FibreReinforcedBulkOperator
   void setCoefficientTraction(std::shared_ptr<CGFS> gfs, std::shared_ptr<CVEC> traction)
   {
     bulkoperator.setCoefficientTraction(gfs, traction);
+  }
+
+  virtual void alpha_volume(const EG& eg, const LFSU& lfsu, const X& x, const LFSV& lfsv, R& r) const override
+  {
+    bulkoperator.alpha_volume(eg, lfsu, x, lfsv, r);
+    fibreoperator.alpha_volume(eg, lfsu, x, lfsv, r);
+  }
+
+  virtual void alpha_boundary(const IG& ig, const LFSU& lfsu, const X& x, const LFSV& lfsv, R& r) const override
+  {
+    bulkoperator.alpha_boundary(ig, lfsu, x, lfsv, r);
+  }
+
+  virtual void alpha_skeleton(const IG& ig, const LFSU& lfsu_s, const X& x_s, const LFSV& lfsv_s, const LFSU& lfsu_n, const X& x_n, const LFSV& lfsv_n, R& r_s, R& r_n) const
+  {
+    bulkoperator.alpha_skeleton(ig, lfsu_s, x_s, lfsv_s, lfsu_n, x_n, lfsv_n, r_s, r_n);
+    fibreoperator.alpha_skeleton(ig, lfsu_s, x_s, lfsv_s, lfsu_n, x_n, lfsv_n, r_s, r_n);
   }
 
   private:

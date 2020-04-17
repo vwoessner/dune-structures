@@ -7,7 +7,8 @@ are copied and pasted into the 1D fibre operator.
 
 from dune.codegen.ufl.execution import *
 from dune.codegen.pdelab.restriction import restricted_name
-from ufl.algorithms import expand_derivatives
+from dune.codegen.pdelab.localoperator import GenericAccumulationMixin
+from ufl.algorithms import expand_derivatives, extract_arguments
 from ufl.algorithms.apply_restrictions import apply_restrictions
 from ufl.algorithms.apply_algebra_lowering import apply_algebra_lowering
 from ufl.algorithms.remove_complex_nodes import remove_complex_nodes
@@ -24,14 +25,19 @@ def generate_tangential_derivatives():
     FE = VectorElement("CG", triangle, 2)
     u = Coefficient(FE, cargo={"name": "u"})
     v = TestFunction(FE)
+
+    # Tangential and normal vector
     t = Coefficient(FE, cargo={"name": "t", "diff": 0, "restriction": 0})
     n = perp(t)
 
-    quantities = {
+    cell_quantities = {
         "dtut" : inner(t, grad(inner(u, t))),
         "dtvt" : inner(t, grad(inner(v, t))),
         "dt2un" : inner(t, grad(inner(t, grad(inner(u, n))))),
         "dt2vn" : inner(t, grad(inner(t, grad(inner(v, n))))),
+    }
+
+    facet_quantities = {
         "sk_dt2un" : avg(inner(t, grad(inner(t, grad(inner(u, n)))))),
         "dt2vn_n" : inner(t, grad(inner(t, grad(inner(v('+'), n))))),
         "dt2vn_s" : inner(t, grad(inner(t, grad(inner(v('-'), n))))),
@@ -40,7 +46,7 @@ def generate_tangential_derivatives():
         "dtvn_s" : inner(t, grad(inner(v('-'), n))),
     }
 
-    for name, expr in quantities.items():
+    def print_code(name, expr, measure):
         # Do the preprocessing
         expr = apply_function_pullbacks(expr)
         expr = expand_derivatives(expr)
@@ -52,16 +58,45 @@ def generate_tangential_derivatives():
             expr = apply_restrictions(expr)
 
         expr = pushdown_indexed(expr)
-    
-        print("\n\nauto {} = {};".format(name, ufl_to_code(expr)))
+
+        print("\n\n\nQuantity: {}".format(name))
+        for snippet in ufl_to_code(expr, measure):
+            print(snippet + '\n\n')
+
+    for name, expr in cell_quantities.items():
+        print_code(name, expr, "cell")
+
+    for name, expr in facet_quantities.items():
+        print_code(name, expr, "interior_facet")
 
 
-class AdHocVisitor(UFL2LoopyVisitor):
-    def __init__(self):
+class AdHocVisitor(GenericAccumulationMixin, UFL2LoopyVisitor):
+    def __init__(self, measure):
         UFL2LoopyVisitor.__init__(self, "cell", {})
         self.grad_count = 0
-        
+        self.measure = measure
+
+    def __call__(self, o, do_split=False):
+        if len(extract_arguments(o)) == 0:
+            return [self._call(o, False)]
+        else:
+            rets = []
+            for info in self.list_accumulation_infos(o):
+                self.current_info = info
+                expr = self._call(o, False)
+                if expr != 0:
+                    rets.append(expr)
+            return rets
+
+    def lfs_inames(self, *args):
+        return []
+
     def argument(self, o):
+        info = self.get_accumulation_info(o)
+        if info != self.current_info[0]:
+            self.indices = None
+            return 0
+
         name = restricted_name("basis", self.restriction)
 
         if self.grad_count == 0:
@@ -86,17 +121,17 @@ class AdHocVisitor(UFL2LoopyVisitor):
                 return o.cargo["diff"]
             name = "d{}{}".format(self.grad_count, name)
         return prim.Variable(name)
-    
+
     def reference_grad(self, o):
         self.grad_count = self.grad_count + 1
         ret = self.call(o.ufl_operands[0])
         self.grad_count = self.grad_count - 1
         return ret
-    
+
     def jacobian_inverse(self, o):
         i, j = self.indices
         self.indices = None
-        
+
         return prim.Subscript(prim.Variable(restricted_name("jit", self.restriction)), (j, i))
 
 
@@ -107,13 +142,13 @@ class IndexNester(IdentityMapper):
         else:
             return expr
 
-def ufl_to_code(expr):
+def ufl_to_code(expr, measure):
     from dune.codegen.generation import global_context
     with global_context(integral_type="cell", form_identifier="foo"):
-        visitor = AdHocVisitor()
+        visitor = AdHocVisitor(measure)
         nester = IndexNester()
         from pymbolic.mapper.c_code import CCodeMapper
         ccm = CCodeMapper()
-        expr = visitor(expr)
-        expr = nester(expr)
-        return ccm(expr)
+        exprs = visitor(expr)
+        exprs = [nester(e) for e in exprs]
+        return [ccm(e) for e in exprs]
