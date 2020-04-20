@@ -7,15 +7,28 @@ There is two principal ways to use this software: As dockerized applications or 
 ## Dockerized setup
 
 Make sure that you have Docker installed on your machine.
-You can do so e.g. by following [these instructions from Docker](https://docs.docker.com/install/linux/docker-ce/debian/#install-using-the-repository). Having done so, you can run the container interactively by doing:
+You can do so e.g. by following [these instructions from Docker](https://docs.docker.com/install/linux/docker-ce/debian/#install-using-the-repository).
+Then, you should pull the dune-structures docker image:
 
 ```
-docker run -ti registry.dune-project.org/dominic/dune-structures
+docker pull registry.dune-project.org/dominic/dune-structures
 ```
 
-More information that should be provided here:
-* Entrypoints of the Docker container
-* Mounting volumes into the container to retrieve visualization data
+You can repeat the above step in order to update the docker image whenever there is a new version.
+It will not be automatically updated when running the container.
+Having pulled the image, you can run the dune-structures executable by doing:
+
+```
+docker run -ti -v <workspace>:/mnt registry.dune-project.org/dominic/dune-structures <inifile>
+```
+
+The above command contains the following two parameters that need to be adapted by the user:
+* `<workspace>` is a directory on your machine that will be used to place intermediate files and output files of the simulation run.
+  You can pass any absolute path, or simply use your current working directory by passing `$(pwd)`.
+* `<inifile>` is the ini file that describes your simulation setup. Its content needs to follow the specification explained in detail below.
+  The file should be in the above workspace directory.
+
+Whether or not these instructions are sufficient to also run on Windows, I do not know.
 
 ## Full installation
 
