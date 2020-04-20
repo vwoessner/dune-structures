@@ -53,4 +53,5 @@ RUN cd /structure \
 
 RUN /structure/dune-common/bin/dunecontrol --opts=/structure/config.opts --only=dune-structures --builddir=/structure/build all
 
-ENTRYPOINT /structure/build/dune-structures/run-in-dune-env /structure/build/dune-structures/apps/universal/universalapp
+WORKDIR /mnt
+ENTRYPOINT ["/structure/build/dune-structures/run-in-dune-env",  "/structure/build/dune-structures/apps/universal/universalapp"]
