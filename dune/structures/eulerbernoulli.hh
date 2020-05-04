@@ -355,7 +355,7 @@ class EulerBernoulli2DLocalOperator
           auto dt2vn_1 = (t[1] * t[0] * (jit[1][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) + t[0] * t[0] * (jit[0][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0)))) * t[1] + (t[1] * t[0] * (jit[1][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) + t[0] * t[0] * (jit[0][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0)))) * t[0];
 
           // TODO: Get these from somewhere
-          auto E = 1e8;
+          auto E = 1e6;
           auto d = 0.1;
           auto A = d;
           auto I = (d*d*d) / 12.0;
@@ -464,17 +464,17 @@ class EulerBernoulli2DLocalOperator
         auto dt2vn_s_1 = (t[1] * t[0] * (jit_n[1][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0))) + t[0] * t[0] * (jit_n[0][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0)))) * t[1] + (t[1] * t[0] * (jit_n[1][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0))) + t[0] * t[0] * (jit_n[0][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0)))) * t[0];
 
         // TODO: Get these from somewhere
-        auto E = 1e8;
+        auto E = 1e6;
         auto d = 0.1;
         auto A = d;
         auto I = (d*d*d) / 12.0;
         auto beta = 1.0;
 
-        r_s.accumulate(lfsu_s.child(0), i, -E*I*(-sk_dt2un*dtvn_s_0 - dt2vn_s_0 * sk_dtun + beta*sk_dtun*dtvn_s_0));
-        r_s.accumulate(lfsu_s.child(1), i, -E*I*(-sk_dt2un*dtvn_s_1 - dt2vn_s_1 * sk_dtun + beta*sk_dtun*dtvn_s_1));
+        r_s.accumulate(lfsu_s.child(0), i, E*I*(-sk_dt2un*dtvn_s_0 - dt2vn_s_0 * sk_dtun + beta*sk_dtun*dtvn_s_0));
+        r_s.accumulate(lfsu_s.child(1), i, E*I*(-sk_dt2un*dtvn_s_1 - dt2vn_s_1 * sk_dtun + beta*sk_dtun*dtvn_s_1));
 
-        r_n.accumulate(lfsu_s.child(0), i,  E*I*(-sk_dt2un*dtvn_n_0 - dt2vn_n_0 * sk_dtun + beta*sk_dtun*dtvn_n_0));
-        r_n.accumulate(lfsu_s.child(1), i,  E*I*(-sk_dt2un*dtvn_n_1 - dt2vn_n_1 * sk_dtun + beta*sk_dtun*dtvn_n_1));
+        r_n.accumulate(lfsu_n.child(0), i, -E*I*(-sk_dt2un*dtvn_n_0 - dt2vn_n_0 * sk_dtun + beta*sk_dtun*dtvn_n_0));
+        r_n.accumulate(lfsu_n.child(1), i, -E*I*(-sk_dt2un*dtvn_n_1 - dt2vn_n_1 * sk_dtun + beta*sk_dtun*dtvn_n_1));
       }
     }
   }

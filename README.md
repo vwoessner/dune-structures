@@ -19,10 +19,12 @@ It will not be automatically updated when running the container.
 Having pulled the image, you can run the dune-structures executable by doing:
 
 ```
-docker run -ti -v <workspace>:/mnt registry.dune-project.org/dominic/dune-structures <inifile>
+docker run -ti -v <workspace>:/mnt \
+  registry.dune-project.org/dominic/dune-structures <inifile>
 ```
 
 The above command contains the following two parameters that need to be adapted by the user:
+
 * `<workspace>` is a directory on your machine that will be used to place intermediate files and output files of the simulation run.
   You can pass any absolute path, or simply use your current working directory by passing `$(pwd)`.
 * `<inifile>` is the ini file that describes your simulation setup. Its content needs to follow the specification explained in detail below.
@@ -73,6 +75,8 @@ CMAKE_FLAGS+="-DDUNE_PYTHON_VIRTUALENV_SETUP=1
 # Mathematical Abstractions
 
 dune-structures provides solvers for elastostatic and elastodynamic simulations with a variety of linear and nonlinear material laws.
+They are given here for reference, so that the reader is aware of what models are exactly implemented.
+This description is not yet complete and will be extended in the future.
 
 ## Basic equations
 
