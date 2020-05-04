@@ -291,6 +291,15 @@ class EulerBernoulli2DLocalOperator
 
     BasisEvaluator<typename LFSU::template Child<0>::Type::Traits::FiniteElementType::Traits::LocalBasisType> basis(child_0.finiteElement().localBasis());
 
+    // Get the force coefficients
+    coefficient_force_lfs->bind(eg.entity());
+    typename CoefficientForceVector::template LocalView<CoefficientForceLFSCache> coefficient_force_view(*coefficient_force_vector);
+    coefficient_force_lfs_cache->update();
+    Dune::PDELab::LocalVector<double> local_coefficient_force_vector(coefficient_force_lfs->size());
+    coefficient_force_view.bind(*coefficient_force_lfs_cache);
+    coefficient_force_view.read(local_coefficient_force_vector);
+    coefficient_force_view.unbind();
+
     // Loop over curve segments in this cell. most of the time this will be just one.
     auto segments = it->second;
     for (auto segment : segments)
@@ -342,6 +351,12 @@ class EulerBernoulli2DLocalOperator
         // Determination of the evaluation parameter here is a bit flaky.
         auto t = fibre->tangent(std::get<1>(segment) + ip.position() * (std::get<2>(segment) - std::get<1>(segment)));
 
+        // Evaluate the body force vector
+        Dune::FieldVector<double, 2> force(0.0);
+        for (std::size_t k = 0; k < 2; ++k)
+          for (std::size_t i = 0; i < child_0.size(); ++i)
+            force[k] += local_coefficient_force_vector(lfsv.child(k), i) * basis.function(i);
+
         // The needed tangential derivative quantities. These expressions are generated
         // using the generate_tangential_derivatives Python script.
         auto dtut = ((d1u[1][1] * jit[1][1] + d1u[1][0] * jit[1][0]) * t[1] + (d1u[0][1] * jit[1][1] + d1u[0][0] * jit[1][0]) * t[0]) * t[1] + ((d1u[1][1] * jit[0][1] + d1u[1][0] * jit[0][0]) * t[1] + (d1u[0][1] * jit[0][1] + d1u[0][0] * jit[0][0]) * t[0]) * t[0];
@@ -359,7 +374,6 @@ class EulerBernoulli2DLocalOperator
           auto d = 0.1;
           auto A = d;
           auto I = (d*d*d) / 12.0;
-          Dune::FieldVector<double, 2> force{0.0, -1.0};
 
           r.accumulate(lfsu.child(0), i, (E*A*dtut*dtvt_0 + E*I*dt2un*dt2vn_0 - A*force[0]*basis.function(i)) * ip.weight() * global_linegeo.integrationElement(ip.position()));
           r.accumulate(lfsu.child(1), i, (E*A*dtut*dtvt_1 + E*I*dt2un*dt2vn_1 - A*force[1]*basis.function(i)) * ip.weight() * global_linegeo.integrationElement(ip.position()));
@@ -485,9 +499,29 @@ class EulerBernoulli2DLocalOperator
   std::map<std::pair<int, int>, std::vector<std::tuple<std::size_t, double>>> face_fibre_intersections;
   std::vector<std::shared_ptr<FibreParametrizationBase<2>>> fibre_parametrizations;
 
+  // Store a force vector - code adapted of how the generated code does it.
+  // That is not the nicest way of doing it, but we do not need additional
+  // template parameters on this class.
+  using CoefficientForceLFS = Dune::PDELab::LocalFunctionSpace<GFS>;
+  mutable std::shared_ptr<CoefficientForceLFS> coefficient_force_lfs;
+  using CoefficientForceVector = Dune::PDELab::Backend::Vector<GFS, double>;
+  mutable std::shared_ptr<CoefficientForceVector> coefficient_force_vector;
+  mutable std::shared_ptr<const GFS> coefficient_force_gfs;
+  using CoefficientForceLFSCache = Dune::PDELab::LFSIndexCache<CoefficientForceLFS>;
+  mutable std::shared_ptr<CoefficientForceLFSCache> coefficient_force_lfs_cache;
+
   using LocalBasisType = typename GFS::template Child<0>::Type::Traits::FiniteElementMap::Traits::FiniteElementType::Traits::LocalBasisType;
   using Cache = Dune::PDELab::LocalBasisCache<LocalBasisType>;
   Cache cache;
+
+  public:
+  void setCoefficientForce(std::shared_ptr<const GFS> p_gfs, std::shared_ptr<CoefficientForceVector> p_coefficient_vector)
+  {
+	coefficient_force_gfs = p_gfs;
+	coefficient_force_vector = p_coefficient_vector;
+	coefficient_force_lfs = std::make_shared<CoefficientForceLFS>(*coefficient_force_gfs);
+	coefficient_force_lfs_cache = std::make_shared<CoefficientForceLFSCache>(*coefficient_force_lfs);
+  }
 };
 
 
@@ -521,6 +555,7 @@ class FibreReinforcedBulkOperator
   void setCoefficientForce(std::shared_ptr<CGFS> gfs, std::shared_ptr<CVEC> force)
   {
     bulkoperator.setCoefficientForce(gfs, force);
+    fibreoperator.setCoefficientForce(gfs, force);
   }
 
   void setMaterial(std::shared_ptr<ElasticMaterialBase<typename GFS::Traits::EntitySet, double>> material)
