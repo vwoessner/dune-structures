@@ -140,6 +140,18 @@ class EulerBernoulli2DLocalOperator
         fibre_parametrizations.push_back(std::make_shared<StraightFibre<2>>(fibreconfig));
       else
         DUNE_THROW(Dune::Exception, "Fibre shape not supported!");
+
+      // Parse the Youngs modulus of the fibre.
+      auto modulus = fibreconfig.get<double>("youngs_modulus", 0.0);
+      if (modulus == 0.0)
+        std::cout << "youngs_modulus not set for all fibres!" << std::endl;
+      fibre_modulus.push_back(modulus);
+
+      // Parse the fibre radii
+      auto radius = fibreconfig.get<double>("radius", 0.0);
+      if (radius == 0.0)
+        std::cout << "radius not set for all fibres!" << std::endl;
+      fibre_radii.push_back(radius);
     }
     std::cout << "Parsed a total of " << fibre_parametrizations.size() << " fibres from the configuration." << std::endl;
 
@@ -357,6 +369,12 @@ class EulerBernoulli2DLocalOperator
           for (std::size_t i = 0; i < child_0.size(); ++i)
             force[k] += local_coefficient_force_vector(lfsv.child(k), i) * basis.function(i);
 
+        // Extract physical parameter of the fibre
+        auto E = fibre_modulus[std::get<0>(segment)];
+        auto d = fibre_radii[std::get<0>(segment)];
+        auto A = d;
+        auto I = (d*d*d) / 12.0;
+
         // The needed tangential derivative quantities. These expressions are generated
         // using the generate_tangential_derivatives Python script.
         auto dtut = ((d1u[1][1] * jit[1][1] + d1u[1][0] * jit[1][0]) * t[1] + (d1u[0][1] * jit[1][1] + d1u[0][0] * jit[1][0]) * t[0]) * t[1] + ((d1u[1][1] * jit[0][1] + d1u[1][0] * jit[0][0]) * t[1] + (d1u[0][1] * jit[0][1] + d1u[0][0] * jit[0][0]) * t[0]) * t[0];
@@ -368,12 +386,6 @@ class EulerBernoulli2DLocalOperator
           auto dtvt_1 = t[1] * (jit[1][1] * basis.jacobian(i, 1) + jit[1][0] * basis.jacobian(i, 0)) * t[1] + t[0] * (jit[0][1] * basis.jacobian(i, 1) + jit[0][0] * basis.jacobian(i, 0)) * t[1];
           auto dt2vn_0 = (t[1] * (jit[1][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * (-1) * t[1] + t[0] * (jit[0][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[1] * (jit[1][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * (-1) * t[1] + t[0] * (jit[0][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) * (-1) * t[1]) * t[0];
           auto dt2vn_1 = (t[1] * t[0] * (jit[1][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0))) + t[0] * t[0] * (jit[0][1] * (jit[1][1] * basis.hessian(i, 1, 1) + jit[1][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[1][1] * basis.hessian(i, 0, 1) + jit[1][0] * basis.hessian(i, 0, 0)))) * t[1] + (t[1] * t[0] * (jit[1][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[1][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0))) + t[0] * t[0] * (jit[0][1] * (jit[0][1] * basis.hessian(i, 1, 1) + jit[0][0] * basis.hessian(i, 1, 0)) + jit[0][0] * (jit[0][1] * basis.hessian(i, 0, 1) + jit[0][0] * basis.hessian(i, 0, 0)))) * t[0];
-
-          // TODO: Get these from somewhere
-          auto E = 1e6;
-          auto d = 0.1;
-          auto A = d;
-          auto I = (d*d*d) / 12.0;
 
           r.accumulate(lfsu.child(0), i, (E*A*dtut*dtvt_0 + E*I*dt2un*dt2vn_0 - A*force[0]*basis.function(i)) * ip.weight() * global_linegeo.integrationElement(ip.position()));
           r.accumulate(lfsu.child(1), i, (E*A*dtut*dtvt_1 + E*I*dt2un*dt2vn_1 - A*force[1]*basis.function(i)) * ip.weight() * global_linegeo.integrationElement(ip.position()));
@@ -458,6 +470,12 @@ class EulerBernoulli2DLocalOperator
       // The tangential vector for the curve
       auto t = fibre->tangent(std::get<1>(segment));
 
+      // Extract physical parameter of the fibre
+      auto E = fibre_modulus[std::get<0>(segment)];
+      auto d = fibre_radii[std::get<0>(segment)];
+      auto A = d;
+      auto I = (d*d*d) / 12.0;
+
       // The needed tangential derivative quantities. These expressions are generated
       // using the generate_tangential_derivatives Python script.
       auto sk_dtun = (t[0] * (jit_s[1][1] * d1u_s[1][1] + jit_s[1][0] * d1u_s[1][0]) + (jit_s[1][1] * d1u_s[0][1] + jit_s[1][0] * d1u_s[0][0]) * (-1) * t[1]) * t[1] + (t[0] * (jit_s[0][1] * d1u_s[1][1] + jit_s[0][0] * d1u_s[1][0]) + (jit_s[0][1] * d1u_s[0][1] + jit_s[0][0] * d1u_s[0][0]) * (-1) * t[1]) * t[0] - ((t[0] * (jit_n[1][1] * d1u_n[1][1] + jit_n[1][0] * d1u_n[1][0]) + (jit_n[1][1] * d1u_n[0][1] + jit_n[1][0] * d1u_n[0][0]) * (-1) * t[1]) * t[1] + (t[0] * (jit_n[0][1] * d1u_n[1][1] + jit_n[0][0] * d1u_n[1][0]) + (jit_n[0][1] * d1u_n[0][1] + jit_n[0][0] * d1u_n[0][0]) * (-1) * t[1]) * t[0]);
@@ -478,10 +496,6 @@ class EulerBernoulli2DLocalOperator
         auto dt2vn_s_1 = (t[1] * t[0] * (jit_n[1][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0))) + t[0] * t[0] * (jit_n[0][1] * (jit_n[1][1] * basis_n.hessian(i, 1, 1) + jit_n[1][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[1][1] * basis_n.hessian(i, 0, 1) + jit_n[1][0] * basis_n.hessian(i, 0, 0)))) * t[1] + (t[1] * t[0] * (jit_n[1][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[1][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0))) + t[0] * t[0] * (jit_n[0][1] * (jit_n[0][1] * basis_n.hessian(i, 1, 1) + jit_n[0][0] * basis_n.hessian(i, 1, 0)) + jit_n[0][0] * (jit_n[0][1] * basis_n.hessian(i, 0, 1) + jit_n[0][0] * basis_n.hessian(i, 0, 0)))) * t[0];
 
         // TODO: Get these from somewhere
-        auto E = 1e6;
-        auto d = 0.1;
-        auto A = d;
-        auto I = (d*d*d) / 12.0;
         auto beta = 1.0;
 
         r_s.accumulate(lfsu_s.child(0), i, E*I*(-sk_dt2un*dtvn_s_0 - dt2vn_s_0 * sk_dtun + beta*sk_dtun*dtvn_s_0));
@@ -498,6 +512,8 @@ class EulerBernoulli2DLocalOperator
   std::map<int, std::vector<std::tuple<std::size_t, double, double>>> element_fibre_intersections;
   std::map<std::pair<int, int>, std::vector<std::tuple<std::size_t, double>>> face_fibre_intersections;
   std::vector<std::shared_ptr<FibreParametrizationBase<2>>> fibre_parametrizations;
+  std::vector<double> fibre_modulus;
+  std::vector<double> fibre_radii;
 
   // Store a force vector - code adapted of how the generated code does it.
   // That is not the nicest way of doing it, but we do not need additional
