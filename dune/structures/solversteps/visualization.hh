@@ -271,7 +271,7 @@ class VonMisesStressVisualizationStep
     auto es = vector->gridFunctionSpace().entitySet();
 
     // A grid function for the stress
-    VonMisesStressGridFunction<typename Traits::Vector> stress(*vector, material);
+    VonMisesStressGridFunction<typename Traits::Vector, Traits::dim> stress(*vector, material);
 
     // Interpolate the stress into a grid function
     using P0FEM = Dune::PDELab::P0LocalFiniteElementMap<typename Traits::ctype, typename Traits::Range, Traits::dim>;

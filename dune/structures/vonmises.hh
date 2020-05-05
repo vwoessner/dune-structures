@@ -7,15 +7,18 @@
 #include<array>
 #include<memory>
 
-/** Calculate von Mises Stress */
-template<typename Container>
+/** Calculate von Mises Stress
+ *
+ *  TODO: I am not 100% sure if my calculations are correct for the 2D case. Do a bit more literature research on that.
+ * */
+template<typename Container, int dim>
 class VonMisesStressGridFunction
     : public Dune::PDELab::GridFunctionBase<
       Dune::PDELab::GridFunctionTraits<typename Container::GridFunctionSpace::Traits::EntitySet,
                                        typename Container::field_type,
                                        1,
                                        Dune::FieldVector<typename Container::field_type,1> >,
-      VonMisesStressGridFunction<Container>
+      VonMisesStressGridFunction<Container, dim>
       >
 {
   private:
@@ -51,7 +54,7 @@ class VonMisesStressGridFunction
     typename Traits::RangeType sum = 0.0;
 
     // Offdiagonal part of the deviatoric stress tensor
-    for (int i=0; i<3; ++i)
+    for (int i=0; i<dim; ++i)
       for (int j=0; j<i; ++j)
       {
         auto entry = lame2 * (displacement_grad[i][j] + displacement_grad[j][i]);
@@ -60,18 +63,18 @@ class VonMisesStressGridFunction
 
     // Calculate divergence
     typename Traits::RangeType div = 0.0;
-    for (int i=0; i<3; ++i)
+    for (int i=0; i<dim; ++i)
       div += displacement_grad[i][i];
 
-    std::array<typename Traits::RangeType, 3> sig;
-    for(int i=0; i<3; ++i)
+    std::array<typename Traits::RangeType, dim> sig;
+    for(int i=0; i<dim; ++i)
       sig[i] = lame1 * div + 2.0 * lame2 * displacement_grad[i][i];
 
     // Diagonal part of the deviatoric stress tensor
-    for (int i=0; i<3; ++i)
+    for (int i=0; i<dim; ++i)
     {
       typename Traits::RangeType entry = 0.0;
-      for (int j=0; j<3; ++j)
+      for (int j=0; j<dim; ++j)
         entry += (i == j ? 2./3. : -1./3.) * sig[j];
       sum += entry * entry;
     }
