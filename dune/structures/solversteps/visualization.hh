@@ -257,6 +257,10 @@ class VonMisesStressVisualizationStep
   public:
   using Traits = VectorStepTraits<i, V...>;
 
+  VonMisesStressVisualizationStep(const Dune::ParameterTree& params)
+    : continuous(params.get<bool>("continuous", false))
+  {}
+
   virtual ~VonMisesStressVisualizationStep() {}
 
   virtual void update_parameter(std::string name, typename Traits::Parameter param) override
@@ -269,26 +273,44 @@ class VonMisesStressVisualizationStep
   {
     auto vector = this->solver->template getVector<i>();
     auto es = vector->gridFunctionSpace().entitySet();
+    auto gfs = vector->gridFunctionSpaceStorage();
 
     // A grid function for the stress
     VonMisesStressGridFunction<typename Traits::Vector, Traits::dim> stress(*vector, material);
 
     // Interpolate the stress into a grid function
-    using P0FEM = Dune::PDELab::P0LocalFiniteElementMap<typename Traits::ctype, typename Traits::Range, Traits::dim>;
-    auto p0fem = std::make_shared<P0FEM>(Dune::GeometryTypes::simplex(Traits::dim));
-    using P0GFS = Dune::PDELab::GridFunctionSpace<typename Traits::EntitySet, P0FEM, Dune::PDELab::NoConstraints, typename Traits::VectorBackend>;
-    auto p0gfs = std::make_shared<P0GFS>(es, p0fem);
-    p0gfs->name("vonmises");
-    p0gfs->setDataSetType(Dune::PDELab::GridFunctionOutputParameters::Output::cellData);
-    using StressVector = Dune::PDELab::Backend::Vector<P0GFS, typename Traits::ctype>;
-    auto stress_container = std::make_shared<StressVector>(p0gfs);
+    if (continuous)
+    {
+      using P1FEM = Dune::PDELab::PkLocalFiniteElementMap<typename Traits::EntitySet, double, typename Traits::Range, 1>;
+      auto p1fem = std::make_shared<P1FEM>(es);
+      using P1GFS = Dune::PDELab::GridFunctionSpace<typename Traits::EntitySet, P1FEM, Dune::PDELab::NoConstraints, typename Traits::VectorBackend>;
+      auto p1gfs = std::make_shared<P1GFS>(es, p1fem);
+      p1gfs->name("vonmises");
+//     p0gfs->setDataSetType(Dune::PDELab::GridFunctionOutputParameters::Output::cellData);
+      using StressVector = Dune::PDELab::Backend::Vector<P1GFS, typename Traits::ctype>;
+      auto stress_container = std::make_shared<StressVector>(p1gfs);
 
-    Dune::PDELab::interpolate(stress, *p0gfs, *stress_container);
-    this->parent->add_dataset(stress_container);
+      Dune::PDELab::interpolate(stress, *p1gfs, *stress_container);
+      this->parent->add_dataset(stress_container);
+    }
+    else {
+      using P0FEM = Dune::PDELab::P0LocalFiniteElementMap<typename Traits::ctype, typename Traits::Range, Traits::dim>;
+      auto p0fem = std::make_shared<P0FEM>(Dune::GeometryTypes::simplex(Traits::dim));
+      using P0GFS = Dune::PDELab::GridFunctionSpace<typename Traits::EntitySet, P0FEM, Dune::PDELab::NoConstraints, typename Traits::VectorBackend>;
+      auto p0gfs = std::make_shared<P0GFS>(es, p0fem);
+      p0gfs->name("vonmises");
+      p0gfs->setDataSetType(Dune::PDELab::GridFunctionOutputParameters::Output::cellData);
+      using StressVector = Dune::PDELab::Backend::Vector<P0GFS, typename Traits::ctype>;
+      auto stress_container = std::make_shared<StressVector>(p0gfs);
+
+      Dune::PDELab::interpolate(stress, *p0gfs, *stress_container);
+      this->parent->add_dataset(stress_container);
+    }
   }
 
   private:
   std::shared_ptr<typename Traits::Material> material;
+  bool continuous;
 };
 
 

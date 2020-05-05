@@ -271,7 +271,7 @@ class ConstructionContext
     registerVectorStep("vis_vonmises",
                  [](auto i, const auto& ctx, const auto& p)
                  {
-                   return std::make_shared<VonMisesStressVisualizationStep<i, V...>>();
+                   return std::make_shared<VonMisesStressVisualizationStep<i, V...>>(p);
                  });
 
     registerStep("vis_fibredistance",
