@@ -3,6 +3,11 @@
 This is not embedded into the dune-codegen code generation pipeline.
 Instead, it is meant to be run by hand and the resulting expressions
 are copied and pasted into the 1D fibre operator.
+
+Currently, this script needs two adjustments in codegen to be run:
+* In python/ufl/transformations/__init__.py  the transformation printing needs to be disabled
+* In python/ufl/modified_terminals.py the assertion in the grad handler needs to be disabled
+I am too lazy right now to find proper upstream fixes for these minor issues.
 """
 
 from dune.codegen.ufl.execution import *
