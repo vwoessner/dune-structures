@@ -62,9 +62,8 @@ class IsotropicPrestress
   virtual void evaluate(const Entity&, const Coord&, Dune::FieldMatrix<T, dim, dim>& m) const override
   {
     Dune::FieldMatrix<T, dim, dim> ret(0.0);
-    ret[0][0] = scale;
-    ret[1][1] = scale;
-    ret[2][2] = scale;
+    for (std::size_t i=0; i<dim; ++i)
+      ret[i][i] = scale;
     m = ret;
   }
 

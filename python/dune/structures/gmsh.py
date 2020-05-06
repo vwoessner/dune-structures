@@ -301,6 +301,7 @@ def cell_geometry_2d(geo, config):
             orientation = end - start
 
             # TODO: Rotation of non-axis aligned fibres
+            start = start - pad_to_3_vector([0, radius])
             fibre = geo.add_rectangle(start, np.linalg.norm(orientation), 2 * radius)
         else:
             raise NotImplementedError("Fibre shape '{}' not known".format(shape))
