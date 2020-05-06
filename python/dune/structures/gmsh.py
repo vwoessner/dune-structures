@@ -88,12 +88,7 @@ def check_gmsh_build_flag(gmshexec, flag):
     return flag in get_gmsh_build_flags(gmshexec)
 
 
-def generate_cell_mesh(config, gmshexec="gmsh"):
-    """ The entry point for the creation of a cell mesh """
-    geo = pygmsh.opencascade.Geometry()
-
-    geo.add_comment("Generated for gmsh version {}".format(".".join(get_gmsh_version(gmshexec))))
-
+def cell_geometry_3d(geo, config):
     # A dictionary with material information
     material_to_geo = {}
 
@@ -255,6 +250,104 @@ def generate_cell_mesh(config, gmshexec="gmsh"):
     # Apply a global scaling to the resulting mesh
     geo.add_raw_code("Mesh.ScalingFactor = {};".format(as_float(config.get("scaling", 1.0))))
 
+
+
+def cell_geometry_2d(geo, config):
+    # A dictionary with material information
+    material_to_geo = {}
+
+    def pad_to_3_vector(arr):
+        arr = as_vec(arr)
+        if len(arr) == 3:
+            return arr
+        elif len(arr) == 2:
+            return np.concatenate([arr, as_vec([0])])
+        else:
+            raise ValueError("What kind of coord is {}".format(arr))
+
+    def add_shape(config):
+        shape = config.get("shape", "box")
+        # For compatibility with 3d we accept "box" as a shape, although we are dealing
+        # with rectangles of course.
+        if shape in ["box", "rectangle"]:
+            size = pad_to_3_vector(config.get("size", [1.0, 1.0]))
+            lowerleft = pad_to_3_vector(config.get("lowerleft", -0.5 * size))
+            return geo.add_rectangle(lowerleft, size[0], size[1])
+        else:
+            raise NotImplementedError
+
+    def add_material(geoobj, config):
+        physical = as_int(config.get("physical", 0))
+        if physical is not None:
+            material_to_geo.setdefault(physical, [])
+            material_to_geo[physical].append(geoobj)
+
+    # Add the cytoplasma
+    cytoconfig = config.get("cytoplasm", {})
+    cyto = add_shape(cytoconfig)
+
+    # Maybe add some fibres
+    fibres = []
+    fibreconfig = config.get("fibres", {})
+    for i, fconfig in enumerate(ini_list(fibreconfig, "fibres")):
+        fibre = None
+        # For compatibility with 3d we accept "cylinder" as a shape, although we are dealing
+        # with rectangles of course. Makes sense in our setting though.
+        shape = fconfig.get("shape", "cylinder")
+        if shape in ["cylinder", "rectangle"]:
+            start = pad_to_3_vector(fconfig.get("start", [-1.0, 0.0]))
+            end = pad_to_3_vector(fconfig.get("end", [2.0, 0.0]))
+            radius = as_float(fconfig.get("radius", 0.1))
+            orientation = end - start
+
+            # TODO: Rotation of non-axis aligned fibres
+            fibre = geo.add_rectangle(start, np.linalg.norm(orientation), 2 * radius)
+        else:
+            raise NotImplementedError("Fibre shape '{}' not known".format(shape))
+
+        # And intersect it with the cytoplasma
+        assert fibre is not None
+        fibre = geo.boolean_intersection([cyto, fibre], delete_first=False, delete_other=True)
+
+        # Add physical information to this fibre
+        add_material(fibre, fconfig)
+
+        # Store the fibre object for later
+        fibres.append(fibre)
+
+    # Implement mesh widths
+    geo.add_raw_code("Characteristic Length{{ PointsOf{{ Surface{{:}}; }} }} = {};".format(cytoconfig.get("meshwidth", 0.1)))
+    for i, fconfig in enumerate(ini_list(fibreconfig, "fibres")):
+        meshwidth = as_float(fconfig.get("meshwidth", 0.02))
+        geo.add_raw_code("Characteristic Length{{ PointsOf{{ Surface{{{}}}; }} }} = {};".format(fibres[i].id, meshwidth))
+
+    # The cytoplasma is defined by the outer shape minus all inclusions
+    cyto = geo.boolean_fragments([cyto], fibres, delete_other=False)
+    add_material(cyto, cytoconfig)
+
+    # Add the collected physical group information
+    for physical, geos in material_to_geo.items():
+        geo.add_physical(geos, physical)
+
+    # Apply a global scaling to the resulting mesh
+    geo.add_raw_code("Mesh.ScalingFactor = {};".format(as_float(config.get("scaling", 1.0))))
+
+
+def generate_cell_mesh(config, gmshexec="gmsh"):
+    """ The entry point for the creation of a cell mesh """
+    geo = pygmsh.opencascade.Geometry()
+
+    geo.add_comment("Generated for gmsh version {}".format(".".join(get_gmsh_version(gmshexec))))
+
+    # Call the actual geometry implementation for this space dimension
+    dim = as_int(config.get("dimension", 3))
+    if dim == 2:
+        cell_geometry_2d(geo, config)
+    elif dim == 3:
+        cell_geometry_3d(geo, config)
+    else:
+        raise NotImplementedError("dimension={} is not supported in mesh generation".format(dim))
+
     # Maybe skip mesh generation if we have a cache hit
     cachefile = "{}.msh".format(hashlib.sha256("\n".join(geo.get_code()).encode()).hexdigest())
     if os.path.exists(cachefile):
@@ -285,7 +378,7 @@ def generate_cell_mesh(config, gmshexec="gmsh"):
     vtkconfig = exportconfig.get("vtk", {})
     if as_bool(vtkconfig.get("enabled", False)):
         filename = vtkconfig.get("filename", config.get("filename"))
-        filename = "{}.vtk".format(os.path.splitext(config.get("filename"))[0])
+        filename = "{}.vtk".format(os.path.splitext(filename)[0])
         # This throws a warning, but the physical groups only work in ASCII mode
         meshio.write(filename, mesh, file_format="vtk-ascii")
 
