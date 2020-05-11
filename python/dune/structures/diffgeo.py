@@ -44,11 +44,11 @@ def generate_tangential_derivatives():
 
     facet_quantities = {
         "sk_dt2un" : avg(inner(t, grad(inner(t, grad(inner(u, n)))))),
-        "dt2vn_n" : inner(t, grad(inner(t, grad(inner(v('+'), n))))),
-        "dt2vn_s" : inner(t, grad(inner(t, grad(inner(v('-'), n))))),
+        "dt2vn_n" : inner(t, grad(inner(t, grad(inner(v('-'), n))))),
+        "dt2vn_s" : inner(t, grad(inner(t, grad(inner(v('+'), n))))),
         "sk_dtun" : jump(inner(t, grad(inner(u, n)))),
-        "dtvn_n" : inner(t, grad(inner(v('+'), n))),
-        "dtvn_s" : inner(t, grad(inner(v('-'), n))),
+        "dtvn_n" : inner(t, grad(inner(v('-'), n))),
+        "dtvn_s" : inner(t, grad(inner(v('+'), n))),
     }
 
     def print_code(name, expr, measure):
