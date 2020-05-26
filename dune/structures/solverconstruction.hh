@@ -279,6 +279,12 @@ class ConstructionContext
                  {
                    return std::make_shared<FibreDistanceVisualizationStep<V...>>(p, ctx.rootconfig);
                  });
+
+    registerStep("vis_indexset",
+                 [](const auto& ctx, const auto& p)
+				 {
+                   return std::make_shared<IndexSetVisualizationStep<V...>>();
+				 });
   }
 
   template<typename Func>

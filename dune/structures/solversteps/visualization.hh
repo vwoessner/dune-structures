@@ -352,4 +352,27 @@ class FibreDistanceVisualizationStep
   CurvedFibrePrestress<typename Traits::GridView, double> prestress;
 };
 
+
+template<typename... V>
+class IndexSetVisualizationStep
+  : public VisualizationStepBase<V...>
+{
+  public:
+  using Traits = SimpleStepTraits<V...>;
+
+  IndexSetVisualizationStep()
+    : indexdata(std::make_shared<std::vector<unsigned int>>())
+  {}
+
+  virtual ~IndexSetVisualizationStep() {}
+
+  virtual void pre() override
+  {
+	indexdata->resize(this->solver->getVector()->gridFunctionSpace().entitySet().size(0));
+	std::iota(indexdata->begin(), indexdata->end(), 0);
+	this->parent->add_celldata(indexdata, "Cell Indices");  }
+
+  private:
+  std::shared_ptr<std::vector<unsigned int>> indexdata;
+};
 #endif
