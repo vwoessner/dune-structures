@@ -6,6 +6,7 @@
 #include<dune/grid/uggrid.hh>
 #include<dune/pdelab.hh>
 #include<dune/structures/gmshfactory.hh>
+#include<dune/structures/gridreorder.hh>
 
 #include<cstdlib>
 #include<fstream>

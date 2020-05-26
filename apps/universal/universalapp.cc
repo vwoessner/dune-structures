@@ -4,15 +4,18 @@
 #include<dune/common/parametertree.hh>
 #include<dune/structures/elasticity.hh>
 #include<dune/structures/gridconstruction.hh>
+#include<dune/structures/gridreorder.hh>
 #include<dune/structures/solverconstruction.hh>
 
 #include<memory>
+#include<tuple>
 
 
 template<int dim, int degree>
 void apply(Dune::MPIHelper& helper, const Dune::ParameterTree& params, char** argv)
 {
   auto [grid, es, physical] = construct_grid<dim>(helper, params.sub("grid"), argv);
+  std::tie(grid, es, physical) = reorder_grid(grid, es, physical, params.sub("grid"));
   auto [x, cc] = elasticity_setup<degree>(es);
   using V = typename std::remove_reference<decltype(*x)>::type;
 
