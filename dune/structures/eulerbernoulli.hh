@@ -128,6 +128,9 @@ class EulerBernoulli2DLocalOperator
     , Dune::PDELab::NumericalJacobianSkeleton<EulerBernoulli2DLocalOperator<GFS>>(1e-9)
     , is(gfs->gridView().indexSet())
   {
+    // Some debugging switches to reduce recompilations in debugging
+    bool verbose = params.get<bool>("verbose", false);
+
 	// Extract stabilization parameter
 	beta = params.get<double>("stabilization_parameter", 1.0);
 
@@ -274,17 +277,20 @@ class EulerBernoulli2DLocalOperator
       }
     }
 
-    std::cout << "Fibre intersection summary:" << std::endl;
-    for (auto [cell, info] : element_fibre_intersections)
-      for (auto sinfo : info)
-        std::cout << "Cell " << cell << " intersects fibre " << std::get<0>(sinfo)
-                  << " on the curve interval [" << std::get<1>(sinfo) << "," << std::get<2>(sinfo) << "]" << std::endl;
-    for (auto [cells, info] :face_fibre_intersections)
+    if (verbose)
     {
-      auto [inside, outside] = cells;
-      for (auto sinfo : info)
-        std::cout << "Facet between cell " << inside << " and " << outside << " intersects fibre "
-                  << std::get<0>(sinfo) << " at t=" << std::get<1>(sinfo) << std::endl;
+      std::cout << "Fibre intersection summary:" << std::endl;
+      for (auto [cell, info] : element_fibre_intersections)
+        for (auto sinfo : info)
+          std::cout << "Cell " << cell << " intersects fibre " << std::get<0>(sinfo)
+                    << " on the curve interval [" << std::get<1>(sinfo) << "," << std::get<2>(sinfo) << "]" << std::endl;
+      for (auto [cells, info] : face_fibre_intersections)
+      {
+        auto [inside, outside] = cells;
+        for (auto sinfo : info)
+          std::cout << "Facet between cell " << inside << " and " << outside << " intersects fibre "
+                    << std::get<0>(sinfo) << " at t=" << std::get<1>(sinfo) << std::endl;
+      }
     }
   }
 
