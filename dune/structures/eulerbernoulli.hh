@@ -130,9 +130,11 @@ class EulerBernoulli2DLocalOperator
   {
     // Some debugging switches to reduce recompilations in debugging
     bool verbose = params.get<bool>("verbose", false);
+    enable_volume = params.get<bool>("enable_volume", true);
+    enable_skeleton = params.get<bool>("enable_skeleton", true);
 
 	// Extract stabilization parameter
-	beta = params.get<double>("stabilization_parameter", 1.0);
+    beta = params.get<double>("stabilization_parameter", 1.0);
 
     // Parse fibres from the configuration
     auto fibrestr = rootparams.get<std::string>("grid.fibres.fibres", "");
@@ -297,6 +299,9 @@ class EulerBernoulli2DLocalOperator
   template<typename EG, typename LFSU, typename X, typename LFSV, typename R>
   void alpha_volume (const EG& eg, const LFSU& lfsu, const X& x, const LFSV& lfsv, R& r) const
   {
+    if (!enable_volume)
+      return;
+
     // See whether something needs to be done on this cell
     auto entity = eg.entity();
     auto it = element_fibre_intersections.find(is.index(entity));
@@ -408,6 +413,9 @@ class EulerBernoulli2DLocalOperator
                        const LFSU& lfsu_n, const X& x_n, const LFSV& lfsv_n,
                        R& r_s, R& r_n) const
   {
+    if (!enable_skeleton)
+      return;
+
     // The notion of inside and outside is quite complex in this situation.
     // We are traversing the 2D grid, whose intersections have inside and outside.
     // But these do not necessarily match the notion of inside and outside of
@@ -525,6 +533,10 @@ class EulerBernoulli2DLocalOperator
   }
 
   private:
+
+  bool enable_volume;
+  bool enable_skeleton;
+
   double beta;
 
   const typename GFS::Traits::GridView::IndexSet& is;
