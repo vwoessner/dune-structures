@@ -17,7 +17,7 @@
 
 
 // A comparison object to define a total ordering on Dune::FieldVectors for the purpose
-// of below algorithm to identify subsurface boundary faces with surface cells.
+// of defining sorting criteria for cells based on center coordinates.
 struct LexicographicFieldVectorComparator
 {
   template<typename T, int dim>
