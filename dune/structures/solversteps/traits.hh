@@ -42,6 +42,7 @@ class SimpleStepTraits
                                  double,
                                  int,
                                  std::string,
+                                 Dune::FieldVector<double, dim>,
                                  std::shared_ptr<Material>,
                                  std::shared_ptr<std::vector<int>>,
                                  Dune::ParameterTree,

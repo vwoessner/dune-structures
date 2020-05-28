@@ -14,6 +14,7 @@
 #include<dune/structures/solversteps/base.hh>
 #include<dune/structures/solversteps/constraints.hh>
 #include<dune/structures/solversteps/elasticity.hh>
+#include<dune/structures/solversteps/filelogger.hh>
 #include<dune/structures/solversteps/interpolation.hh>
 #include<dune/structures/solversteps/linearsolver.hh>
 #include<dune/structures/solversteps/material.hh>

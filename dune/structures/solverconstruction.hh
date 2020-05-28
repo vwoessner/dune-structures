@@ -172,6 +172,11 @@ class ConstructionContext
                     return std::make_shared<FibreReinforcedElasticitySolverStep<i, V...>>(ctx.rootconfig, p);
                   });
 
+    registerStep("filelogger",
+		 [](const auto& ctx, const auto& p)
+		 {
+                    return std::make_shared<FileLoggerStep<V...>>(p);
+		 });
 
     registerVectorStep("interpolation",
                  [](auto i, const auto& ctx, const auto& p)

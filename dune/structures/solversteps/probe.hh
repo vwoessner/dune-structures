@@ -26,6 +26,13 @@ class ProbeTransitionStep
 
   virtual ~ProbeTransitionStep() {}
 
+  virtual void set_solver(std::shared_ptr<typename Traits::Solver> solver_) override
+  {
+    this->solver = solver_;
+    if (config.hasKey("name"))
+      this->solver->introduce_parameter(config.get<std::string>("name"), typename DGF::Traits::DomainType(0.0));
+  }
+
   virtual void apply() override
   {
     auto vector = this->solver->template getVector<i>();
@@ -37,6 +44,10 @@ class ProbeTransitionStep
 
     if (config.get<bool>("displace", false))
       eval += config.get<typename Traits::GlobalCoordinate>("position");
+
+    // Report the value of the probe into the solvers parameter system
+    if (config.hasKey("name"))
+      this->solver->update_parameter(config.get<std::string>("name"), eval);
 
     std::cout << "Probe " << config.get<std::string>("name", "") << ": " << eval << std::endl;
   }
