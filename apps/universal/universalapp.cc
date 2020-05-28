@@ -35,7 +35,8 @@ int main(int argc, char** argv)
 
   // Parse the ini file
   Dune::ParameterTree params;
-  Dune::ParameterTreeParser::readINITree(argv[1], params);
+  Dune::ParameterTreeParser::readOptions(argc, argv, params);
+  Dune::ParameterTreeParser::readINITree(argv[1], params, false);
 
   // Dispatch on grid dimension
   auto dim = params.get<int>("grid.dimension", 3);
