@@ -11,6 +11,7 @@
 
 // Include all available solver steps in order to have this header serve
 // as a convenience header
+#include<dune/structures/solversteps/adaptivity.hh>
 #include<dune/structures/solversteps/base.hh>
 #include<dune/structures/solversteps/constraints.hh>
 #include<dune/structures/solversteps/elasticity.hh>

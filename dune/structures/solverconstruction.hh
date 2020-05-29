@@ -112,6 +112,14 @@ class ConstructionContext
       }
     }
 
+    registerStep("adaptivity",
+		 [](auto& ctx, const auto& p)
+		 {
+                   auto step = std::make_shared<AdaptivitySolverStep<V...>>();
+                   ctx.add_children(step, p);
+                   return step;
+		 });
+
     registerVectorStep("constraints",
                  [](auto i, const auto& ctx, const auto& p)
                  {
@@ -173,6 +181,12 @@ class ConstructionContext
                   {
                     return std::make_shared<FibreReinforcedElasticitySolverStep<i, V...>>(ctx.rootconfig, p);
                   });
+
+    registerStep("fibre_refinement",
+		 [](const auto& ctx, const auto& p)
+		 {
+                    return std::make_shared<FiberVicinityMarkerStep<V...>>();
+		 });
 
     registerStep("filelogger",
 		 [](const auto& ctx, const auto& p)
