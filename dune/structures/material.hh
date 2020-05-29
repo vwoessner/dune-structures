@@ -215,7 +215,12 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
   private:
   std::shared_ptr<ElasticMaterialBase<GV, T>> get_material(const Entity& e) const
   {
-    return materials.find((*physical_entity_mapping)[is->index(e)])->second;
+    // Find the coarse level entity that can be used to look up the physical entity index
+    auto lookup_entity = e;
+    while (lookup_entity.hasFather())
+      lookup_entity = lookup_entity.father();
+
+    return materials.find((*physical_entity_mapping)[is->index(lookup_entity)])->second;
   }
 
   const typename GV::IndexSet* is;
