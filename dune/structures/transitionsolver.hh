@@ -48,13 +48,15 @@ class TransitionSolver
   using StepTraits = SimpleStepTraits<V...>;
   using EntitySet = typename StepTraits::EntitySet;
   using Parameter = typename StepTraits::Parameter;
+  using Grid = typename StepTraits::Grid;
 
-  TransitionSolver(EntitySet es)
-    : es(es), steps(0)
+  TransitionSolver(std::shared_ptr<Grid> grid, EntitySet es)
+    : grid(grid), es(es), steps(0)
   {}
 
-  TransitionSolver(EntitySet es, std::vector<std::shared_ptr<StepBase>> steps)
-    : es(es)
+  TransitionSolver(std::shared_ptr<Grid> grid, EntitySet es, std::vector<std::shared_ptr<StepBase>> steps)
+    : grid(grid)
+    , es(es)
     , steps(steps)
   {}
 
@@ -163,6 +165,11 @@ class TransitionSolver
     return es;
   }
 
+  std::shared_ptr<Grid> getGrid() const
+  {
+    return grid;
+  }
+
   void setVectors(const std::tuple<std::shared_ptr<V>...>& vectors_)
   {
     vectors = vectors_;
@@ -186,6 +193,7 @@ class TransitionSolver
   }
 
   private:
+  std::shared_ptr<Grid> grid;
   EntitySet es;
   std::vector<std::shared_ptr<StepBase>> steps;
   std::map<std::string, Parameter> paramdata;

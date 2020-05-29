@@ -89,13 +89,15 @@ class ConstructionContext
 
   ConstructionContext(Dune::MPIHelper& helper,
                       const Dune::ParameterTree& config,
+                      std::shared_ptr<typename StepTraits::Grid> grid,
                       typename StepTraits::EntitySet es,
                       std::shared_ptr<std::vector<int>> physical)
     : helper(helper)
     , rootconfig(config)
+    , grid(grid)
     , es(es)
     , physical(physical)
-    , solver(std::make_unique<TransitionSolver<V...>>(es))
+    , solver(std::make_unique<TransitionSolver<V...>>(grid, es))
   {
     // Parse
     {
@@ -380,6 +382,7 @@ class ConstructionContext
   // The reference members that might be needed for construction of steps
   Dune::MPIHelper& helper;
   const Dune::ParameterTree& rootconfig;
+  std::shared_ptr<typename StepTraits::Grid> grid;
   typename StepTraits::EntitySet es;
   std::shared_ptr<std::vector<int>> physical;
 

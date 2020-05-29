@@ -19,7 +19,7 @@ void apply(Dune::MPIHelper& helper, const Dune::ParameterTree& params, char** ar
   auto [x, cc] = elasticity_setup<degree>(es);
   using V = typename std::remove_reference<decltype(*x)>::type;
 
-  ConstructionContext<V> ctx(helper, params, es, physical);
+  ConstructionContext<V> ctx(helper, params, grid, es, physical);
   ctx.setVectors(x);
   ctx.setConstraintsContainers(cc);
 
