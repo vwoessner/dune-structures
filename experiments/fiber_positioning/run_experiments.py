@@ -1,35 +1,48 @@
 #!/usr/bin/env python
 
 #
-# Script that runs the experiment and outputs a plot. If the results should
-# be recomputed (takes several minutes), you should remove the positioning.log
-# file before running this script.
+# Script that runs a batch of experiments for the positioning
+# of a fibre in a cantilever.
 #
 
-import matplotlib
-import numpy as np
 import os
 import subprocess
+import sys
+import matplotlib
+import numpy as np
 
 matplotlib.use("PDF")
 
 from matplotlib import pyplot as plt
 
-# The list of data points
-positions = list(0.001 + 0.002 * i for i in range(500))
+# Extract data from command line arguments
+ini = sys.argv[1]
+left = float(sys.argv[2])
+right = float(sys.argv[3])
+samples = int(sys.argv[4])
+stab = sys.argv[5]
 
-if not os.path.isfile("positioning.log"): 
+# The list of data points
+h = (right - left / samples)
+positions = list(left + 0.5 * h + h * i for i in range(samples))
+
+filename = "positioning_l{}_r{}_n{}_beta{}.log".format(left, right, samples, stab)
+if not os.path.isfile(filename):
     for pos in positions:
-        cmd = ['../../apps/universal/universalapp', 'hansbo_beam.ini']
+        cmd = ['../../apps/universal/universalapp', ini]
         cmd.append('-grid.fibres.first.start')
         cmd.append('-0.5 {}'.format(pos))
         cmd.append('-grid.fibres.first.end')
         cmd.append('4.5 {}'.format(pos))
-        
+        cmd.append('-fibre_operator.stabilization_parameter')
+        cmd.append(stab)
+        cmd.append('-filelogger.filename')
+        cmd.append(filename)
+
         subprocess.call(cmd)
 
 displacements = []
-with open("positioning.log", 'r') as f:
+with open(filename, 'r') as f:
     for line in f:
         _, ydis = line.split()
         ydis = float(ydis)
@@ -44,9 +57,12 @@ displacements = [max(min(d, max_val), min_val) for d in displacements]
 plt.plot(positions, displacements)
 
 # Add vertical lines at vertex positionings
-ticks = np.arange(0.0, 1.1, 0.1)
+#ticks = np.arange(0.0, 1.1, 0.1)
 ax = plt.axes()
-ax.set_xticks(ticks)
+#ax.set_xticks(ticks)
 ax.xaxis.grid()
 
-plt.savefig("positioning.pdf")
+ax.set_xlabel("Beam positioning in y-direction")
+ax.set_ylabel("y-Displacement")
+
+plt.savefig("{}.pdf".format(filename))
