@@ -39,11 +39,11 @@ P dynamic_parse(const Dune::ParameterTree& tree, std::string default_type = "dou
   auto type = tree.get("datatype", default_type);
 
   if (type == "double")
-    return tree.get<double>("value");
+    return P(tree.get<double>("value"));
   else if (type == "int")
-    return tree.get<int>("value");
+    return P(tree.get<int>("value"));
   else if (type == "string")
-    return tree.get<std::string>("value");
+    return P(tree.get<std::string>("value"));
   else
     DUNE_THROW(Dune::Exception, "Cannot parse parameter");
 }

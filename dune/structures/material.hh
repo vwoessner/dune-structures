@@ -90,10 +90,21 @@ class ElasticMaterialBase
   virtual void prestress(const Entity& e, const Coord& x, Dune::FieldMatrix<T, dim, dim>&) const = 0;
 
   virtual int material_law_index(const Entity& e) const = 0;
-
+/*
   T parameter_unrolled(const Entity& e, int i, T x...) const
   {
     return this->parameter(e, Dune::FieldVector<T, dim>{x}, i);
+  }
+*/
+
+  T parameter_unrolled(const Entity& e, int i, T x0, T x1) const
+  {
+    return this->parameter(e, Dune::FieldVector<T, dim>{x0, x1}, i);
+  }
+
+  T parameter_unrolled(const Entity& e, int i, T x0, T x1, T x2) const
+  {
+    return this->parameter(e, Dune::FieldVector<T, dim>{x0, x1, x2}, i);
   }
 
   GV gridView() const
