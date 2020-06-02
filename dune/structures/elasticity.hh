@@ -83,7 +83,12 @@ auto elasticity_setup(ES es)
   using V = Dune::PDELab::Backend::Vector<GFS, double>;
   auto x = std::make_shared<V>(gfs);
 
-  return std::make_pair(x, cc);
+  // And two more containers for body force and traction fields. One might consider
+  // interpolation with lower order here.
+  auto force = std::make_shared<V>(gfs, 0.0);
+  auto traction = std::make_shared<V>(gfs, 0.0);
+
+  return std::make_tuple(x, cc, force, traction);
 }
 
 
