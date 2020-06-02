@@ -17,16 +17,17 @@ from matplotlib import pyplot as plt
 
 # Extract data from command line arguments
 ini = sys.argv[1]
-left = float(sys.argv[2])
-right = float(sys.argv[3])
-samples = int(sys.argv[4])
-stab = sys.argv[5]
+cells = int(sys.argv[2])
+left = float(sys.argv[3])
+right = float(sys.argv[4])
+samples = int(sys.argv[5])
+stab = sys.argv[6]
 
 # The list of data points
-h = (right - left / samples)
+h = (right - left) / samples
 positions = list(left + 0.5 * h + h * i for i in range(samples))
 
-filename = "positioning_l{}_r{}_n{}_beta{}.log".format(left, right, samples, stab)
+filename = "positioning_cells{}_l{}_r{}_n{}_beta{}.log".format(cells, left, right, samples, stab)
 if not os.path.isfile(filename):
     for pos in positions:
         cmd = ['../../apps/universal/universalapp', ini]
@@ -38,6 +39,8 @@ if not os.path.isfile(filename):
         cmd.append(stab)
         cmd.append('-filelogger.filename')
         cmd.append(filename)
+        cmd.append('-grid.N')
+        cmd.append('{} {}'.format(4*cells, cells))
 
         subprocess.call(cmd)
 
