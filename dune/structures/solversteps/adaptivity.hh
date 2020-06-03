@@ -5,6 +5,8 @@
 #include<dune/structures/solversteps/base.hh>
 #include<dune/structures/solversteps/traits.hh>
 
+#include<tuple>
+
 
 template<typename... V>
 class AdaptivitySolverStep
@@ -26,40 +28,46 @@ class AdaptivitySolverStep
 
     std::cout << "Adapting the grid..." << std::endl;
 
-    /** TODO:
-     * In the below implementation, only one vector is treated, where all vectors from
-     * the variadic template list V... should be considered. Unfortunately all these must
-     * be handled in one call of adapt_grid. The code should look something like this
-     * in Python generator syntax, but I yet need to understand how this looks like in C++
-     * metaprogramming world.
+    /**
+     * The following code is horribly complicated. So it might deserve some remarks:
      *
-     * adapt_grid(grid,
-     *            transferSolutions(*this->solver->template getVector<i>()->gridFunctionSpaceStorage(),
-     *                              *this->solver->template getVector<i>(),
-     *                              4)
-     *            for i in range(sizeof...(V)));
-     *
-     * Of course all the below hassle with const_cast was removed from this minimal example.
-     *
-     * Another thing that bothers me, where I do not understand PDELab semantics enough:
-     * If two of the vectors in V... use the same grid function space, is it okay to pass
-     * that gfs twice into adapt or do I actually need to group my vectors by gfs object???
-     * I doubt I will ever succeed in doing that in meta-programming, I would much rather
-     * duplicate and invade the PDELab adaptivity interface.
+     * * This is necessary because all vectors to be adapted need to be passed to the
+     *   `adaptGrid` function in one go.
+     * *  PDELab requires a non-const reference to the grid function space, but our way
+     *    of not redundantly carrying around gfs's gives us only shared pointers to `const GFS`.
+     *    We solve this by casting away the const...
+     * *  Another thing that bothers me, where I do not understand PDELab semantics enough:
+     *    If two of the vectors in V... use the same grid function space, is it okay to pass
+     *    that gfs twice into adapt or do I actually need to group my vectors by gfs object???
+     *    I doubt I will ever succeed in doing that in meta-programming, I would much rather
+     *    duplicate and invade the PDELab adaptivity interface.
+     * *  The `4` below hardcodes the integration order. It should of course be configurable in
+     *    some way, but I will not target that before I actually think about coarsening.
      */
+    auto transfer = std::apply(
+      [](auto... v)
+      {
+        return std::make_tuple(
+          Dune::PDELab::transferSolutions(
+            *const_cast<typename std::remove_const<typename decltype(v)::element_type::GridFunctionSpace>::type*>(v->gridFunctionSpaceStorage().get()),
+            4,
+            *v
+          )...
+        );
+       },
+       this->solver->getVectors()
+     );
 
-    auto vector = this->solver->getVector();
-    auto gfs = vector->gridFunctionSpaceStorage();
-
-    // The extraction of the grid function space is super-ugly here: PDELab requires a non-const
-    // reference to the grid function space, but our way of not redundantly carrying around gfs's
-    // gives us only shared pointers to `const GFS`. We solve this by casting away the const.
-    Dune::PDELab::adapt_grid(*(this->solver->getGrid()),
-			     *const_cast<typename std::remove_const<typename decltype(gfs)::element_type>::type*>(gfs.get()),
-			     *vector,
-			     4);
-
-    // TODO: Integration order was hardcoded to 4 above, but must come from somewhere
+    std::apply(
+      [this](auto... v)
+      {
+        Dune::PDELab::adaptGrid(
+          *(this->solver->getGrid()),
+	  v...
+	);
+      },
+      transfer
+    );
   }
 };
 

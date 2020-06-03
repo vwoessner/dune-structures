@@ -187,6 +187,11 @@ class TransitionSolver
     return std::get<i>(vectors);
   }
 
+  auto getVectors()
+  {
+    return vectors;
+  }
+
   template<std::size_t i=0>
   auto getConstraintsContainer()
   {
