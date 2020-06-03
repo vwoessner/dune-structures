@@ -101,7 +101,7 @@ class ConstructionContext
   {
     // Parse
     {
-      auto vecstr = config.get<std::string>("vectors", "solution");
+      auto vecstr = config.get<std::string>("solver.vectors", "solution");
       auto vectors  = str_split(vecstr);
 
       std::size_t i = 0;
@@ -163,20 +163,20 @@ class ConstructionContext
                    return step;
                  });
 
-    registerVectorStep("elasticity_operator",
+    registerVectorStep<2>("elasticity_operator",
                  [](auto i, const auto& ctx, const auto& p)
                  {
                    return std::make_shared<ElasticityOperatorStep<i, V...>>(p);
                  });
 
-    registerVectorStep("elasticity_mass_operator",
+    registerVectorStep<2>("elasticity_mass_operator",
                  [](auto i, const auto& ctx, const auto& p)
                  {
                    return std::make_shared<ElasticityMassOperatorStep<i, V...>>(p);
                  });
 
     if constexpr (dim == 2)
-      registerVectorStep("fibre_operator",
+      registerVectorStep<2>("fibre_operator",
                   [](auto i, auto& ctx, const auto& p)
                   {
                     return std::make_shared<FibreReinforcedElasticitySolverStep<i, V...>>(ctx.rootconfig, p);
@@ -308,18 +308,24 @@ class ConstructionContext
 				 });
   }
 
-  template<typename Func>
+  template<std::size_t additional, typename Func>
   void registerVectorStep(std::string identifier, Func&& func)
   {
     is_vector[identifier] = true;
     Dune::Hybrid::forEach(Dune::Hybrid::integralRange(std::integral_constant<std::size_t, 0>{},
-                                                      std::integral_constant<std::size_t, sizeof...(V)>{}),
+                                                      std::integral_constant<std::size_t, sizeof...(V) - additional>{}),
                           [this, identifier, func](auto i){
                             auto subident = identifier + "_" + std::to_string(i);
                             this->mapping[subident] = [i, func](auto& ctx, const auto& p){
                               return func(i, ctx, p);
                             };
                           });
+  }
+
+  template<typename Func>
+  void registerVectorStep(std::string identifier, Func&& func)
+  {
+    registerVectorStep<0>(identifier, std::forward<Func>(func));
   }
 
   template<typename Func>

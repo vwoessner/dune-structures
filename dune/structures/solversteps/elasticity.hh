@@ -19,7 +19,9 @@ class ElasticityOperatorStep
 
   static constexpr int dim = Traits::dim;
   using BaseOperator = AbstractLocalOperatorInterface<typename Traits::GridFunctionSpace>;
-  using LocalOperator = typename OperatorSwitch<typename Traits::GridFunctionSpace, dim>::Elasticity;
+  using FGFS = typename std::tuple_element<i + 1, std::tuple<V...>>::type::GridFunctionSpace;
+  using TGFS = typename std::tuple_element<i + 2, std::tuple<V...>>::type::GridFunctionSpace;
+  using LocalOperator = typename OperatorSwitch<typename Traits::GridFunctionSpace, dim, FGFS, TGFS>::Elasticity;
 
   ElasticityOperatorStep(const Dune::ParameterTree& params)
     : params(params)
@@ -36,19 +38,12 @@ class ElasticityOperatorStep
     auto gfs = vector->gridFunctionSpaceStorage();
     auto material = this->solver->template param<std::shared_ptr<typename Traits::Material>>("material");
     auto lop = std::make_shared<LocalOperator>(*gfs, *gfs, params, material);
-    auto force = std::make_shared<typename Traits::Vector>(*gfs, 0.0);
-    auto traction = std::make_shared<typename Traits::Vector>(*gfs, 0.0);
 
-    // Interpolate the force vector
-    auto force_gf = makeGridFunctionTreeFromCallables(*gfs, get_callable_array<double(typename Traits::Entity, typename Traits::GlobalCoordinate), V...>(*(this->solver), params.get<std::string>("force", "0.0")));
-    Dune::PDELab::interpolate(force_gf, *gfs, *force);
+    auto force = this->solver->template getVector<i + 1>();
+    lop->setCoefficientForce(force->gridFunctionSpaceStorage(), force);
 
-    // Interpolate the traction vector
-    auto traction_gf = makeGridFunctionTreeFromCallables(*gfs, get_callable_array<double(typename Traits::Entity, typename Traits::GlobalCoordinate), V...>(*(this->solver), params.get<std::string>("traction", "0.0")));
-    Dune::PDELab::interpolate(traction_gf, *gfs, *traction);
-
-    lop->setCoefficientForce(gfs, force);
-    lop->setCoefficientTraction(gfs, traction);
+    auto traction = this->solver->template getVector<i + 2>();
+    lop->setCoefficientTraction(traction->gridFunctionSpaceStorage(), traction);
 
     // ... and register it in the parameter system
     this->solver->template introduce_parameter<std::shared_ptr<BaseOperator>>("elasticity_operator", lop);
@@ -76,8 +71,10 @@ class ElasticityMassOperatorStep
   using Traits = VectorStepTraits<i, V...>;
 
   using BaseOperator = AbstractLocalOperatorInterface<typename Traits::GridFunctionSpace>;
+  using FGFS = typename std::tuple_element<i + 1, std::tuple<V...>>::type::GridFunctionSpace;
+  using TGFS = typename std::tuple_element<i + 2, std::tuple<V...>>::type::GridFunctionSpace;
   using TemporalLocalOperator = typename OperatorSwitch<typename Traits::GridFunctionSpace,
-                                                        Traits::dim>::Mass;
+                                                        Traits::dim, FGFS, TGFS>::Mass;
 
   ElasticityMassOperatorStep(const Dune::ParameterTree& params)
     : params(params)

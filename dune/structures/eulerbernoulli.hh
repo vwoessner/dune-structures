@@ -105,14 +105,14 @@ class BasisEvaluator
  * For multiple beams, use a sum of operators. This may not be super
  * high performance, but things are already complicated enough!
  */
-template<typename GFS>
+template<typename GFS, typename FGFS>
 class EulerBernoulli2DLocalOperator
   :  public Dune::PDELab::FullSkeletonPattern
   ,  public Dune::PDELab::FullVolumePattern
   ,  public Dune::PDELab::LocalOperatorDefaultFlags
   ,  public Dune::PDELab::InstationaryLocalOperatorDefaultMethods<double>
-  ,  public Dune::PDELab::NumericalJacobianVolume<EulerBernoulli2DLocalOperator<GFS>>
-  ,  public Dune::PDELab::NumericalJacobianSkeleton<EulerBernoulli2DLocalOperator<GFS>>
+  ,  public Dune::PDELab::NumericalJacobianVolume<EulerBernoulli2DLocalOperator<GFS, FGFS>>
+  ,  public Dune::PDELab::NumericalJacobianSkeleton<EulerBernoulli2DLocalOperator<GFS, FGFS>>
 {
   public:
   // pattern assembly flags
@@ -124,8 +124,8 @@ class EulerBernoulli2DLocalOperator
   enum { doAlphaSkeleton  = true };
 
   EulerBernoulli2DLocalOperator(const Dune::ParameterTree& rootparams, const Dune::ParameterTree& params, std::shared_ptr<const GFS> gfs)
-    : Dune::PDELab::NumericalJacobianVolume<EulerBernoulli2DLocalOperator<GFS>>(1e-9)
-    , Dune::PDELab::NumericalJacobianSkeleton<EulerBernoulli2DLocalOperator<GFS>>(1e-9)
+    : Dune::PDELab::NumericalJacobianVolume<EulerBernoulli2DLocalOperator<GFS, FGFS>>(1e-9)
+    , Dune::PDELab::NumericalJacobianSkeleton<EulerBernoulli2DLocalOperator<GFS, FGFS>>(1e-9)
     , is(gfs->gridView().indexSet())
   {
     // Some debugging switches to reduce recompilations in debugging
@@ -548,11 +548,11 @@ class EulerBernoulli2DLocalOperator
   // Store a force vector - code adapted of how the generated code does it.
   // That is not the nicest way of doing it, but we do not need additional
   // template parameters on this class.
-  using CoefficientForceLFS = Dune::PDELab::LocalFunctionSpace<GFS>;
+  using CoefficientForceLFS = Dune::PDELab::LocalFunctionSpace<FGFS>;
   mutable std::shared_ptr<CoefficientForceLFS> coefficient_force_lfs;
-  using CoefficientForceVector = Dune::PDELab::Backend::Vector<GFS, double>;
+  using CoefficientForceVector = Dune::PDELab::Backend::Vector<FGFS, double>;
   mutable std::shared_ptr<CoefficientForceVector> coefficient_force_vector;
-  mutable std::shared_ptr<const GFS> coefficient_force_gfs;
+  mutable std::shared_ptr<const FGFS> coefficient_force_gfs;
   using CoefficientForceLFSCache = Dune::PDELab::LFSIndexCache<CoefficientForceLFS>;
   mutable std::shared_ptr<CoefficientForceLFSCache> coefficient_force_lfs_cache;
 
@@ -561,7 +561,7 @@ class EulerBernoulli2DLocalOperator
   Cache cache;
 
   public:
-  void setCoefficientForce(std::shared_ptr<const GFS> p_gfs, std::shared_ptr<CoefficientForceVector> p_coefficient_vector)
+  void setCoefficientForce(std::shared_ptr<const FGFS> p_gfs, std::shared_ptr<CoefficientForceVector> p_coefficient_vector)
   {
 	coefficient_force_gfs = p_gfs;
 	coefficient_force_vector = p_coefficient_vector;
@@ -571,14 +571,14 @@ class EulerBernoulli2DLocalOperator
 };
 
 
-template<typename GFS, int dim>
+template<typename GFS, typename FGFS, typename TGFS, int dim>
 class FibreReinforcedBulkOperator
   : public AbstractLocalOperatorInterface<GFS>
 {
   public:
   using BaseOperator = AbstractLocalOperatorInterface<GFS>;
-  using BulkOperator = typename OperatorSwitch<GFS, dim>::Elasticity;
-  using FibreOperator = EulerBernoulli2DLocalOperator<GFS>;
+  using BulkOperator = typename OperatorSwitch<GFS, dim, FGFS, TGFS>::Elasticity;
+  using FibreOperator = EulerBernoulli2DLocalOperator<GFS, FGFS>;
 
   using EG = typename BaseOperator::EG;
   using IG = typename BaseOperator::IG;
@@ -633,8 +633,8 @@ class FibreReinforcedBulkOperator
   }
 
   private:
-  typename OperatorSwitch<GFS, dim>::Elasticity bulkoperator;
-  EulerBernoulli2DLocalOperator<GFS> fibreoperator;
+  typename OperatorSwitch<GFS, dim, FGFS, TGFS>::Elasticity bulkoperator;
+  EulerBernoulli2DLocalOperator<GFS, FGFS> fibreoperator;
 };
 
 
