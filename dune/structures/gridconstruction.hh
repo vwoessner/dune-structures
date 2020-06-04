@@ -50,6 +50,8 @@ auto construct_grid(Dune::MPIHelper& helper, const Dune::ParameterTree& params, 
 
   auto grid = Dune::StructuredGridFactory<GridType>::createSimplexGrid(ll, ur, N);
   grid->loadBalance();
+  grid->globalRefine(params.get<int>("refinement", 0));
+
   auto physical = std::make_shared<std::vector<int>>(grid->size(0), 0);
   GV gv = grid->leafGridView();
   ES es(grid->leafGridView());
