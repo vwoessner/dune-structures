@@ -464,6 +464,11 @@ class FibreReinforcedBulkOperator
 
   virtual ~FibreReinforcedBulkOperator() = default;
 
+  void compute_grid_intersection()
+  {
+    fibreoperator.compute_grid_intersection();
+  }
+
   template<typename CGFS, typename CVEC>
   void setCoefficientForce(std::shared_ptr<CGFS> gfs, std::shared_ptr<CVEC> force)
   {

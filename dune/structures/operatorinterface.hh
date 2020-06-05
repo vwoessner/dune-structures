@@ -55,10 +55,6 @@ class AbstractLocalOperatorInterface
 
   virtual void alpha_skeleton(const IG&, const LFSU&, const X&, const LFSV&, const LFSU&, const X&, const LFSV&, R&, R&) const
   {}
-
-  // I am not really happy to have this in here, but dont care too much
-  virtual void setMaterial(std::shared_ptr<ElasticMaterialBase<typename GFSU::Traits::EntitySet, double>>)
-  {}
 };
 
 #endif

@@ -51,7 +51,13 @@ class FibreReinforcedElasticitySolverStep
     if (name == "material")
     {
       auto material = std::get<std::shared_ptr<typename Traits::Material>>(param);
-      this->solver->template param<std::shared_ptr<BaseOperator>>("fibre_operator")->setMaterial(material);
+      auto lop_pointer = this->solver->template param<std::shared_ptr<BaseOperator>>("fibre_operator").get();
+      dynamic_cast<LocalOperator*>(lop_pointer)->setMaterial(material);
+    }
+    if (name == "adapted")
+    {
+      auto lop_pointer = this->solver->template param<std::shared_ptr<BaseOperator>>("fibre_operator").get();
+      dynamic_cast<LocalOperator*>(lop_pointer)->compute_grid_intersection();
     }
   }
 

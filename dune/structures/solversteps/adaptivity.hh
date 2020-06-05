@@ -17,6 +17,19 @@ class AdaptivitySolverStep
 
   virtual ~AdaptivitySolverStep() = default;
 
+  virtual void set_solver(std::shared_ptr<typename Traits::Solver> solver_)
+  {
+    // Introduce a parameter that notifies steps that the grid has changed.
+    // The actual type and value are not particularly relevant: We simply
+    // encode that the grid has undergone adaptation. More importantly each
+    // update of this parameter can be used as a notification event.
+    solver_->template introduce_parameter<bool>("adapted", false);
+    this->solver = solver_;
+
+    for (auto step : this->steps)
+      step->set_solver(solver_);
+  }
+
   virtual void apply() override
   {
     // TODO: Here, we should check that the grid is unmarked.
@@ -68,6 +81,10 @@ class AdaptivitySolverStep
       },
       transfer
     );
+
+    // Notify other solver steps that the grid has been adapted
+    // They might need to rebuild some data structures.
+    this->solver->update_parameter("adapted", true);
   }
 };
 
