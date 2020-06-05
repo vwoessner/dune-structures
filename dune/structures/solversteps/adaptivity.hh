@@ -2,6 +2,8 @@
 #define DUNE_STRUCTURES_SOLVERSTEPS_ADAPTIVITY_HH
 
 #include<dune/pdelab.hh>
+#include<dune/structures/parametrizedcurves.hh>
+#include<dune/structures/utilities.hh>
 #include<dune/structures/solversteps/base.hh>
 #include<dune/structures/solversteps/traits.hh>
 
@@ -96,6 +98,10 @@ class FiberVicinityMarkerStep
   public:
   using Traits = SimpleStepTraits<V...>;
 
+  FiberVicinityMarkerStep(const Dune::ParameterTree& rootparams)
+    : rootparams(rootparams)
+  {}
+
   virtual ~FiberVicinityMarkerStep() = default;
 
   virtual void apply() override
@@ -103,13 +109,38 @@ class FiberVicinityMarkerStep
     std::cout << "Marking elements in the vicinity of a fibre for refinement..." << std::endl;
     auto vector = this->solver->getVector();
     auto es = vector->gridFunctionSpaceStorage()->gridView();
+    const auto& is = es.indexSet();
 
-    // Pseudo global refine for now
+    // Parse fibres from the configuration
+    std::vector<std::shared_ptr<FibreParametrizationBase<2>>> fibre_parametrizations;
+    auto fibrestr = rootparams.get<std::string>("grid.fibres.fibres", "");
+    auto fibres = str_split(fibrestr);
+    for (auto fibre: fibres)
+    {
+      str_trim(fibre);
+      auto fibreconfig = rootparams.sub("grid.fibres").sub(fibre);
+
+      if (fibreconfig.get<std::string>("shape") == "cylinder")
+        fibre_parametrizations.push_back(std::make_shared<StraightFibre<2>>(fibreconfig));
+      else
+        DUNE_THROW(Dune::Exception, "Fibre shape not supported!");
+    }
+
+    std::vector<FibreGridIntersection> intersections(fibre_parametrizations.size());
+    std::transform(fibre_parametrizations.begin(),
+		   fibre_parametrizations.end(),
+		   intersections.begin(),
+		   [es](auto f){ return compute_grid_fibre_intersection(es, f); });
+
+    // Iterate over the grid and mark cells for refinement
     for (auto e : elements(es))
-      this->solver->getGrid()->mark(1, e);
-
-    // This is where the actual marking happens
+      for (auto fib : intersections)
+	if (fib.element_fibre_intersections.find(is.index(e)) != (fib.element_fibre_intersections.end()))
+          this->solver->getGrid()->mark(1, e);
   }
+
+  private:
+  Dune::ParameterTree rootparams;
 };
 
 #endif

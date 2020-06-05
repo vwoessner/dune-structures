@@ -182,11 +182,12 @@ class ConstructionContext
                     return std::make_shared<FibreReinforcedElasticitySolverStep<i, V...>>(ctx.rootconfig, p);
                   });
 
-    registerStep("fibre_refinement",
-		 [](const auto& ctx, const auto& p)
-		 {
-                    return std::make_shared<FiberVicinityMarkerStep<V...>>();
-		 });
+    if constexpr (dim == 2)
+      registerStep("fibre_refinement",
+                  [](const auto& ctx, const auto& p)
+                  {
+                    return std::make_shared<FiberVicinityMarkerStep<V...>>(ctx.rootconfig);
+                  });
 
     registerStep("filelogger",
 		 [](const auto& ctx, const auto& p)
