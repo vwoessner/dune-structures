@@ -16,12 +16,14 @@ void apply(Dune::MPIHelper& helper, const Dune::ParameterTree& params, char** ar
 {
   auto [grid, es, physical] = construct_grid<dim>(helper, params.sub("grid"), argv);
   std::tie(grid, es, physical) = reorder_grid(grid, es, physical, params.sub("grid"));
-  auto [x, cc] = elasticity_setup<degree>(es);
+  auto [x, cc, force, force_cc, traction, traction_cc] = elasticity_setup<degree>(es);
   using V = typename std::remove_reference<decltype(*x)>::type;
+  using V_F = typename std::remove_reference<decltype(*force)>::type;
+  using V_T = typename std::remove_reference<decltype(*traction)>::type;
 
-  ConstructionContext<V> ctx(helper, params, es, physical);
-  ctx.setVectors(x);
-  ctx.setConstraintsContainers(cc);
+  ConstructionContext<V, V_F, V_T> ctx(helper, params, grid, es, physical);
+  ctx.setVectors(x, force, traction);
+  ctx.setConstraintsContainers(cc, force_cc, traction_cc);
 
   auto solver = ctx.construct(params.sub("solver"));
 

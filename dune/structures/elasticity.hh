@@ -20,38 +20,38 @@
 #include"operators/quasistatic_mass_2d_p2_operator.hh"
 
 
-template<typename GFS, int dim, typename FEM>
+template<typename GFS, int dim, typename FEM, typename FGFS, typename TGFS>
 struct OperatorSwitchImpl
 {};
 
-template<typename GFS, int dim>
-using OperatorSwitch = OperatorSwitchImpl<GFS, dim, typename GFS::template Child<0>::Type::Traits::FiniteElementMap>;
+template<typename GFS, int dim, typename FGFS, typename TGFS>
+using OperatorSwitch = OperatorSwitchImpl<GFS, dim, typename GFS::template Child<0>::Type::Traits::FiniteElementMap, FGFS, TGFS>;
 
-template<typename GFS, typename ES, typename R>
-struct OperatorSwitchImpl<GFS, 3, Dune::PDELab::PkLocalFiniteElementMap<ES, double, R, 1>>
+template<typename GFS, typename ES, typename R, typename FGFS, typename TGFS>
+struct OperatorSwitchImpl<GFS, 3, Dune::PDELab::PkLocalFiniteElementMap<ES, double, R, 1>, FGFS, TGFS>
 {
-  using Elasticity = ElasticityOperator<GFS, GFS, GFS, GFS>;
+  using Elasticity = ElasticityOperator<GFS, GFS, FGFS, TGFS>;
   using Mass = QuasiStaticMassOperator<GFS, GFS>;
 };
 
-template<typename GFS, typename ES, typename R>
-struct OperatorSwitchImpl<GFS, 3, Dune::PDELab::PkLocalFiniteElementMap<ES, double, R, 2>>
+template<typename GFS, typename ES, typename R, typename FGFS, typename TGFS>
+struct OperatorSwitchImpl<GFS, 3, Dune::PDELab::PkLocalFiniteElementMap<ES, double, R, 2>, FGFS, TGFS>
 {
-  using Elasticity = ElasticityP2Operator<GFS, GFS, GFS, GFS>;
+  using Elasticity = ElasticityP2Operator<GFS, GFS, FGFS, TGFS>;
   using Mass = QuasiStaticMassP2Operator<GFS, GFS>;
 };
 
-template<typename GFS, typename ES, typename R>
-struct OperatorSwitchImpl<GFS, 2, Dune::PDELab::PkLocalFiniteElementMap<ES, double, R, 1>>
+template<typename GFS, typename ES, typename R, typename FGFS, typename TGFS>
+struct OperatorSwitchImpl<GFS, 2, Dune::PDELab::PkLocalFiniteElementMap<ES, double, R, 1>, FGFS, TGFS>
 {
-  using Elasticity = Elasticity2DOperator<GFS, GFS, GFS, GFS>;
+  using Elasticity = Elasticity2DOperator<GFS, GFS, FGFS, TGFS>;
   using Mass = QuasiStaticMass2DOperator<GFS, GFS>;
 };
 
-template<typename GFS, typename ES, typename R>
-struct OperatorSwitchImpl<GFS, 2, Dune::PDELab::PkLocalFiniteElementMap<ES, double, R, 2>>
+template<typename GFS, typename ES, typename R, typename FGFS, typename TGFS>
+struct OperatorSwitchImpl<GFS, 2, Dune::PDELab::PkLocalFiniteElementMap<ES, double, R, 2>, FGFS, TGFS>
 {
-  using Elasticity = Elasticity2DP2Operator<GFS, GFS, GFS, GFS>;
+  using Elasticity = Elasticity2DP2Operator<GFS, GFS, FGFS, TGFS>;
   using Mass = QuasiStaticMass2DP2Operator<GFS, GFS>;
 };
 
@@ -83,7 +83,20 @@ auto elasticity_setup(ES es)
   using V = Dune::PDELab::Backend::Vector<GFS, double>;
   auto x = std::make_shared<V>(gfs);
 
-  return std::make_pair(x, cc);
+  // And two more containers for body force and traction fields. One might consider
+  // interpolation with lower order here.
+  using NoCon = Dune::PDELab::NoConstraints;
+  using FGFS = Dune::PDELab::VectorGridFunctionSpace<ES, FEM, dim, VB, VB, NoCon>;
+  using FV = Dune::PDELab::Backend::Vector<FGFS, double>;
+  using FCC = typename FGFS::template ConstraintsContainer<RangeType>::Type;
+
+  auto fgfs = std::make_shared<FGFS>(es, fem);
+  auto force = std::make_shared<FV>(fgfs, 0.0);
+  auto force_cc = std::make_shared<FCC>();
+  auto traction = std::make_shared<FV>(fgfs, 0.0);
+  auto traction_cc = std::make_shared<FCC>();
+
+  return std::make_tuple(x, cc, force, force_cc, traction, traction_cc);
 }
 
 

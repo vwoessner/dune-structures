@@ -39,11 +39,11 @@ P dynamic_parse(const Dune::ParameterTree& tree, std::string default_type = "dou
   auto type = tree.get("datatype", default_type);
 
   if (type == "double")
-    return tree.get<double>("value");
+    return P(tree.get<double>("value"));
   else if (type == "int")
-    return tree.get<int>("value");
+    return P(tree.get<int>("value"));
   else if (type == "string")
-    return tree.get<std::string>("value");
+    return P(tree.get<std::string>("value"));
   else
     DUNE_THROW(Dune::Exception, "Cannot parse parameter");
 }
@@ -89,17 +89,19 @@ class ConstructionContext
 
   ConstructionContext(Dune::MPIHelper& helper,
                       const Dune::ParameterTree& config,
+                      std::shared_ptr<typename StepTraits::Grid> grid,
                       typename StepTraits::EntitySet es,
                       std::shared_ptr<std::vector<int>> physical)
     : helper(helper)
     , rootconfig(config)
+    , grid(grid)
     , es(es)
     , physical(physical)
-    , solver(std::make_unique<TransitionSolver<V...>>(es))
+    , solver(std::make_unique<TransitionSolver<V...>>(grid, es))
   {
     // Parse
     {
-      auto vecstr = config.get<std::string>("vectors", "solution");
+      auto vecstr = config.get<std::string>("solver.vectors", "solution");
       auto vectors  = str_split(vecstr);
 
       std::size_t i = 0;
@@ -109,6 +111,14 @@ class ConstructionContext
         vector_name_to_index[vec] = i++;
       }
     }
+
+    registerStep("adaptivity",
+		 [](auto& ctx, const auto& p)
+		 {
+                   auto step = std::make_shared<AdaptivitySolverStep<V...>>();
+                   ctx.add_children(step, p);
+                   return step;
+		 });
 
     registerVectorStep("constraints",
                  [](auto i, const auto& ctx, const auto& p)
@@ -153,23 +163,30 @@ class ConstructionContext
                    return step;
                  });
 
-    registerVectorStep("elasticity_operator",
+    registerVectorStep<2>("elasticity_operator",
                  [](auto i, const auto& ctx, const auto& p)
                  {
                    return std::make_shared<ElasticityOperatorStep<i, V...>>(p);
                  });
 
-    registerVectorStep("elasticity_mass_operator",
+    registerVectorStep<2>("elasticity_mass_operator",
                  [](auto i, const auto& ctx, const auto& p)
                  {
                    return std::make_shared<ElasticityMassOperatorStep<i, V...>>(p);
                  });
 
     if constexpr (dim == 2)
-      registerVectorStep("fibre_operator",
+      registerVectorStep<2>("fibre_operator",
                   [](auto i, auto& ctx, const auto& p)
                   {
                     return std::make_shared<FibreReinforcedElasticitySolverStep<i, V...>>(ctx.rootconfig, p);
+                  });
+
+    if constexpr (dim == 2)
+      registerStep("fibre_refinement",
+                  [](const auto& ctx, const auto& p)
+                  {
+                    return std::make_shared<FiberVicinityMarkerStep<V...>>(ctx.rootconfig);
                   });
 
     registerStep("filelogger",
@@ -226,6 +243,15 @@ class ConstructionContext
                  [](auto i, const auto& ctx, const auto& p)
                  {
                    return std::make_shared<ProbeTransitionStep<i, V...>>(ctx.es.gridView(), p);
+                 });
+
+    registerStep("repeat",
+		 [](auto& ctx, const auto& p)
+                 {
+                   auto step = std::make_shared<RepeatStep<V...>>(p);
+                   step->set_solver(ctx.solver);
+                   ctx.add_children(step, p);
+                   return step;
                  });
 
     registerStep("timeloop",
@@ -292,18 +318,24 @@ class ConstructionContext
 				 });
   }
 
-  template<typename Func>
+  template<std::size_t additional, typename Func>
   void registerVectorStep(std::string identifier, Func&& func)
   {
     is_vector[identifier] = true;
     Dune::Hybrid::forEach(Dune::Hybrid::integralRange(std::integral_constant<std::size_t, 0>{},
-                                                      std::integral_constant<std::size_t, sizeof...(V)>{}),
+                                                      std::integral_constant<std::size_t, sizeof...(V) - additional>{}),
                           [this, identifier, func](auto i){
                             auto subident = identifier + "_" + std::to_string(i);
                             this->mapping[subident] = [i, func](auto& ctx, const auto& p){
                               return func(i, ctx, p);
                             };
                           });
+  }
+
+  template<typename Func>
+  void registerVectorStep(std::string identifier, Func&& func)
+  {
+    registerVectorStep<0>(identifier, std::forward<Func>(func));
   }
 
   template<typename Func>
@@ -380,6 +412,7 @@ class ConstructionContext
   // The reference members that might be needed for construction of steps
   Dune::MPIHelper& helper;
   const Dune::ParameterTree& rootconfig;
+  std::shared_ptr<typename StepTraits::Grid> grid;
   typename StepTraits::EntitySet es;
   std::shared_ptr<std::vector<int>> physical;
 

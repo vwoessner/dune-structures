@@ -3,6 +3,7 @@
 
 #include<dune/common/parametertree.hh>
 #include<dune/structures/material.hh>
+#include<dune/structures/uniquevariant.hh>
 
 #include<memory>
 #include<string>
@@ -38,15 +39,15 @@ class SimpleStepTraits
 
   // The possible types for parametrization of solver steps
   using Material = MaterialCollection<EntitySet, double>;
-  using Parameter = std::variant<bool,
-                                 double,
-                                 int,
-                                 std::string,
-                                 Dune::FieldVector<double, dim>,
-                                 std::shared_ptr<Material>,
-                                 std::shared_ptr<std::vector<int>>,
-                                 Dune::ParameterTree,
-                                 std::shared_ptr<AbstractLocalOperatorInterface<typename V::GridFunctionSpace>>...>;
+  using Parameter = unique_variant<bool,
+                                   double,
+                                   int,
+                                   std::string,
+                                   Dune::FieldVector<double, dim>,
+                                   std::shared_ptr<Material>,
+                                   std::shared_ptr<std::vector<int>>,
+                                   Dune::ParameterTree,
+                                   std::shared_ptr<AbstractLocalOperatorInterface<typename V::GridFunctionSpace>>...>;
 
 };
 
