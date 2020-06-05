@@ -11,51 +11,14 @@
 #include<dune/geometry/affinegeometry.hh>
 #include<dune/pdelab.hh>
 #include<dune/structures/elasticity.hh>
+#include<dune/structures/enumerate.hh>
 #include<dune/structures/material.hh>
+#include<dune/structures/parametrizedcurves.hh>
+
+#include<algorithm>
 #include<array>
 #include<map>
 #include<tuple>
-
-
-template<int dim>
-class FibreParametrizationBase
-{
-  public:
-  using GlobalCoordinate = Dune::FieldVector<double, dim>;
-  virtual ~FibreParametrizationBase() = default;
-  virtual GlobalCoordinate eval(double t) const = 0;
-  virtual GlobalCoordinate tangent(double t) const = 0;
-};
-
-
-template<int dim>
-class StraightFibre
-  : public FibreParametrizationBase<dim>
-{
-  public:
-  using GlobalCoordinate = Dune::FieldVector<double, dim>;
-  virtual ~StraightFibre() = default;
-
-  StraightFibre(const Dune::ParameterTree& param)
-    : start(param.get<GlobalCoordinate>("start"))
-    , dir(param.get<GlobalCoordinate>("end") - start)
-  {}
-
-  virtual GlobalCoordinate eval(double t) const override
-  {
-    return start + t * dir;
-  }
-
-  virtual GlobalCoordinate tangent(double t) const override
-  {
-    GlobalCoordinate tang(dir);
-    tang /= tang.two_norm();
-    return tang;
-  }
-
-  private:
-  GlobalCoordinate start, dir;
-};
 
 
 template<typename LocalBasis>
@@ -126,7 +89,7 @@ class EulerBernoulli2DLocalOperator
   EulerBernoulli2DLocalOperator(const Dune::ParameterTree& rootparams, const Dune::ParameterTree& params, std::shared_ptr<const GFS> gfs)
     : Dune::PDELab::NumericalJacobianVolume<EulerBernoulli2DLocalOperator<GFS, FGFS>>(1e-9)
     , Dune::PDELab::NumericalJacobianSkeleton<EulerBernoulli2DLocalOperator<GFS, FGFS>>(1e-9)
-    , is(gfs->gridView().indexSet())
+    , gv(gfs->gridView())
   {
     // Some debugging switches to reduce recompilations in debugging
     bool verbose = params.get<bool>("verbose", false);
@@ -163,137 +126,36 @@ class EulerBernoulli2DLocalOperator
     }
     std::cout << "Parsed a total of " << fibre_parametrizations.size() << " fibres from the configuration." << std::endl;
 
-    /* Find intersections of fibres with the grid. The outline is rougly the following:
-       - Find the first simplex that the fibre intersects by doing hierarchical search on fibre(0)
-       - If fibre(0) is outside the grid, do a more expensive method to find the first simplex
-       - Do a bisection of the fibre interval to find the parameter t where it leaves the simplex
-       - Store the parameter interval and the simplex index
-       - Go to the neighboring simplex and repeat until at a boundary intersection or at fibre(1).
-    */
-    for (std::size_t fibindex = 0; fibindex < fibre_parametrizations.size(); ++fibindex)
-    {
-      auto fibre = fibre_parametrizations[fibindex];
-      auto gv = gfs->gridView();
-      int index = -1;
-      typename GFS::Traits::GridView::template Codim<0>::Entity element = *(gv.template begin<0>());
-
-      // This tolerance threshold is used in the following
-      double tol = 1e-12;
-
-      // We iterate this algorithm, because in rare scenarios the strategy of going from cell to cell
-      // across intersections fails. This is when the curve traverses through a grid vertex from one cell
-      // to a non-adjacent one. In these cases we restart the algorithm by doing a grid search for the
-      // current cell.
-      double t = 0.0;
-      while(t + tol < 1.0)
-      {
-        if (t > tol)
-          std::cout << "A restart of the curve cutting algorithm was needed at t=" << t << std::endl;
-
-        // Find the first cell in the grid that the curve traverses
-        for(const auto& e : elements(gv))
-        {
-          auto geo = e.geometry();
-          if (referenceElement(geo).checkInside(geo.local(fibre->eval(t + tol))))
-          {
-            index = is.index(e);
-            element = e;
-            break;
-          }
-        }
-
-        // Coordinate not in the grid, but this is not the start => It is the end.
-        if ((index == -1) && (t > tol))
-          break;
-
-        // The coordinate was not found in the grid, we need to bisect the curve
-        // to find a starting element within the grid.
-        if (index == -1)
-        {
-          double bisect_a = t;
-          double bisect_b = 0.5;
-          while (bisect_b - bisect_a > tol)
-          {
-            double mid = 0.5 * (bisect_a + bisect_b);
-            index = -1;
-            for(const auto& e : elements(gv))
-            {
-              auto geo = e.geometry();
-              if (referenceElement(geo).checkInside(geo.local(fibre->eval(mid))))
-              {
-                index = is.index(e);
-                element = e;
-                break;
-              }
-            }
-
-            if (index == -1)
-              bisect_a = mid;
-            else
-              bisect_b = mid;
-          }
-
-          // Restart the outer loop
-          t = bisect_a;
-          continue;
-        }
-
-        // Go from cell to cell by finding the intersection that the
-        while(index != -1)
-        {
-          // Find the value of t where the curve leaves the element
-          double bisect_a = t;
-          double bisect_b = 1.0;
-          while (bisect_b - bisect_a > tol)
-          {
-            double mid = 0.5 * (bisect_a + bisect_b);
-            auto geo = element.geometry();
-            if (referenceElement(geo).checkInside(geo.local(fibre->eval(mid))))
-              bisect_a = mid;
-            else
-              bisect_b = mid;
-          }
-
-          // Store the fibre segment that we found
-          element_fibre_intersections[index].push_back({fibindex, t, bisect_a});
-          t = bisect_a;
-
-          // Find the intersection and the outside cell
-          index = -1;
-          for (auto intersection : intersections(gv, element))
-          {
-            if (!intersection.boundary())
-            {
-              auto geo = intersection.outside().geometry();
-              if (referenceElement(geo).checkInside(geo.local(fibre->eval(t + tol))))
-              {
-                int inside_index = is.index(element);
-                element = intersection.outside();
-                index = is.index(element);
-                face_fibre_intersections[std::make_pair(inside_index, index)].push_back({fibindex, t});
-                break;
-              }
-            }
-          }
-        }
-      }
-    }
+    compute_grid_intersection();
 
     if (verbose)
     {
       std::cout << "Fibre intersection summary:" << std::endl;
-      for (auto [cell, info] : element_fibre_intersections)
-        for (auto sinfo : info)
-          std::cout << "Cell " << cell << " intersects fibre " << std::get<0>(sinfo)
-                    << " on the curve interval [" << std::get<1>(sinfo) << "," << std::get<2>(sinfo) << "]" << std::endl;
-      for (auto [cells, info] : face_fibre_intersections)
+      for (auto [fibindex, intersection] : enumerate(fibre_intersections))
       {
-        auto [inside, outside] = cells;
-        for (auto sinfo : info)
-          std::cout << "Facet between cell " << inside << " and " << outside << " intersects fibre "
-                    << std::get<0>(sinfo) << " at t=" << std::get<1>(sinfo) << std::endl;
+	for (auto [cellindex, range] : intersection.element_fibre_intersections)
+	{
+	   auto [start, end] = range;
+	   std::cout << "Cell " << cellindex << " intersects fibre " << fibindex
+	                       << " on the curve interval [" << start << "," << end << "]" << std::endl;
+	}
+	for (auto [indexpair, tparam] : intersection.facet_fibre_intersections)
+	{
+	   auto [inside, outside] = indexpair;
+           std::cout << "Facet between cell " << inside << " and " << outside << " intersects fibre "
+	             << fibindex << " at t=" << tparam << std::endl;
+	}
       }
     }
+  }
+
+  void compute_grid_intersection()
+  {
+    fibre_intersections.resize(fibre_parametrizations.size());
+    std::transform(fibre_parametrizations.begin(),
+		   fibre_parametrizations.end(),
+		   fibre_intersections.begin(),
+		   [this](auto f){ return compute_grid_fibre_intersection(this->gv, f); });
   }
 
   template<typename EG, typename LFSU, typename X, typename LFSV, typename R>
@@ -304,34 +166,37 @@ class EulerBernoulli2DLocalOperator
 
     // See whether something needs to be done on this cell
     auto entity = eg.entity();
-    auto it = element_fibre_intersections.find(is.index(entity));
-    if (it == element_fibre_intersections.end())
-      return;
+    const auto& is = gv.indexSet();
 
-    // Extract some necessary information
-    using namespace Dune::Indices;
-    auto child_0 = child(lfsu, _0);
-    auto child_1 = child(lfsu, _1);
-    auto cellgeo = entity.geometry();
-
-    BasisEvaluator<typename LFSU::template Child<0>::Type::Traits::FiniteElementType::Traits::LocalBasisType> basis(child_0.finiteElement().localBasis());
-
-    // Get the force coefficients
-    coefficient_force_lfs->bind(eg.entity());
-    typename CoefficientForceVector::template LocalView<CoefficientForceLFSCache> coefficient_force_view(*coefficient_force_vector);
-    coefficient_force_lfs_cache->update();
-    Dune::PDELab::LocalVector<double> local_coefficient_force_vector(coefficient_force_lfs->size());
-    coefficient_force_view.bind(*coefficient_force_lfs_cache);
-    coefficient_force_view.read(local_coefficient_force_vector);
-    coefficient_force_view.unbind();
-
-    // Loop over curve segments in this cell. most of the time this will be just one.
-    auto segments = it->second;
-    for (auto segment : segments)
+    for (std::size_t fibindex=0; fibindex<fibre_parametrizations.size(); ++fibindex)
     {
-      auto fibre = fibre_parametrizations[std::get<0>(segment)];
-      auto start = fibre->eval(std::get<1>(segment));
-      auto stop = fibre->eval(std::get<2>(segment));
+      // Check whether this fiber actually intersects the cell
+      auto fibintersection = fibre_intersections[fibindex];
+      auto it = fibintersection.element_fibre_intersections.find(is.index(entity));
+      if (it == fibintersection.element_fibre_intersections.end())
+	continue;
+
+      auto fibre = fibre_parametrizations[fibindex];
+
+      // Extract some necessary information
+      using namespace Dune::Indices;
+      auto child_0 = child(lfsu, _0);
+      auto child_1 = child(lfsu, _1);
+      auto cellgeo = entity.geometry();
+
+      BasisEvaluator<typename LFSU::template Child<0>::Type::Traits::FiniteElementType::Traits::LocalBasisType> basis(child_0.finiteElement().localBasis());
+
+      // Get the force coefficients
+      coefficient_force_lfs->bind(eg.entity());
+      typename CoefficientForceVector::template LocalView<CoefficientForceLFSCache> coefficient_force_view(*coefficient_force_vector);
+      coefficient_force_lfs_cache->update();
+      Dune::PDELab::LocalVector<double> local_coefficient_force_vector(coefficient_force_lfs->size());
+      coefficient_force_view.bind(*coefficient_force_lfs_cache);
+      coefficient_force_view.read(local_coefficient_force_vector);
+      coefficient_force_view.unbind();
+
+      auto start = fibre->eval(it->second.first);
+      auto stop = fibre->eval(it->second.second);
 
       // Construct the geometry of the 1D inclusion embedded into the reference element of the cell
       using LineGeometry = Dune::AffineGeometry<double, 1, 2>;
@@ -374,7 +239,7 @@ class EulerBernoulli2DLocalOperator
 
         // The tangential vector for the curve
         // Determination of the evaluation parameter here is a bit flaky.
-        auto t = fibre->tangent(std::get<1>(segment) + ip.position() * (std::get<2>(segment) - std::get<1>(segment)));
+        auto t = fibre->tangent(it->second.first + ip.position() * (it->second.second - it->second.first));
 
         // Evaluate the body force vector
         Dune::FieldVector<double, 2> force(0.0);
@@ -383,8 +248,8 @@ class EulerBernoulli2DLocalOperator
             force[k] += local_coefficient_force_vector(lfsv.child(k), i) * basis.function(i);
 
         // Extract physical parameter of the fibre
-        auto E = fibre_modulus[std::get<0>(segment)];
-        auto d = fibre_radii[std::get<0>(segment)];
+        auto E = fibre_modulus[fibindex];
+        auto d = fibre_radii[fibindex];
         auto A = d;
         auto I = (d*d*d) / 12.0;
 
@@ -416,40 +281,43 @@ class EulerBernoulli2DLocalOperator
     if (!enable_skeleton)
       return;
 
-    // The notion of inside and outside is quite complex in this situation.
-    // We are traversing the 2D grid, whose intersections have inside and outside.
-    // But these do not necessarily match the notion of inside and outside of
-    // the 1D discretization. We therefore need to remap these references in some
-    // cases.
-    bool flipped = false;
+    // See whether something needs to be done on this intersection
+    const auto& is = gv.indexSet();
 
-    auto it = face_fibre_intersections.find(std::make_pair(is.index(ig.inside()), is.index(ig.outside())));
-    if (it == face_fibre_intersections.end())
+    for (std::size_t fibindex=0; fibindex<fibre_parametrizations.size(); ++fibindex)
     {
-      it = face_fibre_intersections.find(std::make_pair(is.index(ig.outside()), is.index(ig.inside())));
-      if (it == face_fibre_intersections.end())
-        return;
+      // The notion of inside and outside is quite complex in this situation.
+      // We are traversing the 2D grid, whose intersections have inside and outside.
+      // But these do not necessarily match the notion of inside and outside of
+      // the 1D discretization. We therefore need to remap these references in some
+      // cases.
+      bool flipped = false;
 
-      flipped = true;
-    }
+      // Check whether this fiber actually intersects the cell
+      auto fibintersection = fibre_intersections[fibindex];
+      auto it = fibintersection.facet_fibre_intersections.find(std::make_pair(is.index(ig.inside()), is.index(ig.outside())));
+      if (it == fibintersection.facet_fibre_intersections.end())
+      {
+        it = fibintersection.facet_fibre_intersections.find(std::make_pair(is.index(ig.outside()), is.index(ig.inside())));
+        if (it == fibintersection.facet_fibre_intersections.end())
+          continue;
 
-    // Extract some necessary information
-    using namespace Dune::Indices;
-    auto child_0 = child(lfsu_s, _0);
-    auto child_1 = child(lfsu_s, _1);
-    auto cellgeo_s = (flipped ? ig.outside() : ig.inside()).geometry();
-    auto cellgeo_n = (flipped ? ig.inside() : ig.outside()).geometry();
+        flipped = true;
+      }
 
-    using Evaluator = BasisEvaluator<typename LFSU::template Child<0>::Type::Traits::FiniteElementType::Traits::LocalBasisType>;
-    Evaluator basis_s(child_0.finiteElement().localBasis());
-    Evaluator basis_n(child_0.finiteElement().localBasis());
+      // Extract some necessary information
+      using namespace Dune::Indices;
+      auto child_0 = child(lfsu_s, _0);
+      auto child_1 = child(lfsu_s, _1);
+      auto cellgeo_s = (flipped ? ig.outside() : ig.inside()).geometry();
+      auto cellgeo_n = (flipped ? ig.inside() : ig.outside()).geometry();
 
-    // Loop over curve segments in this cell. most of the time this will be just one.
-    auto segments = it->second;
-    for (auto segment : segments)
-    {
-      auto fibre = fibre_parametrizations[std::get<0>(segment)];
-      auto tparam = fibre->eval(std::get<1>(segment));
+      using Evaluator = BasisEvaluator<typename LFSU::template Child<0>::Type::Traits::FiniteElementType::Traits::LocalBasisType>;
+      Evaluator basis_s(child_0.finiteElement().localBasis());
+      Evaluator basis_n(child_0.finiteElement().localBasis());
+
+      auto fibre = fibre_parametrizations[fibindex];
+      auto tparam = fibre->eval(it->second);
 
       // Position in reference element of the inside/outside cell
       auto pos_s = cellgeo_s.local(tparam);
@@ -494,11 +362,11 @@ class EulerBernoulli2DLocalOperator
       auto jit_n = cellgeo_n.jacobianInverseTransposed(pos_n);
 
       // The tangential vector for the curve
-      auto t = fibre->tangent(std::get<1>(segment));
+      auto t = fibre->tangent(it->second);
 
       // Extract physical parameter of the fibre
-      auto E = fibre_modulus[std::get<0>(segment)];
-      auto d = fibre_radii[std::get<0>(segment)];
+      auto E = fibre_modulus[fibindex];
+      auto d = fibre_radii[fibindex];
       auto A = d;
       auto I = (d*d*d) / 12.0;
 
@@ -538,10 +406,9 @@ class EulerBernoulli2DLocalOperator
 
   double beta;
 
-  const typename GFS::Traits::GridView::IndexSet& is;
-  std::map<int, std::vector<std::tuple<std::size_t, double, double>>> element_fibre_intersections;
-  std::map<std::pair<int, int>, std::vector<std::tuple<std::size_t, double>>> face_fibre_intersections;
+  typename GFS::Traits::GridView gv;
   std::vector<std::shared_ptr<FibreParametrizationBase<2>>> fibre_parametrizations;
+  std::vector<FibreGridIntersection> fibre_intersections;
   std::vector<double> fibre_modulus;
   std::vector<double> fibre_radii;
 
