@@ -245,6 +245,15 @@ class ConstructionContext
                    return std::make_shared<ProbeTransitionStep<i, V...>>(ctx.es.gridView(), p);
                  });
 
+    registerStep("repeat",
+		 [](auto& ctx, const auto& p)
+                 {
+                   auto step = std::make_shared<RepeatStep<V...>>(p);
+                   step->set_solver(ctx.solver);
+                   ctx.add_children(step, p);
+                   return step;
+                 });
+
     registerStep("timeloop",
                  [](auto& ctx, const auto& p)
                  {
