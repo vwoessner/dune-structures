@@ -22,19 +22,19 @@ namespace Dune::BlockLab {
   class AbstractBlockBase<std::tuple<P...>, std::tuple<V...>>
   {
     public:
-    using Traits = BlockTraits<std::tuple<P...>, std::tuple<V...>>;
+    using Solver = Dune::BlockLab::BlockSolver<std::tuple<P...>, std::tuple<V...>>;
     static constexpr std::size_t vectors = 1;
 
     // The virtual interface - pretty simple
     virtual ~AbstractBlockBase() = default;
 
-    virtual void set_solver(std::shared_ptr<typename Traits::Solver> solver_) = 0;
+    virtual void set_solver(std::shared_ptr<Solver> solver_) = 0;
     virtual void setup() = 0;
     virtual void apply() = 0;
-    virtual void update_parameter(std::string name, typename Traits::Parameter param) = 0;
+    virtual void update_parameter(std::string name, typename Solver::Parameter param) = 0;
 
     protected:
-    std::shared_ptr<typename Traits::Solver> solver;
+    std::shared_ptr<Solver> solver;
   };
 
 

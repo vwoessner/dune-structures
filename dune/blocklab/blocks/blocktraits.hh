@@ -1,7 +1,6 @@
 #ifndef DUNE_BLOCKLAB_BLOCKS_BLOCKTRAITS_HH
 #define DUNE_BLOCKLAB_BLOCKS_BLOCKTRAITS_HH
 
-#include<dune/blocklab/utilities/uniquevariant.hh>
 #include<dune/common/fvector.hh>
 #include<dune/common/parametertree.hh>
 
@@ -38,17 +37,7 @@ namespace Dune::BlockLab {
     using Range = typename Vector::field_type;
     using ConstraintsContainer = typename GridFunctionSpace::template ConstraintsContainer<Range>::Type;
     using VectorBackend = typename GridFunctionSpace::Traits::Backend;
-
-    // The possible types for parametrization of solver steps
-    // TODO: - Add operator interface std::shared_ptr<AbstractLocalOperatorInterface<typename V::GridFunctionSpace>>...>
-    using Parameter = unique_variant<bool,
-                                     double,
-                                     int,
-                                     std::string,
-                                     Dune::FieldVector<double, dim>,
-                                     Dune::ParameterTree,
-				     P...>;
-
+    using Parameter = typename Solver::Parameter;
   };
 
 } // namespace Dune::BlockLab

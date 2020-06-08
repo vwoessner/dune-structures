@@ -7,41 +7,58 @@
 
 #include<dune/blocklab/blocks/blockbase.hh>
 #include<dune/blocklab/blocks/blocktraits.hh>
+#include<dune/blocklab/utilities/uniquevariant.hh>
+#include<dune/common/fvector.hh>
 #include<dune/common/shared_ptr.hh>
 
+#include<map>
 #include<memory>
 #include<string>
+#include<tuple>
 #include<vector>
 
 namespace Dune::BlockLab {
 
   template<typename P, typename V>
-  class BlockSolver
+  class BlockSolver;
+
+  template<typename... P, typename... V>
+  class BlockSolver<std::tuple<P...>, std::tuple<V...>>
   {
     public:
-    using Traits = BlockTraits<P, V>;
-    using Parameter = typename Traits::Parameter;
+    // Export the template parameters of the solver class
+    using ParameterTuple = std::tuple<P...>;
+    using VectorTuple = std::tuple<V...>;
+
+    // The possible types for parametrization of solver steps
+    // TODO: - Add operator interface std::shared_ptr<AbstractLocalOperatorInterface<typename V::GridFunctionSpace>>...>
+    using Parameter = unique_variant<bool,
+                                     double,
+                                     int,
+                                     std::string,
+                                     Dune::ParameterTree,
+				     P...>;
 
     void apply()
     {
-      for (auto step : steps)
-	step->setup();
+      for (auto block : blocks)
+	block->setup();
 
-      for (auto step : steps)
-	step->apply();
+      for (auto block : blocks)
+	block->apply();
     }
 
-    template<typename STEP>
-    void add(std::shared_ptr<STEP> step)
+    template<typename BLOCK>
+    void add(std::shared_ptr<BLOCK> block)
     {
-      steps.push_back(step);
-      step->set_solver(Dune::stackobject_to_shared_ptr(*this));
+      blocks.push_back(block);
+      block->set_solver(Dune::stackobject_to_shared_ptr(*this));
     }
 
-    template<typename STEP>
-    void add(STEP& step)
+    template<typename BLOCK>
+    void add(BLOCK& block)
     {
-      add(Dune::stackobject_to_shared_ptr(step));
+      add(Dune::stackobject_to_shared_ptr(block));
     }
 
     template<typename T>
@@ -62,12 +79,12 @@ namespace Dune::BlockLab {
       update_parameter(name, Parameter(std::forward<T>(val)));
     }
 
-    void update_parameter(std::string name, Parameter& val)
+    void update_parameter(std::string name, Parameter val)
     {
       paramdata[name] = val;
 
-      for (auto step: steps)
-        step->update_parameter(name, paramdata[name]);
+      for (auto block: blocks)
+        block->update_parameter(name, paramdata[name]);
     }
 
     template<typename T>
@@ -77,7 +94,7 @@ namespace Dune::BlockLab {
     }
 
     private:
-    std::vector<std::shared_ptr<AbstractBlockBase<P, V>>> steps;
+    std::vector<std::shared_ptr<AbstractBlockBase<std::tuple<P...>, std::tuple<V...>>>> blocks;
     std::map<std::string, Parameter> paramdata;
   };
 
