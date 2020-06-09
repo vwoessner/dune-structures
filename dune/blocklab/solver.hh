@@ -7,6 +7,7 @@
 
 #include<dune/blocklab/blocks/blockbase.hh>
 #include<dune/blocklab/blocks/blocktraits.hh>
+#include<dune/blocklab/operators/virtualinterface.hh>
 #include<dune/blocklab/utilities/uniquevariant.hh>
 #include<dune/common/fvector.hh>
 #include<dune/common/shared_ptr.hh>
@@ -31,13 +32,13 @@ namespace Dune::BlockLab {
     using VectorTuple = std::tuple<V...>;
 
     // The possible types for parametrization of solver steps
-    // TODO: - Add operator interface std::shared_ptr<AbstractLocalOperatorInterface<typename V::GridFunctionSpace>>...>
     using Parameter = unique_variant<bool,
                                      double,
                                      int,
                                      std::string,
                                      Dune::ParameterTree,
-				     P...>;
+                                     std::shared_ptr<AbstractLocalOperatorInterface<typename V::GridFunctionSpace>>...,
+                                     P...>;
 
     void apply()
     {
