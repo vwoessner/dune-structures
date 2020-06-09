@@ -47,7 +47,7 @@ namespace Dune::BlockLab {
 	return grid;
       }
 
-      std::shared_ptr<Parameter> createParameter()
+      std::shared_ptr<Parameter> createParameters()
       {
 	return std::make_shared<Parameter>();
       }
