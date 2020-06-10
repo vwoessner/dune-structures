@@ -32,9 +32,9 @@ namespace Dune::BlockLab {
     /* Construct this block from the construction context */
     template<typename Context>
     InterpolationBlock(Context& ctx, const Dune::ParameterTree& config)
-      : InterpolationBlock({muparser_callable<FunctionSignature>(
+      : InterpolationBlock(muparser_callable_array<typename Traits::GridFunctionSpace, FunctionSignature>(
 	                    config.get<std::string>("functions"),
-                            ctx.getSolver())}
+                            ctx.getSolver())
 			   )
     {}
 

@@ -5,8 +5,10 @@
  *  to parse arithmetic expressions from configuration files.
  */
 
+#include<dune/blocklab/utilities/stringsplit.hh>
 #include<dune/common/hybridutilities.hh>
 #include<dune/grid/concepts/intersection.hh>
+#include<dune/typetree/utility.hh>
 
 #include<muParser.h>
 
@@ -97,6 +99,46 @@ namespace Dune::BlockLab {
     using CB = impl::BlockSolverCallbacks<typename Solver::ParameterTuple, typename Solver::VectorTuple>;
     CB::solver = solver.get();
     return MuParserCallable<Signature>(expr, std::make_pair("param", CB::param));
+  }
+
+
+
+  template<typename GFS, typename Signature, typename... Callbacks>
+  std::array<std::function<Signature>, Dune::TypeTree::TreeInfo<GFS>::leafCount>
+  muparser_callable_array(std::string expr, Callbacks&&... callbacks)
+  {
+    constexpr auto len = Dune::TypeTree::TreeInfo<GFS>::leafCount;
+    std::array<std::function<Signature>, len> result;
+
+    auto exprs = string_split(expr);
+    if (exprs.size() == 1)
+      result.fill(muparser_callable<Signature, Callbacks...>(exprs[0], std::forward<Callbacks>(callbacks)...));
+    else
+      std::transform(exprs.begin(), exprs.end(), result.begin(),
+		     [callbacks...](auto it){
+                       return muparser_callable<Signature, Callbacks...>(it, std::forward<Callbacks>(callbacks)...);
+                     });
+
+    return std::move(result);
+  }
+
+  template<typename GFS, typename Signature, typename Solver>
+  std::array<std::function<Signature>, Dune::TypeTree::TreeInfo<GFS>::leafCount>
+  muparser_callable_array(std::string expr, std::shared_ptr<Solver> solver)
+  {
+    constexpr auto len = Dune::TypeTree::TreeInfo<GFS>::leafCount;
+    std::array<std::function<Signature>, len> result;
+
+    auto exprs = string_split(expr);
+    if (exprs.size() == 1)
+      result.fill(muparser_callable<Signature, Solver>(exprs[0], solver));
+    else
+      std::transform(exprs.begin(), exprs.end(), result.begin(),
+		     [solver](auto it){
+                       return muparser_callable<Signature, Solver>(it, solver);
+                     });
+
+    return std::move(result);
   }
 
 } // namespace Dune::BlockLab
