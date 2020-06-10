@@ -8,7 +8,6 @@
 #include<dune/blocklab/utilities/stringsplit.hh>
 #include<dune/common/hybridutilities.hh>
 #include<dune/grid/concepts/intersection.hh>
-#include<dune/typetree/utility.hh>
 
 #include<muParser.h>
 
@@ -103,12 +102,11 @@ namespace Dune::BlockLab {
 
 
 
-  template<typename GFS, typename Signature, typename... Callbacks>
-  std::array<std::function<Signature>, Dune::TypeTree::TreeInfo<GFS>::leafCount>
+  template<std::size_t size, typename Signature, typename... Callbacks>
+  std::array<std::function<Signature>, size>
   muparser_callable_array(std::string expr, Callbacks&&... callbacks)
   {
-    constexpr auto len = Dune::TypeTree::TreeInfo<GFS>::leafCount;
-    std::array<std::function<Signature>, len> result;
+    std::array<std::function<Signature>, size> result;
 
     auto exprs = string_split(expr);
     if (exprs.size() == 1)
@@ -122,12 +120,11 @@ namespace Dune::BlockLab {
     return std::move(result);
   }
 
-  template<typename GFS, typename Signature, typename Solver>
-  std::array<std::function<Signature>, Dune::TypeTree::TreeInfo<GFS>::leafCount>
+  template<std::size_t size, typename Signature, typename Solver>
+  std::array<std::function<Signature>, size>
   muparser_callable_array(std::string expr, std::shared_ptr<Solver> solver)
   {
-    constexpr auto len = Dune::TypeTree::TreeInfo<GFS>::leafCount;
-    std::array<std::function<Signature>, len> result;
+    std::array<std::function<Signature>, size> result;
 
     auto exprs = string_split(expr);
     if (exprs.size() == 1)

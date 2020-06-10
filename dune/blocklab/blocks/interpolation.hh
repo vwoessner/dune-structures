@@ -6,12 +6,12 @@
  *  into a DoF vector. Context-based construction uses the
  *  MuParser library to parse functions from the inifile.
  */
-
 #include<dune/blocklab/blocks/blockbase.hh>
 #include<dune/blocklab/construction/callabletree.hh>
 #include<dune/blocklab/construction/muparser.hh>
 #include<dune/common/parametertree.hh>
 #include<dune/pdelab/gridfunctionspace/interpolate.hh>
+#include<dune/typetree/utility.hh>
 
 #include<array>
 #include<functional>
@@ -32,7 +32,7 @@ namespace Dune::BlockLab {
     /* Construct this block from the construction context */
     template<typename Context>
     InterpolationBlock(Context& ctx, const Dune::ParameterTree& config)
-      : InterpolationBlock(muparser_callable_array<typename Traits::GridFunctionSpace, FunctionSignature>(
+      : InterpolationBlock(muparser_callable_array<Dune::TypeTree::TreeInfo<typename Traits::GridFunctionSpace>::leafCount, FunctionSignature>(
 	                    config.get<std::string>("functions"),
                             ctx.getSolver())
 			   )
@@ -45,7 +45,7 @@ namespace Dune::BlockLab {
       : funcs(funcs)
     {}
 
-    virtual ~InterpolationBlock() {}
+    virtual ~InterpolationBlock() = default;
 
     virtual void apply() override
     {
