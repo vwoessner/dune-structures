@@ -83,11 +83,11 @@ namespace Dune::BlockLab {
 
       // A pointer to a solver instance. This currently prohibits two solvers
       // of exact same type to be instantiated within one program
-      static BlockSolver<P, V>* solver;
+      static const BlockSolver<P, V>* solver;
     };
 
     template<typename P, typename V>
-    BlockSolver<P, V>* BlockSolverCallbacks<P, V>::solver = 0;
+    const BlockSolver<P, V>* BlockSolverCallbacks<P, V>::solver = 0;
 
   }
 

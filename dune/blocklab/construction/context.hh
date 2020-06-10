@@ -55,6 +55,17 @@ namespace Dune::BlockLab {
       return rootconfig;
     }
 
+    // Get a pointer to the solver object that is about to be constructed.
+    // I am more than unhappy with this being in the interface because the
+    // solver interface cannot be actually used during construction. But it
+    // happens that some parts (Muparser callbacks) need the pointer to the
+    // solver during construction! I am now handing out a const version,
+    // which should offer some protection against misuse
+    std::shared_ptr<const BlockSolver<P, V>> getSolver()
+    {
+      return solver;
+    }
+
     template<typename Func>
     void registerBlock(std::string identifier, Func&& func)
     {
@@ -91,12 +102,15 @@ namespace Dune::BlockLab {
 
     std::shared_ptr<BlockSolver<P, V>> constructSolver(const Dune::ParameterTree& config)
     {
-      auto solver = std::make_shared<BlockSolver<P, V>>(
-	std::apply([](auto... p){ return std::make_tuple(p->getVector()...); }, providers),
-	std::apply([](auto... p){ return std::make_tuple(p->getConstraintsContainer()...); }, providers)
-      );
+      if(!solver)
+      {
+	solver = std::make_shared<BlockSolver<P, V>>(
+	  std::apply([](auto... p){ return std::make_tuple(p->getVector()...); }, providers),
+	  std::apply([](auto... p){ return std::make_tuple(p->getConstraintsContainer()...); }, providers)
+	);
 
-      solver->add(std::make_shared<ParentBlockBase<P, V>>(*this, config));
+	solver->add(std::make_shared<ParentBlockBase<P, V>>(*this, config));
+      }
       return solver;
     }
 
@@ -111,7 +125,7 @@ namespace Dune::BlockLab {
 	std::size_t i = 0;
 	if (config.hasKey("vector"))
         {
-          auto vector = config.get<std::string>("vector");
+          auto vector = config.get<std::string>("vector", "solution");
           auto it = vector_names.find(vector);
           if (it == vector_names.end())
             DUNE_THROW(Dune::Exception, "The specified vector name does not exist");
@@ -136,6 +150,10 @@ namespace Dune::BlockLab {
     // The objects that are available during grid construction through above getter
     Dune::MPIHelper& mpihelper;
     Dune::ParameterTree rootconfig;
+
+    // The solver class. Actually this should not be exposed during construction
+    // because only a very limited subset of its interface is valid
+    std::shared_ptr<BlockSolver<P, V>> solver;
   };
 
 } // namespace Dune::BlockLab
