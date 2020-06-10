@@ -1,6 +1,7 @@
 #ifndef DUNE_BLOCKLAB_GRIDS_STRUCTURED_HH
 #define DUNE_BLOCKLAB_GRIDS_STRUCTURED_HH
 
+#include<dune/blocklab/grids/capabilities.hh>
 #include<dune/common/filledarray.hh>
 #include<dune/common/fvector.hh>
 #include<dune/common/parametertree.hh>
@@ -21,7 +22,7 @@ namespace Dune::BlockLab {
       public:
       using Grid = GridImpl;
       using Parameter = std::tuple<>;
-      using EntitySet = Dune::PDELab::OverlappingEntitySet<typename Grid::LeafGridView>;
+
       static constexpr int dim = Grid::dimension;
 
       StructuredGridProviderImpl(const Dune::ParameterTree& config)
@@ -61,10 +62,40 @@ namespace Dune::BlockLab {
 
 
   template<typename Grid>
-  using StructuredSimplexGridProvider = impl::StructuredGridProviderImpl<Grid, true>;
+  class StructuredSimplexGridProvider
+    : public impl::StructuredGridProviderImpl<Grid, true>
+  {
+    using impl::StructuredGridProviderImpl<Grid, true>::StructuredGridProviderImpl;
+  };
 
   template<typename Grid>
-  using StructuredCubeGridProvider = impl::StructuredGridProviderImpl<Grid, false>;
+  class StructuredCubeGridProvider
+    : public impl::StructuredGridProviderImpl<Grid, false>
+  {
+    using impl::StructuredGridProviderImpl<Grid, false>::StructuredGridProviderImpl;
+  };
+
+  namespace Capabilities {
+
+    template<typename Grid>
+    struct HasSimplices<StructuredSimplexGridProvider<Grid>>
+    {
+      static constexpr bool value = true;
+    };
+
+    template<typename Grid>
+    struct HasCubes<StructuredCubeGridProvider<Grid>>
+    {
+      static constexpr bool value = true;
+    };
+
+    template<typename Grid>
+    struct HasSimplices<StructuredCubeGridProvider<Grid>>
+    {
+      static constexpr bool value = isAdaptive<StructuredCubeGridProvider<Grid>>();
+    };
+
+  } // namespace Capabilities
 
 } // namespace Dune::BlockLab
 

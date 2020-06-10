@@ -1,6 +1,7 @@
 #ifndef DUNE_BLOCKLAB_GRIDS_GMSH_HH
 #define DUNE_BLOCKLAB_GRIDS_GMSH_HH
 
+#include<dune/blocklab/grids/capabilities.hh>
 #include<dune/common/parametertree.hh>
 #include<dune/grid/common/gridfactory.hh>
 #include<dune/grid/io/file/gmshreader.hh>
@@ -137,6 +138,22 @@ namespace Dune::BlockLab {
     std::shared_ptr<Grid> grid;
     std::shared_ptr<std::vector<int>> physical;
   };
+
+  namespace Capabilities {
+
+    template<typename Grid>
+    struct HasSimplices<GMSHGridProvider<Grid>>
+    {
+      static constexpr bool value = true;
+    };
+
+    template<typename Grid>
+    struct HasCubes<GMSHGridProvider<Grid>>
+    {
+      static constexpr bool value = true;
+    };
+
+  } // namespace Capabilities
 
 } // namespace Dune::BlockLab
 

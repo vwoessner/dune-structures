@@ -1,5 +1,6 @@
 #include"config.h"
 
+#include<dune/blocklab/grids/capabilities.hh>
 #include<dune/blocklab/grids/concept.hh>
 #include<dune/blocklab/grids/structured.hh>
 #include<dune/common/parallel/mpihelper.hh>
@@ -65,6 +66,38 @@ int main(int argc, char** argv)
   test.check(Dune::BlockLab::isGridProvider<Provider6>())
       << "Provider6 failed the GridProvider concept check";
 
+  // Make sure that the capabilities deliver the expected values
+  test.check(Dune::BlockLab::hasSimplices<Provider1>() &&
+	     !Dune::BlockLab::hasCubes<Provider1>() &&
+	     Dune::BlockLab::isAdaptive<Provider1>())
+      << "Provider1 set wrong capabilities";
+
+  test.check(Dune::BlockLab::hasSimplices<Provider2>() &&
+	     Dune::BlockLab::hasCubes<Provider2>() &&
+	     Dune::BlockLab::isAdaptive<Provider2>())
+      << "Provider2 set wrong capabilities";
+
+  test.check(Dune::BlockLab::hasSimplices<Provider3>() &&
+	     !Dune::BlockLab::hasCubes<Provider3>() &&
+	     Dune::BlockLab::isAdaptive<Provider3>())
+      << "Provider3 set wrong capabilities";
+
+  test.check(Dune::BlockLab::hasSimplices<Provider4>() &&
+	     Dune::BlockLab::hasCubes<Provider4>() &&
+	     Dune::BlockLab::isAdaptive<Provider4>())
+      << "Provider4 set wrong capabilities";
+
+  test.check(!Dune::BlockLab::hasSimplices<Provider5>() &&
+	     Dune::BlockLab::hasCubes<Provider5>() &&
+	     !Dune::BlockLab::isAdaptive<Provider5>())
+      << "Provider5 set wrong capabilities";
+
+  test.check(!Dune::BlockLab::hasSimplices<Provider6>() &&
+	     Dune::BlockLab::hasCubes<Provider6>() &&
+	     !Dune::BlockLab::isAdaptive<Provider6>())
+      << "Provider1 set wrong capabilities";
+
+  // Check that the providers create valid gris
   test.check(checkGrid<Provider1>())
       << "Provider1 created an invalid grid";
 
