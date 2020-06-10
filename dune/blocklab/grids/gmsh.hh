@@ -80,7 +80,7 @@ namespace Dune::BlockLab {
     public:
     using Grid = Dune::UGGrid<dimension>;
     using Parameter = std::tuple<std::shared_ptr<std::vector<int>>>;
-    using EntitySet = Dune::PDELab::OverlappingEntitySet<typename Grid::LeafGridView>;
+
     static constexpr int dim = Grid::dimension;
 
     GMSHGridProvider(const Dune::ParameterTree& config)

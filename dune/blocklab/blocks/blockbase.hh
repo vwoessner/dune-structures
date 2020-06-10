@@ -84,8 +84,8 @@ namespace Dune::BlockLab {
       {
         if(config.hasSub(block))
           add(ctx.constructBlock(block, config.sub(block)));
-        else if(ctx.rootconfig.hasSub(block))
-          add(ctx.constructBlock(block, ctx.rootconfig.sub(block)));
+        else if(ctx.getRootConfig().hasSub(block))
+          add(ctx.constructBlock(block, ctx.getRootConfig().sub(block)));
         else
         {
           Dune::ParameterTree dummy;

@@ -39,7 +39,7 @@ int main(int argc, char** argv)
   Dune::MPIHelper& helper = Dune::MPIHelper::instance(argc, argv);
 
   // Construct a solver instance
-  auto solver = std::make_shared<Dune::BlockLab::BlockSolver<std::tuple<>, std::tuple<>>>();
+  auto solver = std::make_shared<Dune::BlockLab::BlockSolver<std::tuple<>, std::tuple<>>>(std::tuple<>{}, std::tuple<>{});
   solver->introduce_parameter("foo", 2.0);
 
   int failures = 0;

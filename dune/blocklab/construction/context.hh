@@ -5,29 +5,55 @@
 #include<dune/blocklab/solver.hh>
 #include<dune/blocklab/utilities/enumerate.hh>
 #include<dune/blocklab/utilities/stringsplit.hh>
+#include<dune/blocklab/utilities/tuplecat.hh>
+#include<dune/common/exceptions.hh>
 #include<dune/common/hybridutilities.hh>
 #include<dune/common/parallel/mpihelper.hh>
 #include<dune/common/parametertree.hh>
 
+#include<array>
 #include<functional>
 #include<memory>
 #include<tuple>
 
 namespace Dune::BlockLab {
 
-  template<typename P, typename V>
+  template<typename UserParameters, typename... VectorProviders>
   class ConstructionContext
   {
+    // Construct a tuple of all vector types in the given providers
+    using V = std::tuple<typename VectorProviders::Vector...>;
+
+    // and a tuple of all parameter types
+    using P = tuple_cat_t<UserParameters, typename VectorProviders::Parameter...>;
+
     public:
+
     ConstructionContext(Dune::MPIHelper& helper,
-			const Dune::ParameterTree& rootconfig)
+			const Dune::ParameterTree& rootconfig,
+			std::shared_ptr<VectorProviders>... providers)
       : mpihelper(helper)
       , rootconfig(rootconfig)
-    {}
+      , providers{providers...}
+    {
+      std::size_t i = 0;
+      (this->vector_names.insert({{ providers->getName(), i++ }}) , ...);
 
-    // The data members that are available for the construction of blocks
-    Dune::MPIHelper& mpihelper;
-    Dune::ParameterTree rootconfig;
+      if (vector_names.size() != sizeof...(VectorProviders))
+	DUNE_THROW(Dune::Exception, "Vector name was not unique throughout given vector providers");
+    }
+
+    // The following getter methods are accessible during block construction
+    // through this Context object!
+    const Dune::MPIHelper& getMPIHelper() const
+    {
+      return mpihelper;
+    }
+
+    const Dune::ParameterTree& getRootConfig() const
+    {
+      return rootconfig;
+    }
 
     template<typename Func>
     void registerBlock(std::string identifier, Func&& func)
@@ -65,13 +91,11 @@ namespace Dune::BlockLab {
 
     std::shared_ptr<BlockSolver<P, V>> constructSolver(const Dune::ParameterTree& config)
     {
-      // Read the vector->index mapping from the configuration.
-      // As soon as the interfaces for that are ready it should
-      // be deduced from the vector providers!
-      for (auto [i, v] : enumerate(string_split(config.get<std::string>("vectors"))))
-	vector_names[v] = i;
+      auto solver = std::make_shared<BlockSolver<P, V>>(
+	std::apply([](auto... p){ return std::make_tuple(p->getVector()...); }, providers),
+	std::apply([](auto... p){ return std::make_tuple(p->getConstraintsContainer()...); }, providers)
+      );
 
-      auto solver = std::make_shared<BlockSolver<P, V>>();
       solver->add(std::make_shared<ParentBlockBase<P, V>>(*this, config));
       return solver;
     }
@@ -102,8 +126,16 @@ namespace Dune::BlockLab {
 
     private:
     // The construction function mapping
-    std::map<std::string, std::function<std::shared_ptr<AbstractBlockBase<P, V>>(ConstructionContext<P, V>&, const Dune::ParameterTree&)>> mapping;
+    std::map<std::string, std::function<std::shared_ptr<AbstractBlockBase<P, V>>(ConstructionContext<UserParameters, VectorProviders...>&, const Dune::ParameterTree&)>> mapping;
     std::map<std::string, std::size_t> vector_names;
+
+    // The vector providers - maybe we can achieve that all information
+    // is extracted already and not store this!
+    std::tuple<std::shared_ptr<VectorProviders>...> providers;
+
+    // The objects that are available during grid construction through above getter
+    Dune::MPIHelper& mpihelper;
+    Dune::ParameterTree rootconfig;
   };
 
 } // namespace Dune::BlockLab

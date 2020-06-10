@@ -7,6 +7,8 @@
 
 #include<dune/blocklab/blocks/blockbase.hh>
 #include<dune/blocklab/construction/context.hh>
+#include<dune/blocklab/grids/structured.hh>
+#include<dune/blocklab/vectors/pkfem.hh>
 #include<dune/common/parametertree.hh>
 #include<dune/grid/uggrid.hh>
 #include<dune/pdelab.hh>
@@ -97,7 +99,6 @@ int main(int argc, char** argv)
 
   // A dummy input
   Dune::ParameterTree config;
-  config["solver.vectors"] = "first, second";
   config["solver.blocks"] = "parent, dummy1";
   config["parent.blocks"] = "dummy2, dummy3";
   config["dummy2.vector"] = "second";
@@ -105,18 +106,18 @@ int main(int argc, char** argv)
 
   // Construct a vector type - just to have one that has the correct Traits
   using Grid = Dune::UGGrid<2>;
-  using GV = typename Grid::LeafGridView;
-  using ES = Dune::PDELab::OverlappingEntitySet<GV>;
-  using FEM = Dune::PDELab::PkLocalFiniteElementMap<ES, double, double, 1>;
-  using GFS = Dune::PDELab::GridFunctionSpace<ES, FEM>;
-  using V = Dune::PDELab::Backend::Vector<GFS, double>;
+  using GridProvider = Dune::BlockLab::StructuredSimplexGridProvider<Grid>;
+  using VectorProvider = Dune::BlockLab::PkFemVectorProvider<GridProvider, 1>;
 
-  using Params = std::tuple<>;
-  using Vectors = std::tuple<V, V>;
+  auto grid = std::make_shared<GridProvider>(config);
+  auto vector1 = std::make_shared<VectorProvider>(grid, "first");
+  auto vector2 = std::make_shared<VectorProvider>(grid, "second");
 
-  using Context = Dune::BlockLab::ConstructionContext<Params, Vectors>;
+  using UserParams = std::tuple<>;
 
-  Context ctx(helper, config);
+  using Context = Dune::BlockLab::ConstructionContext<UserParams, VectorProvider, VectorProvider>;
+
+  Context ctx(helper, config, vector1, vector2);
 
   ctx.registerBlock<DummyBlock1>("dummy1");
   ctx.registerBlock<DummyBlock2>("dummy2");

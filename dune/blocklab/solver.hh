@@ -23,13 +23,12 @@ namespace Dune::BlockLab {
   template<typename P, typename V>
   class BlockSolver;
 
-  template<typename... P, typename... V>
-  class BlockSolver<std::tuple<P...>, std::tuple<V...>>
+  template<typename... Parameters, typename... Vectors>
+  class BlockSolver<std::tuple<Parameters...>, std::tuple<Vectors...>>
   {
     public:
-    // Export the template parameters of the solver class
-    using ParameterTuple = std::tuple<P...>;
-    using VectorTuple = std::tuple<V...>;
+    using ParameterTuple = std::tuple<Parameters...>;
+    using VectorTuple = std::tuple<Vectors...>;
 
     // The possible types for parametrization of solver steps
     using Parameter = unique_variant<bool,
@@ -37,8 +36,15 @@ namespace Dune::BlockLab {
                                      int,
                                      std::string,
                                      Dune::ParameterTree,
-                                     std::shared_ptr<AbstractLocalOperatorInterface<typename V::GridFunctionSpace>>...,
-                                     P...>;
+                                     std::shared_ptr<AbstractLocalOperatorInterface<typename Vectors::GridFunctionSpace>>...,
+                                     Parameters...
+				     >;
+
+    BlockSolver(std::tuple<std::shared_ptr<Vectors>...> vectors,
+		std::tuple<std::shared_ptr<typename Vectors::GridFunctionSpace::template ConstraintsContainer<double>::Type>...> ccs)
+      : vectors(vectors)
+      , constraintscontainers(ccs)
+    {}
 
     void apply()
     {
@@ -94,9 +100,25 @@ namespace Dune::BlockLab {
       return std::get<typename std::decay<T>::type>(paramdata.find(name)->second);
     }
 
+    template<std::size_t i>
+    auto getVector()
+    {
+      return std::get<i>(vectors);
+    }
+
+    template<std::size_t i>
+    auto getConstraintsContainer()
+    {
+      return std::get<i>(constraintscontainers);
+    }
+
     private:
-    std::vector<std::shared_ptr<AbstractBlockBase<std::tuple<P...>, std::tuple<V...>>>> blocks;
+    std::vector<std::shared_ptr<AbstractBlockBase<std::tuple<Parameters...>, std::tuple<Vectors...>>>> blocks;
     std::map<std::string, Parameter> paramdata;
+
+    // The data gathered by vector providers and passed to the constructor of this class
+    std::tuple<std::shared_ptr<Vectors>...> vectors;
+    std::tuple<std::shared_ptr<typename Vectors::GridFunctionSpace::template ConstraintsContainer<double>::Type>...> constraintscontainers;
   };
 
 } // namespace Dune::BlockLab

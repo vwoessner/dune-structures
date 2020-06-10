@@ -19,8 +19,7 @@ namespace Dune::BlockLab {
       template<class T>
       auto require(T&& t) -> decltype(
 	Dune::Concept::requireType<typename T::Grid>(),
-	Dune::Concept::requireType<typename T::Parameter>(),
-	Dune::Concept::requireType<typename T::EntitySet>()
+	Dune::Concept::requireType<typename T::Parameter>()
       );
     };
 
