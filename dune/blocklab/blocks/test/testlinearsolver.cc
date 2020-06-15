@@ -20,7 +20,7 @@ int main(int argc, char** argv)
   config["solver.blocks"] = "convectiondiffusionfem, linearsolver";
   config["linearsolver.operator"] = "convectiondiffusionfem_operator";
 
-  auto ctx = structured_ug2_p2fem(helper, config);
+  auto ctx = structured_ug2_p1fem(helper, config);
   ctx.template registerBlock<Dune::BlockLab::LinearSolverBlock>("linearsolver");
   ctx.template registerBlock<Dune::BlockLab::ConvectionDiffusionFEMBlock>("convectiondiffusionfem");
 
