@@ -135,7 +135,16 @@ namespace Dune::BlockLab {
         identifier = "_" + identifier + "_" + std::to_string(i);
       }
 
-      return mapping[identifier](*this, config);
+      std::shared_ptr<AbstractBlockBase<P, V>> block;
+      try {
+        block = mapping[identifier](*this, config);
+      }
+      catch(std::bad_function_call&)
+      {
+        DUNE_THROW(Dune::Exception, "Looking for a block of type '" + identifier + "' failed!");
+      }
+
+      return block;
     }
 
     private:

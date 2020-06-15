@@ -38,7 +38,7 @@ namespace Dune::BlockLab {
     using PT = typename Traits::PermTensorType;
 
     ConvectionDiffusionRuntimeParameters(const Dune::ParameterTree& config)
-      : bctype_func(muparser_callable<BCType(E, ED)>(config.get<std::string>("bctype", "1")))
+      : bctype_func(muparser_callable<BCType(I, ID)>(config.get<std::string>("bctype", "1")))
       , c_func(muparser_callable<RFT(E, ED)>(config.get<std::string>("c", "0.0")))
       , f_func(muparser_callable<RFT(E, ED)>(config.get<std::string>("f", "0.0")))
       , j_func(muparser_callable<RFT(I, ID)>(config.get<std::string>("j", "0.0")))
@@ -99,11 +99,11 @@ namespace Dune::BlockLab {
     }
 
     private:
-    MuParserCallable<BCType(E, ED)> bctype_func;
-    MuParserCallable<RFT(E, ED)> c_func;
-    MuParserCallable<RFT(E, ED)> f_func;
-    MuParserCallable<RFT(I, ID)> j_func;
-    MuParserCallable<RFT(I, ID)> o_func;
+    std::function<BCType(I, ID)> bctype_func;
+    std::function<RFT(E, ED)> c_func;
+    std::function<RFT(E, ED)> f_func;
+    std::function<RFT(I, ID)> j_func;
+    std::function<RFT(I, ID)> o_func;
   };
 
 
@@ -115,7 +115,7 @@ namespace Dune::BlockLab {
     using Traits = typename BlockBase<P, V, i>::Traits;
     using ParameterInterface = ConvectionDiffusionRuntimeParameters<typename Traits::EntitySet, typename Traits::Range>;
     using AbstractOperator = AbstractLocalOperatorInterface<typename Traits::GridFunctionSpace>;
-    using LocalOperator = Dune::PDELab::ConvectionDiffusionFEM<ParameterInterface, typename Traits::FiniteElement>;
+    using LocalOperator = Dune::PDELab::ConvectionDiffusionFEM<ParameterInterface, typename Traits::FiniteElementMap>;
     using WrappedOperator = VirtualizedLocalOperator<LocalOperator, typename Traits::GridFunctionSpace>;
 
     template<typename Context>

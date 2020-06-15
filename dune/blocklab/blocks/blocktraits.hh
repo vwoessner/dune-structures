@@ -31,6 +31,7 @@ namespace Dune::BlockLab {
     // Export the vector and grid dependent types
     using Vector = typename std::tuple_element<i, std::tuple<V...>>::type;
     using GridFunctionSpace = typename Vector::GridFunctionSpace;
+    using FiniteElementMap = typename GridFunctionSpace::Traits::FiniteElementMap;
     using GridView = typename GridFunctionSpace::Traits::GridViewType;
     static constexpr int dim = GridView::dimension;
     using Grid = typename GridView::Traits::Grid;

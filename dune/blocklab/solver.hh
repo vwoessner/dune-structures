@@ -48,12 +48,23 @@ namespace Dune::BlockLab {
 
     void apply()
     {
+      // Make sure that each block knows its parent block
       for (auto block : blocks)
 	block->set_parent(nullptr);
 
+      // Call setup on all blocks
       for (auto block : blocks)
 	block->setup();
 
+      // Make sure that all blocks can update to the initial state
+      // of the parameter system
+      for (auto [name, param] : paramdata)
+      {
+        for (auto block : blocks)
+          block->update_parameter(name, param);
+      }
+
+      // Call apply on all blocks
       for (auto block : blocks)
 	block->apply();
     }

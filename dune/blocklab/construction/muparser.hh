@@ -56,7 +56,7 @@ namespace Dune::BlockLab {
     {
       // Evaluate quantities accessible from muparser expressions
       *position = e.geometry().global(x);
-      return parser.Eval();
+      return static_cast<R>(parser.Eval());
     }
 
     protected:

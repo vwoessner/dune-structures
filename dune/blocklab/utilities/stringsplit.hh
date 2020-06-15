@@ -23,6 +23,9 @@ namespace Dune::BlockLab {
   // Taken from here: http://www.martinbroadhurst.com/how-to-split-a-string-in-c.html
   std::vector<std::string> string_split(const std::string& str, char delim=',', bool trim=true)
   {
+    if (str == "")
+      return {};
+
     std::vector<std::string> cont;
     std::size_t current, previous = 0;
     current = str.find(delim);

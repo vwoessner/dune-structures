@@ -5,8 +5,11 @@
  *  be registered with any construction context.
  */
 
+#include<dune/blocklab/blocks/constraints.hh>
 #include<dune/blocklab/blocks/error.hh>
 #include<dune/blocklab/blocks/interpolation.hh>
+#include<dune/blocklab/blocks/linearsolver.hh>
+#include<dune/blocklab/blocks/visualization.hh>
 #include<dune/blocklab/operators/convectiondiffusionfem.hh>
 
 namespace Dune::BlockLab {
@@ -16,8 +19,12 @@ namespace Dune::BlockLab {
   void registerBuiltinBlocks(Context& ctx)
   {
     // Register all the basic blocks from the block subdirectory
+    ctx.template registerBlock<ConstraintsBlock>("constraints");
     ctx.template registerBlock<DiscretizationErrorBlock>("error");
     ctx.template registerBlock<InterpolationBlock>("interpolation");
+    ctx.template registerBlock<LinearSolverBlock>("linearsolver");
+    ctx.template registerBlock<VisualizationBlock>("visualization");
+    ctx.template registerBlock<VectorVisualizationBlock>("vis_vector");
 
     // Register all the operator-blocks
     ctx.template registerBlock<ConvectionDiffusionFEMBlock>("convectiondiffusionfem");
