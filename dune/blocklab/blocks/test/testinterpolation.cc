@@ -6,7 +6,6 @@
 #include<dune/common/parallel/mpihelper.hh>
 #include<dune/common/parametertree.hh>
 #include<dune/common/test/testsuite.hh>
-#include<dune/grid/uggrid.hh>
 
 #include<memory>
 #include<tuple>

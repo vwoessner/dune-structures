@@ -20,21 +20,25 @@ namespace Dune::BlockLab {
 
   template<typename... P, typename... V>
   class AbstractBlockBase<std::tuple<P...>, std::tuple<V...>>
+    : public std::enable_shared_from_this<AbstractBlockBase<std::tuple<P...>, std::tuple<V...>>>
   {
     public:
+    using BlockBase = AbstractBlockBase<std::tuple<P...>, std::tuple<V...>>;
     using Solver = Dune::BlockLab::BlockSolver<std::tuple<P...>, std::tuple<V...>>;
     static constexpr std::size_t vectors = 1;
 
     // The virtual interface - pretty simple
     virtual ~AbstractBlockBase() = default;
 
-    virtual void set_solver(std::shared_ptr<Solver> solver_) = 0;
+    virtual void set_parent(std::shared_ptr<BlockBase> parent) = 0;
+    virtual void set_solver(std::shared_ptr<Solver> solver) = 0;
     virtual void setup() = 0;
     virtual void apply() = 0;
     virtual void update_parameter(std::string name, typename Solver::Parameter param) = 0;
 
     protected:
     std::shared_ptr<Solver> solver;
+    std::shared_ptr<BlockBase> parent;
   };
 
 
@@ -46,6 +50,11 @@ namespace Dune::BlockLab {
     using Traits = BlockTraits<P, V, i>;
 
     virtual ~BlockBase() = default;
+
+    virtual void set_parent(std::shared_ptr<typename Traits::BlockBase> parent) override final
+    {
+      this->parent = parent;
+    }
 
     virtual void set_solver(std::shared_ptr<typename Traits::Solver> solver_) override final
     {
@@ -100,6 +109,13 @@ namespace Dune::BlockLab {
     {}
 
     virtual ~ParentBlockBase() = default;
+
+    virtual void set_parent(std::shared_ptr<typename Traits::BlockBase> parent) override final
+    {
+      this->parent = parent;
+      for (auto block : blocks)
+	block->set_parent(this->shared_from_this());
+    }
 
     virtual void set_solver(std::shared_ptr<typename Traits::Solver> solver_) override final
     {

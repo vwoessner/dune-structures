@@ -14,6 +14,9 @@ namespace Dune::BlockLab {
   template<typename P, typename V>
   class BlockSolver;
 
+  template<typename P, typename V>
+  class AbstractBlockBase;
+
   template<typename P, typename V, std::size_t i=0>
   class BlockTraits;
 
@@ -23,6 +26,7 @@ namespace Dune::BlockLab {
     public:
     // The transition solver for this
     using Solver = BlockSolver<std::tuple<P...>, std::tuple<V...>>;
+    using BlockBase = AbstractBlockBase<std::tuple<P...>, std::tuple<V...>>;
 
     // Export the vector and grid dependent types
     using Vector = typename std::tuple_element<i, std::tuple<V...>>::type;

@@ -55,6 +55,7 @@ namespace Dune::BlockLab {
         EntitySet es(gridprovider->createGrid()->leafGridView());
         auto fem = std::make_shared<FiniteElementMap>(es);
         gfs = std::make_shared<GridFunctionSpace>(es, fem);
+        gfs->name(name);
       }
       return gfs;
     }

@@ -49,6 +49,9 @@ namespace Dune::BlockLab {
     void apply()
     {
       for (auto block : blocks)
+	block->set_parent(nullptr);
+
+      for (auto block : blocks)
 	block->setup();
 
       for (auto block : blocks)
