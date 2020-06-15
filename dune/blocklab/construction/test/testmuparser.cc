@@ -79,5 +79,5 @@ int main(int argc, char** argv)
   // A function array of three functions
   test.check(check_array("x - 0.5, y, z + 0.5", {0.0, 0.5, 1.0}));
 
-  return 0;
+  return test.exit();
 }
