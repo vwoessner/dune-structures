@@ -6,9 +6,6 @@
 #include<dune/common/parametertree.hh>
 #include<dune/common/test/testsuite.hh>
 
-#include<memory>
-#include<tuple>
-
 
 int main(int argc, char** argv)
 {
