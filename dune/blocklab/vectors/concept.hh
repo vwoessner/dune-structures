@@ -18,7 +18,7 @@ namespace Dune::BlockLab {
     {
       template<typename T>
       auto require(T&& t) -> decltype(
-        Dune::Concept::requireType<typename T::FiniteElementMap>()
+        Dune::Concept::requireType<typename T::GridFunctionSpace>()
       );
     };
   } // namespace impl
