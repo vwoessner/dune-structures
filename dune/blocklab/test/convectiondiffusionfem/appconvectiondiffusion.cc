@@ -7,6 +7,7 @@
 #include<dune/common/parallel/mpihelper.hh>
 #include<dune/common/parametertree.hh>
 #include<dune/common/parametertreeparser.hh>
+#include<dune/common/test/testsuite.hh>
 #include<dune/grid/uggrid.hh>
 
 #include<memory>
@@ -39,8 +40,11 @@ int main(int argc, char** argv)
   Dune::BlockLab::registerBuiltinBlocks(ctx);
 
   auto solver = ctx.constructSolver(config.sub("solver"));
-
   solver->apply();
 
-  return 0;
+  Dune::TestSuite test;
+  // The error threshold here is the L2-error of the interpolant of the solution
+  test.check(solver->template param<double>("l2error") < 3e-5);
+
+  return test.exit();
 }
