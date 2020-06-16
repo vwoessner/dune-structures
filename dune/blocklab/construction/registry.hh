@@ -14,8 +14,10 @@
 #include<dune/blocklab/blocks/linearsolver.hh>
 #include<dune/blocklab/blocks/newton.hh>
 #include<dune/blocklab/blocks/parameter.hh>
+#include<dune/blocklab/blocks/probe.hh>
 #include<dune/blocklab/blocks/visualization.hh>
 #include<dune/blocklab/operators/convectiondiffusionfem.hh>
+
 
 namespace Dune::BlockLab {
 
@@ -30,6 +32,7 @@ namespace Dune::BlockLab {
     ctx.template registerBlock<InterpolationBlock>("interpolation");
     ctx.template registerBlock<LinearSolverBlock>("linearsolver");
     ctx.template registerBlock<NewtonSolverBlock>("newton");
+    ctx.template registerBlock<ProbeBlock>("probe");
     ctx.template registerBlock<ParameterBlock>("parameter");
     ctx.template registerBlock<RepeatBlock>("repeat");
     ctx.template registerBlock<TimestepperBlock>("timestepper");

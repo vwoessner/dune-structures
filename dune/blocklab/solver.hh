@@ -36,6 +36,7 @@ namespace Dune::BlockLab {
                                      int,
                                      std::string,
                                      Dune::ParameterTree,
+                                     typename Vectors::GridFunctionSpace::Traits::FiniteElement::Traits::LocalBasisType::Traits::RangeType...,
                                      std::shared_ptr<AbstractLocalOperatorInterface<typename Vectors::GridFunctionSpace>>...,
                                      Parameters...
 				     >;
