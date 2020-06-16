@@ -7,7 +7,7 @@
 class Vector1
 {
   public:
-  using FiniteElementMap = int;
+  using GridFunctionSpace = int;
 };
 
 
