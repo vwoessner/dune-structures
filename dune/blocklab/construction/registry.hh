@@ -15,6 +15,7 @@
 #include<dune/blocklab/blocks/newton.hh>
 #include<dune/blocklab/blocks/parameter.hh>
 #include<dune/blocklab/blocks/probe.hh>
+#include<dune/blocklab/blocks/variation.hh>
 #include<dune/blocklab/blocks/visualization.hh>
 #include<dune/blocklab/operators/convectiondiffusionfem.hh>
 
@@ -27,6 +28,8 @@ namespace Dune::BlockLab {
   {
     // Register all the basic blocks from the block subdirectory
     ctx.template registerBlock<ConstraintsBlock>("constraints");
+    ctx.template registerBlock<ContinuousVariationBlock>("continuousvariation");
+    ctx.template registerBlock<DiscreteVariationBlock>("discretevariation");
     ctx.template registerBlock<DiscretizationErrorBlock>("error");
     ctx.template registerBlock<FileLoggerBlock>("filelogger");
     ctx.template registerBlock<InterpolationBlock>("interpolation");
