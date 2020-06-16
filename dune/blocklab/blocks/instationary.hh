@@ -39,11 +39,11 @@ namespace Dune::BlockLab {
       {
         this->update_parameter("time", time);
         this->update_parameter("timestep", dt);
-        std::cout << "Performing time step " << time << " -> " << time + dt  << " with " << this->steps.size() << " steps" << std::endl;
+        std::cout << "Performing time step " << time << " -> " << time + dt  << " with " << this->blocks.size() << " steps" << std::endl;
 
         // Apply the solver
-        for (auto step : this->steps)
-          step->apply();
+        for (auto block : this->blocks)
+          block->apply();
 
         time += dt;
       }

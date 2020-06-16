@@ -39,6 +39,7 @@ namespace Dune::BlockLab {
     using ctype = typename Grid::ctype;
     using Entity = typename GridView::template Codim<0>::Entity;
     using GlobalCoordinate = typename Entity::Geometry::GlobalCoordinate;
+    using LocalCoordinate = typename Entity::Geometry::LocalCoordinate;
     using Range = typename Vector::field_type;
     using ConstraintsContainer = typename GridFunctionSpace::template ConstraintsContainer<Range>::Type;
     using VectorBackend = typename GridFunctionSpace::Traits::Backend;

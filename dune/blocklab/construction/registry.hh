@@ -34,6 +34,8 @@ namespace Dune::BlockLab {
     ctx.template registerBlock<RepeatBlock>("repeat");
     ctx.template registerBlock<TimestepperBlock>("timestepper");
     ctx.template registerBlock<VisualizationBlock>("visualization");
+    ctx.template registerBlock<IndexSetVisualizationBlock>("vis_indexset");
+    ctx.template registerBlock<MPIRankVisualizationBlock>("vis_mpirank");
     ctx.template registerBlock<VectorVisualizationBlock>("vis_vector");
 
     // Register all the operator-blocks

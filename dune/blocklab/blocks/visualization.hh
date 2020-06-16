@@ -122,13 +122,13 @@ namespace Dune::BlockLab {
             container);
     };
 
-    template<typename Container>
-    void add_celldata(std::shared_ptr<Container> container, std::string name)
+    template<typename Function>
+    void add_celldata(std::shared_ptr<Function> function)
     {
       if (instationary)
-        std::get<typename impl::VTKWriterChooser<typename Traits::GridView, true>::ptype>(vtkwriter)->addCellData(*container, name);
+        std::get<typename impl::VTKWriterChooser<typename Traits::GridView, true>::ptype>(vtkwriter)->addCellData(function);
       else
-        std::get<typename impl::VTKWriterChooser<typename Traits::GridView, false>::ptype>(vtkwriter)->addCellData(*container, name);
+        std::get<typename impl::VTKWriterChooser<typename Traits::GridView, false>::ptype>(vtkwriter)->addCellData(function);
     }
 
     private:
@@ -158,6 +158,115 @@ namespace Dune::BlockLab {
     {
       auto vector = this->solver->template getVector<i>();
       std::dynamic_pointer_cast<VisualizationBlock<P, V, i>>(this->parent)->add_dataset(vector);
+    }
+  };
+
+
+  template<typename P, typename V, std::size_t i>
+  class MPIRankVisualizationBlock
+    : public BlockBase<P, V, i>
+  {
+    public:
+    using Traits = BlockTraits<P, V, i>;
+
+    struct RankFunction
+      : public Dune::VTKFunction<typename Traits::GridView>
+    {
+      RankFunction(const Dune::MPIHelper& helper)
+	: rank(helper.rank())
+      {}
+
+      virtual ~RankFunction() = default;
+
+      virtual int ncomps() const override
+      {
+	return 1;
+      }
+
+      virtual double evaluate (int comp, const typename Traits::Entity& e,
+                               const typename Traits::LocalCoordinate& xi) const override
+      {
+        return static_cast<double>(rank);
+      }
+
+      virtual std::string name () const override
+      {
+	return "MPI Rank";
+      }
+
+      double rank;
+    };
+
+    template<typename Context>
+    MPIRankVisualizationBlock(Context& ctx, const Dune::ParameterTree&)
+      : MPIRankVisualizationBlock(ctx.getMPIHelper())
+    {}
+
+    MPIRankVisualizationBlock(const Dune::MPIHelper& helper)
+      : helper(helper)
+    {}
+
+    virtual ~MPIRankVisualizationBlock() = default;
+
+    virtual void setup() override
+    {
+      auto rankfunction = std::make_shared<RankFunction>(helper);
+      std::dynamic_pointer_cast<VisualizationBlock<P, V, i>>(this->parent)->add_celldata(rankfunction);
+    }
+
+    private:
+    const Dune::MPIHelper& helper;
+  };
+
+
+  template<typename P, typename V, std::size_t i>
+  class IndexSetVisualizationBlock
+    : public BlockBase<P, V, i>
+  {
+    public:
+    using Traits = BlockTraits<P, V, i>;
+
+    struct IndexSetFunction
+      : public Dune::VTKFunction<typename Traits::GridView>
+    {
+      using Base = Dune::VTKFunction<typename Traits::GridView>;
+      using Entity = typename Base::Entity;
+
+      IndexSetFunction(typename Traits::GridView gv)
+        : is(gv.indexSet())
+      {}
+
+      virtual ~IndexSetFunction() = default;
+
+      virtual int ncomps() const override
+      {
+        return 1;
+      }
+
+      virtual double evaluate (int comp, const typename Traits::Entity& e,
+                               const typename Traits::LocalCoordinate& xi) const override
+      {
+        return static_cast<double>(is.index(e));
+      }
+
+      virtual std::string name () const override
+      {
+        return "Cell Indices";
+      }
+
+      const typename Traits::GridView::IndexSet& is;
+    };
+
+    template<typename Context>
+    IndexSetVisualizationBlock(Context&, const Dune::ParameterTree&)
+    {}
+
+    virtual ~IndexSetVisualizationBlock() = default;
+
+    virtual void setup() override
+    {
+      auto indexsetfunc= std::make_shared<IndexSetFunction>(this->solver->template getVector<i>()->gridFunctionSpace().gridView());
+      std::dynamic_pointer_cast<VisualizationBlock<P, V, i>>(this->parent)->add_celldata(indexsetfunc);
     }
   };
 
