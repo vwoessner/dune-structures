@@ -1,6 +1,3 @@
-# This will move away once dune-blocklab comes into existence
-include(DuneBlocklabMacros)
-
 # Make the code generator sources of dune-structures known
 # to dune-codegen to correctly retrigger code generation upon changes
 # in the python code.

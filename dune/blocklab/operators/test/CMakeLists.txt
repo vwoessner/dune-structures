@@ -1,1 +1,0 @@
-dune_add_test(SOURCES testconvectiondiffusionfem.cc)

@@ -1,5 +1,0 @@
-from dune.structures import *
-
-material = LinearMaterial()
-
-r = elasticity_form(material, force=as_vector([0.0, 0.0, -0.016]))

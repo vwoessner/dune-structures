@@ -8,10 +8,12 @@
  *  Cut Finite Element Methods for Linear Elasticity Problems
  */
 
+#include<dune/blocklab/operators/virtualinterface.hh>
+#include<dune/blocklab/utilities/enumerate.hh>
+#include<dune/blocklab/utilities/stringsplit.hh>
 #include<dune/geometry/affinegeometry.hh>
 #include<dune/pdelab.hh>
 #include<dune/structures/elasticity.hh>
-#include<dune/structures/enumerate.hh>
 #include<dune/structures/material.hh>
 #include<dune/structures/parametrizedcurves.hh>
 
@@ -101,10 +103,8 @@ class EulerBernoulli2DLocalOperator
 
     // Parse fibres from the configuration
     auto fibrestr = rootparams.get<std::string>("grid.fibres.fibres", "");
-    auto fibres = str_split(fibrestr);
-    for (auto fibre: fibres)
+    for (auto fibre: Dune::BlockLab::string_split(fibrestr))
     {
-      str_trim(fibre);
       auto fibreconfig = rootparams.sub("grid.fibres").sub(fibre);
 
       if (fibreconfig.get<std::string>("shape") == "cylinder")
@@ -131,7 +131,7 @@ class EulerBernoulli2DLocalOperator
     if (verbose)
     {
       std::cout << "Fibre intersection summary:" << std::endl;
-      for (auto [fibindex, intersection] : enumerate(fibre_intersections))
+      for (auto [fibindex, intersection] : Dune::BlockLab::enumerate(fibre_intersections))
       {
 	for (auto [cellindex, range] : intersection.element_fibre_intersections)
 	{
@@ -443,10 +443,10 @@ class EulerBernoulli2DLocalOperator
 
 template<typename GFS, typename FGFS, typename TGFS, int dim>
 class FibreReinforcedBulkOperator
-  : public AbstractLocalOperatorInterface<GFS>
+  : public Dune::BlockLab::AbstractLocalOperatorInterface<GFS>
 {
   public:
-  using BaseOperator = AbstractLocalOperatorInterface<GFS>;
+  using BaseOperator = Dune::BlockLab::AbstractLocalOperatorInterface<GFS>;
   using BulkOperator = typename OperatorSwitch<GFS, dim, FGFS, TGFS>::Elasticity;
   using FibreOperator = EulerBernoulli2DLocalOperator<GFS, FGFS>;
 

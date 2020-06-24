@@ -1,8 +1,0 @@
-__name = fenics
-
-extension = 1.0 0.2 0.2
-cells = 10 3 3
-elementType = hexahedral
-
-[formcompiler.r]
-numerical_jacobian = 1

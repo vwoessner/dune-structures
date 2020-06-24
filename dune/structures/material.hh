@@ -1,12 +1,13 @@
 #ifndef DUNE_STRUCTURES_MATERIAL_HH
 #define DUNE_STRUCTURES_MATERIAL_HH
 
+#include<dune/blocklab/blocks/blockbase.hh>
+#include<dune/blocklab/utilities/stringsplit.hh>
 #include<dune/common/fmatrix.hh>
 #include<dune/common/fvector.hh>
 #include<dune/common/shared_ptr.hh>
 #include<dune/common/parametertree.hh>
 #include<dune/structures/prestress.hh>
-#include<dune/structures/utilities.hh>
 
 #include<map>
 #include<memory>
@@ -90,21 +91,10 @@ class ElasticMaterialBase
   virtual void prestress(const Entity& e, const Coord& x, Dune::FieldMatrix<T, dim, dim>&) const = 0;
 
   virtual int material_law_index(const Entity& e) const = 0;
-/*
+
   T parameter_unrolled(const Entity& e, int i, T x...) const
   {
     return this->parameter(e, Dune::FieldVector<T, dim>{x}, i);
-  }
-*/
-
-  T parameter_unrolled(const Entity& e, int i, T x0, T x1) const
-  {
-    return this->parameter(e, Dune::FieldVector<T, dim>{x0, x1}, i);
-  }
-
-  T parameter_unrolled(const Entity& e, int i, T x0, T x1, T x2) const
-  {
-    return this->parameter(e, Dune::FieldVector<T, dim>{x0, x1, x2}, i);
   }
 
   GV gridView() const
@@ -241,7 +231,7 @@ class MaterialCollection : public ElasticMaterialBase<GV, T>
 
 
 template<typename T,typename GV>
-std::shared_ptr<MaterialCollection<GV, T>> parse_material(
+std::shared_ptr<ElasticMaterialBase<GV, T>> parse_material(
     const GV& gv,
     std::shared_ptr<std::vector<int>> physical_groups,
     const Dune::ParameterTree& params,
@@ -252,10 +242,9 @@ std::shared_ptr<MaterialCollection<GV, T>> parse_material(
 
   // Get the list of materials and iterate over them
   auto material_groups = params.get<std::string>("materials");
-  auto groups = str_split(material_groups);
+  auto groups = Dune::BlockLab::string_split(material_groups);
   for (auto group : groups)
   {
-    str_trim(group);
     const auto& groupconf = params.sub(group);
     auto material = std::make_shared<HomogeneousElasticMaterial<GV, T>>(gv, groupconf, rootparams);
     coll->add_material(groupconf.get<int>("group", 0), material);
@@ -263,5 +252,45 @@ std::shared_ptr<MaterialCollection<GV, T>> parse_material(
 
   return coll;
 }
+
+
+template<typename P, typename V, std::size_t i>
+class MaterialInitializationBlock
+  : public Dune::BlockLab::BlockBase<P, V, i>
+{
+  public:
+  using Traits = Dune::BlockLab::BlockTraits<P, V, i>;
+  using Material = std::shared_ptr<ElasticMaterialBase<typename Traits::EntitySet, double>>;
+
+  template<typename Context>
+  MaterialInitializationBlock(Context& ctx, const Dune::ParameterTree& config)
+    : root_config(ctx.getRootConfig())
+    , material_config(config)
+  {}
+
+  virtual ~MaterialInitializationBlock() = default;
+
+  virtual void setup() override
+  {
+    // Make sure that there is a physical vector - even if the grid provider does not have it
+    auto size = this->solver->template getVector<i>()->gridFunctionSpace().gridView().size(0);
+    this->solver->introduce_parameter("physical", std::make_shared<std::vector<int>>(size, 0));
+
+    // And then intialize the amterial
+    material = parse_material<double>(
+      this->solver->template getVector<i>()->gridFunctionSpace().entitySet(),
+      this->solver->template param<std::shared_ptr<std::vector<int>>>("physical"),
+      material_config,
+      root_config
+    );
+    this->solver->introduce_parameter("material", material);
+  }
+
+  protected:
+  Dune::ParameterTree root_config;
+  Dune::ParameterTree material_config;
+  Material material;
+};
+
 
 #endif
