@@ -51,18 +51,18 @@ int main(int argc, char** argv)
   );
 
   auto vector_providers = std::make_tuple(
-    std::make_pair("p1fem",
-                   [](const auto& c, auto gp){
-                     using GridProvider = typename decltype(gp)::element_type;
-                     auto leaf = std::make_shared<Dune::BlockLab::PkFemVectorProvider<GridProvider, 1>>(gp);
-                     return Dune::BlockLab::fieldProvider<GridProvider::Grid::dimension>(leaf);
-                   })//,
-//    std::make_pair("p2fem",
+//    std::make_pair("p1fem",
 //                   [](const auto& c, auto gp){
 //                     using GridProvider = typename decltype(gp)::element_type;
-//                     auto leaf = std::make_shared<Dune::BlockLab::PkFemVectorProvider<GridProvider, 2>>(gp);
-//                     return Dune::BlockLab::powerProvider<GridProvider::Grid::dimension>(leaf);
-//                   })
+//                     auto leaf = std::make_shared<Dune::BlockLab::PkFemVectorProvider<GridProvider, 1>>(gp);
+//                     return Dune::BlockLab::fieldProvider<GridProvider::Grid::dimension>(leaf);
+//                   })//,
+    std::make_pair("p2fem",
+                   [](const auto& c, auto gp){
+                     using GridProvider = typename decltype(gp)::element_type;
+                     auto leaf = std::make_shared<Dune::BlockLab::PkFemVectorProvider<GridProvider, 2>>(gp);
+                     return Dune::BlockLab::fieldProvider<GridProvider::Grid::dimension>(leaf);
+                   })
   );
 
   // The registration function that we are using

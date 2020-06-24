@@ -118,8 +118,6 @@ class VonMisesStressVisualizationBlock<P, V, i, Dune::BlockLab::enableBlock<Dune
       auto p1fem = std::make_shared<P1FEM>(es);
       using P1GFS = Dune::PDELab::GridFunctionSpace<typename Traits::EntitySet, P1FEM, Dune::PDELab::NoConstraints, typename Traits::VectorBackend>;
       auto p1gfs = std::make_shared<P1GFS>(es, p1fem);
-      p1gfs->name("vonmises");
-//     p0gfs->setDataSetType(Dune::PDELab::GridFunctionOutputParameters::Output::cellData);
       using StressVector = Dune::PDELab::Backend::Vector<P1GFS, typename Traits::ctype>;
       auto stress_container = std::make_shared<StressVector>(p1gfs);
 
@@ -131,7 +129,6 @@ class VonMisesStressVisualizationBlock<P, V, i, Dune::BlockLab::enableBlock<Dune
       auto p0fem = std::make_shared<P0FEM>(Dune::GeometryTypes::simplex(Traits::dim));
       using P0GFS = Dune::PDELab::GridFunctionSpace<typename Traits::EntitySet, P0FEM, Dune::PDELab::NoConstraints, typename Traits::VectorBackend>;
       auto p0gfs = std::make_shared<P0GFS>(es, p0fem);
-      p0gfs->name("vonmises");
       p0gfs->setDataSetType(Dune::PDELab::GridFunctionOutputParameters::Output::cellData);
       using StressVector = Dune::PDELab::Backend::Vector<P0GFS, typename Traits::ctype>;
       auto stress_container = std::make_shared<StressVector>(p0gfs);

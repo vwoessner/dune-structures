@@ -10,52 +10,6 @@
 #include<memory>
 
 
-template<typename... V>
-class MaterialInitialization
-  : public TransitionSolverStepBase<V...>
-{
-  public:
-  using Traits = SimpleStepTraits<V...>;
-
-  MaterialInitialization(typename Traits::EntitySet es,
-      std::shared_ptr<std::vector<int>> physical,
-      const Dune::ParameterTree& params,
-      const Dune::ParameterTree& rootparams
-      )
-    : es(es)
-    , physical(physical)
-    , params(params)
-    , rootparams(rootparams)
-    , material(parse_material<double>(es, physical, params, rootparams))
-  {}
-
-  virtual ~MaterialInitialization() {}
-
-  virtual void set_solver(std::shared_ptr<typename Traits::Solver> solver_) override
-  {
-    this->solver = solver_;
-    this->solver->introduce_parameter("physical", physical);
-    this->solver->introduce_parameter("material_params", params);
-    this->solver->introduce_parameter("material", material);
-  }
-
-  virtual void update_parameter(std::string name, typename Traits::Parameter param) override
-  {
-    if (name == "material_params")
-    {
-      params = std::get<Dune::ParameterTree>(param);
-      this->solver->update_parameter("material", parse_material<double>(es, physical, params, rootparams));
-    }
-  }
-
-  protected:
-  typename Traits::EntitySet es;
-  std::shared_ptr<std::vector<int>> physical;
-  Dune::ParameterTree params;
-  Dune::ParameterTree rootparams;
-  std::shared_ptr<typename Traits::Material> material;
-  std::shared_ptr<typename Traits::Solver> solver;
-};
 
 
 template<typename... V>

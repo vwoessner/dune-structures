@@ -99,7 +99,7 @@ class EulerBernoulli2DLocalOperator
     enable_skeleton = params.get<bool>("enable_skeleton", true);
 
 	// Extract stabilization parameter
-    beta = params.get<double>("stabilization_parameter", 1.0);
+    beta = params.get<double>("stabilization_parameter", 1000.0);
 
     // Parse fibres from the configuration
     auto fibrestr = rootparams.get<std::string>("grid.fibres.fibres", "");

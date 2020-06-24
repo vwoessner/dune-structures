@@ -57,7 +57,7 @@ class FibreReinforcedElasticityOperatorBlock<P, V, i, Dune::BlockLab::enableBloc
     lop->setCoefficientTraction(traction->gridFunctionSpaceStorage(), traction);
 
     // ... and register it in the parameter system
-    this->solver->template introduce_parameter<std::shared_ptr<BaseOperator>>("fibre_operator", lop);
+    this->solver->template introduce_parameter<std::shared_ptr<BaseOperator>>("reinforced_operator", lop);
   }
 
   virtual void update_parameter(std::string name, typename Traits::Parameter param) override
@@ -65,12 +65,12 @@ class FibreReinforcedElasticityOperatorBlock<P, V, i, Dune::BlockLab::enableBloc
     if (name == "material")
     {
       auto material = std::get<Material>(param);
-      auto lop_pointer = this->solver->template param<std::shared_ptr<BaseOperator>>("fibre_operator").get();
+      auto lop_pointer = this->solver->template param<std::shared_ptr<BaseOperator>>("reinforced_operator").get();
       dynamic_cast<LocalOperator*>(lop_pointer)->setMaterial(material);
     }
     if (name == "adapted")
     {
-      auto lop_pointer = this->solver->template param<std::shared_ptr<BaseOperator>>("fibre_operator").get();
+      auto lop_pointer = this->solver->template param<std::shared_ptr<BaseOperator>>("reinforced_operator").get();
       dynamic_cast<LocalOperator*>(lop_pointer)->compute_grid_intersection();
     }
   }
