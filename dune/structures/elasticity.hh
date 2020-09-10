@@ -3,6 +3,7 @@
 
 #include<dune/blocklab/blocks/blockbase.hh>
 #include<dune/blocklab/blocks/enableif.hh>
+#include<dune/blocklab/utilities/yaml.hh>
 #include<dune/pdelab.hh>
 
 #include<iostream>
@@ -64,7 +65,7 @@ class ElasticityOperatorBlock
 {
   public:
   template<typename Context>
-  ElasticityOperatorBlock(Context& ctx, const Dune::ParameterTree& config)
+  ElasticityOperatorBlock(Context& ctx, const YAML::Node& config)
     : Dune::BlockLab::DisabledBlock<P, V, i>(ctx, config)
   {}
 };
@@ -85,8 +86,8 @@ class ElasticityOperatorBlock<P, V, i, Dune::BlockLab::enableBlock<Dune::BlockLa
   using LocalOperator = typename OperatorSwitch<typename Traits::GridFunctionSpace, dim, FGFS, TGFS>::Elasticity;
 
   template<typename Context>
-  ElasticityOperatorBlock(Context&, const Dune::ParameterTree& config)
-    : params(config)
+  ElasticityOperatorBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
   {}
 
   virtual ~ElasticityOperatorBlock() = default;
@@ -97,7 +98,7 @@ class ElasticityOperatorBlock<P, V, i, Dune::BlockLab::enableBlock<Dune::BlockLa
     auto vector = this->solver->template getVector<i>();
     auto gfs = vector->gridFunctionSpaceStorage();
     auto material = this->solver->template param<Material>("material");
-    auto lop = std::make_shared<LocalOperator>(*gfs, *gfs, params, material);
+    auto lop = std::make_shared<LocalOperator>(*gfs, *gfs, Dune::ParameterTree(), material);
 
     auto force = this->solver->template getVector<i + 1>();
     lop->setCoefficientForce(force->gridFunctionSpaceStorage(), force);
@@ -106,7 +107,7 @@ class ElasticityOperatorBlock<P, V, i, Dune::BlockLab::enableBlock<Dune::BlockLa
     lop->setCoefficientTraction(traction->gridFunctionSpaceStorage(), traction);
 
     // ... and register it in the parameter system
-    this->solver->template introduce_parameter<std::shared_ptr<BaseOperator>>("elasticity_operator", lop);
+    this->solver->template introduce_parameter<std::shared_ptr<BaseOperator>>(this->getBlockName(), lop);
   }
 
   virtual void update_parameter(std::string name, typename Traits::Parameter param) override
@@ -114,13 +115,20 @@ class ElasticityOperatorBlock<P, V, i, Dune::BlockLab::enableBlock<Dune::BlockLa
     if (name == "material")
     {
       auto material = std::get<Material>(param);
-      auto lop_pointer = this->solver->template param<std::shared_ptr<BaseOperator>>("elasticity_operator").get();
+      auto lop_pointer = this->solver->template param<std::shared_ptr<BaseOperator>>(this->getBlockName()).get();
       dynamic_cast<LocalOperator*>(lop_pointer)->setMaterial(material);
     }
   }
 
-  private:
-  Dune::ParameterTree params;
+  static std::vector<std::string> blockData()
+  {
+    auto data = Dune::BlockLab::BlockBase<P, V, i>::blockData();
+    data.push_back(
+      "title: Elasticity Operator                          \n"
+      "category: operators                                 \n"
+    );
+    return data;
+  }
 };
 
 
@@ -131,7 +139,7 @@ class ElasticityMassOperatorBlock
 {
   public:
   template<typename Context>
-  ElasticityMassOperatorBlock(Context& ctx, const Dune::ParameterTree& config)
+  ElasticityMassOperatorBlock(Context& ctx, const YAML::Node& config)
     : Dune::BlockLab::DisabledBlock<P, V, i>(ctx, config)
   {}
 };
@@ -150,8 +158,8 @@ class ElasticityMassOperatorBlock<P, V, i, Dune::BlockLab::enableBlock<Dune::Blo
                                                         Traits::dim, FGFS, TGFS>::Mass;
 
   template<typename Context>
-  ElasticityMassOperatorBlock(Context&, const Dune::ParameterTree& config)
-    : params(config)
+  ElasticityMassOperatorBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
   {}
 
   virtual ~ElasticityMassOperatorBlock() = default;
@@ -161,14 +169,21 @@ class ElasticityMassOperatorBlock<P, V, i, Dune::BlockLab::enableBlock<Dune::Blo
     // Construct the local operator...
     auto vector = this->solver->template getVector<i>();
     auto gfs = vector->gridFunctionSpaceStorage();
-    auto lop = std::make_shared<TemporalLocalOperator>(*gfs, *gfs, params);
+    auto lop = std::make_shared<TemporalLocalOperator>(*gfs, *gfs, Dune::ParameterTree());
 
     // ... and register it in the parameter system
-    this->solver->template introduce_parameter<std::shared_ptr<BaseOperator>>("elasticity_mass_operator", lop);
+    this->solver->template introduce_parameter<std::shared_ptr<BaseOperator>>(this->getBlockName(), lop);
   }
 
-  private:
-  Dune::ParameterTree params;
+  static std::vector<std::string> blockData()
+  {
+    auto data = Dune::BlockLab::BlockBase<P, V, i>::blockData();
+    data.push_back(
+      "title: Elasticity Mass Operator                     \n"
+      "category: operators                                 \n"
+    );
+    return data;
+  }
 };
 
 #endif

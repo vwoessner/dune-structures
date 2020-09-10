@@ -8,13 +8,13 @@
  *  vector providers and blocks.
  */
 
-#include<dune/blocklab/construction/combinatorics.hh>
+#include<dune/blocklab/app.hh>
+#include<dune/blocklab/events.hh>
+#include<dune/blocklab/init.hh>
 #include<dune/blocklab/grids.hh>
-#include<dune/blocklab/utilities/tuple.hh>
 #include<dune/blocklab/vectors.hh>
-#include<dune/common/parallel/mpihelper.hh>
-#include<dune/common/parametertree.hh>
-#include<dune/common/parametertreeparser.hh>
+
+#include<dune/blocklab/utilities/tuple.hh>
 #include<dune/pdelab/common/partitionviewentityset.hh>
 
 #include<dune/structures/elasticity.hh>
@@ -37,32 +37,33 @@ struct ParameterGatherer
 
 int main(int argc, char** argv)
 {
-  Dune::MPIHelper& helper = Dune::MPIHelper::instance(argc, argv);
+  auto init = Dune::BlockLab::initBlockLab(argc, argv);
 
-  // Parse the ini file
-  Dune::ParameterTree config;
-  Dune::ParameterTreeParser::readOptions(argc, argv, config);
-  Dune::ParameterTreeParser::readINITree(argv[1], config, false);
+  using GridProvider = Dune::BlockLab::StructuredSimplexGridProvider<Dune::UGGrid<2>>;
+  auto grid = [](const auto& c)
+    { 
+      return std::make_shared<GridProvider>(c);
+    };
 
-  auto grid_providers = std::make_tuple(
-//    std::make_pair("cell3d", [](const auto& c){ return std::make_shared<StructuresGridProvider<3>>(c); })//,
-    std::make_pair("structuredug2d", [](const auto& c){ return std::make_shared<Dune::BlockLab::StructuredSimplexGridProvider<Dune::UGGrid<2>>>(c); })//,
-//    std::make_pair("structuredug3d", [](const auto& c){ return std::make_shared<Dune::BlockLab::StructuredSimplexGridProvider<Dune::UGGrid<3>>>(c); })
-  );
-
-  auto vector_providers = std::make_tuple(
-//    std::make_pair("p1fem",
-//                   [](const auto& c, auto gp){
-//                     using GridProvider = typename decltype(gp)::element_type;
-//                     auto leaf = std::make_shared<Dune::BlockLab::PkFemVectorProvider<GridProvider, 1>>(gp);
-//                     return Dune::BlockLab::fieldProvider<GridProvider::Grid::dimension>(leaf);
-//                   })//,
-    std::make_pair("p2fem",
-                   [](const auto& c, auto gp){
-                     using GridProvider = typename decltype(gp)::element_type;
-                     auto leaf = std::make_shared<Dune::BlockLab::PkFemVectorProvider<GridProvider, 2>>(gp);
-                     return Dune::BlockLab::fieldProvider<GridProvider::Grid::dimension>(leaf);
-                   })
+  auto vectors = std::make_tuple(
+    std::make_tuple("solution", "Solution", [](auto gp)
+      {
+        using GridProvider = typename decltype(gp)::element_type;
+        auto leaf = std::make_shared<Dune::BlockLab::PkFemVectorProvider<GridProvider, 2>>(gp);
+        return Dune::BlockLab::fieldProvider<GridProvider::Grid::dimension>(leaf);
+      }),
+    std::make_tuple("force", "Body Force", [](auto gp)
+      {
+        using GridProvider = typename decltype(gp)::element_type;
+        auto leaf = std::make_shared<Dune::BlockLab::PkFemVectorProvider<GridProvider, 2>>(gp);
+        return Dune::BlockLab::fieldProvider<GridProvider::Grid::dimension>(leaf);
+      }),
+    std::make_tuple("traction", "Traction Force", [](auto gp)
+      {
+        using GridProvider = typename decltype(gp)::element_type;
+        auto leaf = std::make_shared<Dune::BlockLab::PkFemVectorProvider<GridProvider, 2>>(gp);
+        return Dune::BlockLab::fieldProvider<GridProvider::Grid::dimension>(leaf);
+      })
   );
 
   // The registration function that we are using
@@ -70,7 +71,7 @@ int main(int argc, char** argv)
     Dune::BlockLab::registerBuiltinBlocks(ctx);
 
     // Add the structures-specific blocks to the solver
-    ctx.template registerBlock<ElasticityOperatorBlock>("elasticity_operator");
+    ctx.template registerBlock<ElasticityOperatorBlock>("elasticity");
     ctx.template registerBlock<MaterialInitializationBlock>("material");
     ctx.template registerBlock<FibreReinforcedElasticityOperatorBlock>("reinforced_operator");
     ctx.template registerBlock<ElasticityMassOperatorBlock>("mass_operator");
@@ -81,15 +82,17 @@ int main(int argc, char** argv)
   };
 
   // Construct additional types to inject into the parameter system
-  using MaterialTuple = ParameterGatherer<
-      StructuresGridProvider<3>,
-      Dune::BlockLab::StructuredSimplexGridProvider<Dune::UGGrid<2>>,
-      Dune::BlockLab::StructuredSimplexGridProvider<Dune::UGGrid<3>>
-      >::Materials;
+  using MaterialTuple = ParameterGatherer<GridProvider>::Materials;
 
   using ParameterTuple = Dune::BlockLab::tuple_cat_t<std::tuple<std::shared_ptr<std::vector<int>>>, MaterialTuple>;
 
-  Dune::BlockLab::instantiate_combinatorics<3, ParameterTuple>(helper, config, grid_providers, vector_providers, reg);
+  Dune::BlockLab::BlockLabApp app(argc, argv, init, grid, vectors, reg, ParameterTuple{});
+
+  app.addDefaultRunner();
+  app.addFrontendExporter();
+  app.addHelpMessage();
+
+  app.run();
 
   return 0;
 }

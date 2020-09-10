@@ -95,7 +95,7 @@ class OneToOneMappingCheckerBlock
 {
   public:
   template<typename Context>
-  OneToOneMappingCheckerBlock(Context& ctx, const Dune::ParameterTree& config)
+  OneToOneMappingCheckerBlock(Context& ctx, const YAML::Node& config)
     : Dune::BlockLab::DisabledBlock<P, V, i>(ctx, config)
   {}
 };
@@ -109,7 +109,8 @@ class OneToOneMappingCheckerBlock<P, V, i, Dune::BlockLab::enableBlock<Dune::Blo
   using Traits = Dune::BlockLab::BlockTraits<P, V, i>;
 
   template<typename Context>
-  OneToOneMappingCheckerBlock(Context&, const Dune::ParameterTree&)
+  OneToOneMappingCheckerBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
   {}
 
   virtual ~OneToOneMappingCheckerBlock() = default;
@@ -125,6 +126,17 @@ class OneToOneMappingCheckerBlock<P, V, i, Dune::BlockLab::enableBlock<Dune::Blo
     std::cout << "Checking one-to-one property of displacement field... ";
     std::cout << (is_onetoone(vdgf) ? "Success!" : "Failure") << std::endl;
   }
+
+  static std::vector<std::string> blockData()
+  {
+    auto data = Dune::BlockLab::BlockBase<P, V, i>::blockData();
+    data.push_back(
+      "title: One-to-one displacement mapping checker      \n"
+      "category: structures                                \n"
+    );
+    return data;
+  }
+  
 };
 
 #endif

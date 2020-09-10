@@ -4,6 +4,7 @@
 #include<dune/blocklab/blocks/blockbase.hh>
 #include<dune/blocklab/blocks/enableif.hh>
 #include<dune/blocklab/blocks/visualization.hh>
+#include<dune/blocklab/utilities/yaml.hh>
 #include<dune/structures/material.hh>
 #include<dune/structures/vonmises.hh>
 
@@ -13,15 +14,16 @@
 #include<variant>
 
 
-template<typename P, typename V, std::size_t i>
+template<typename P, typename V>
 class PhysicalEntityVisualizationBlock
-  : public Dune::BlockLab::BlockBase<P, V, i>
+  : public Dune::BlockLab::BlockBase<P, V>
 {
   public:
-  using Traits = Dune::BlockLab::BlockTraits<P, V, i>;
+  using Traits = Dune::BlockLab::BlockTraits<P, V>;
 
   template<typename Context>
-  PhysicalEntityVisualizationBlock(Context&, const Dune::ParameterTree&)
+  PhysicalEntityVisualizationBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::BlockBase<P, V>(ctx, config)
   {}
 
   virtual ~PhysicalEntityVisualizationBlock() = default;
@@ -61,10 +63,20 @@ class PhysicalEntityVisualizationBlock
 
   virtual void setup() override
   {
-    auto gv = this->solver->template getVector<i>()->gridFunctionSpace().gridView();
+    auto gv = this->solver->template getVector<0>()->gridFunctionSpace().gridView();
     auto physical = this->solver->template param<std::shared_ptr<std::vector<int>>>("physical");
     auto function = std::make_shared<PhysicalEntityFunction>(gv, physical);
-    std::dynamic_pointer_cast<Dune::BlockLab::VisualizationBlock<P, V, i>>(this->parent)->add_celldata(function);
+    std::dynamic_pointer_cast<Dune::BlockLab::VisualizationBlock<P, V>>(this->parent)->add_celldata(function);
+  }
+
+  static std::vector<std::string> blockData()
+  {
+    auto data = Dune::BlockLab::BlockBase<P, V>::blockData();
+    data.push_back(
+      "title: Physical entity information visualization    \n"
+      "category: structures                                \n"
+    );
+    return data;
   }
 };
 
@@ -75,7 +87,7 @@ class VonMisesStressVisualizationBlock
 {
   public:
   template<typename Context>
-  VonMisesStressVisualizationBlock(Context& ctx, const Dune::ParameterTree& config)
+  VonMisesStressVisualizationBlock(Context& ctx, const YAML::Node& config)
    : Dune::BlockLab::DisabledBlock<P, V, i>(ctx, config)
   {}
 };
@@ -90,8 +102,9 @@ class VonMisesStressVisualizationBlock<P, V, i, Dune::BlockLab::enableBlock<Dune
   using Material = std::shared_ptr<ElasticMaterialBase<typename Traits::EntitySet, double>>;
 
   template<typename Context>
-  VonMisesStressVisualizationBlock(Context &, const Dune::ParameterTree& config)
-    : continuous(config.get<bool>("continuous", false))
+  VonMisesStressVisualizationBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
+    , continuous(config["continuous"].as<bool>())
   {}
 
   virtual ~VonMisesStressVisualizationBlock() = default;
@@ -122,7 +135,7 @@ class VonMisesStressVisualizationBlock<P, V, i, Dune::BlockLab::enableBlock<Dune
       auto stress_container = std::make_shared<StressVector>(p1gfs);
 
       Dune::PDELab::interpolate(stress, *p1gfs, *stress_container);
-      std::dynamic_pointer_cast<Dune::BlockLab::VisualizationBlock<P, V, i>>(this->parent)->add_dataset(stress_container, "vonmises");
+      std::dynamic_pointer_cast<Dune::BlockLab::VisualizationBlock<P, V>>(this->parent)->add_dataset(stress_container, "vonmises");
     }
     else {
       using P0FEM = Dune::PDELab::P0LocalFiniteElementMap<typename Traits::ctype, typename Traits::Range, Traits::dim>;
@@ -134,8 +147,23 @@ class VonMisesStressVisualizationBlock<P, V, i, Dune::BlockLab::enableBlock<Dune
       auto stress_container = std::make_shared<StressVector>(p0gfs);
 
       Dune::PDELab::interpolate(stress, *p0gfs, *stress_container);
-      std::dynamic_pointer_cast<Dune::BlockLab::VisualizationBlock<P, V, i>>(this->parent)->add_dataset(stress_container, "vonmises");
+      std::dynamic_pointer_cast<Dune::BlockLab::VisualizationBlock<P, V>>(this->parent)->add_dataset(stress_container, "vonmises");
     }
+  }
+
+  static std::vector<std::string> blockData()
+  {
+    auto data = Dune::BlockLab::BlockBase<P, V, i>::blockData();
+    data.push_back(
+      "title: Von-Mises Stress Visualization               \n"
+      "category: structures                                \n"
+      "schema:                                             \n"
+      "  continuous:                                       \n"
+      "    type: boolean                                   \n"
+      "    title: Use Continuous Interpolation             \n"
+      "    default: false                                  \n"
+    );
+    return data;
   }
 
   private:
@@ -144,16 +172,17 @@ class VonMisesStressVisualizationBlock<P, V, i, Dune::BlockLab::enableBlock<Dune
 };
 
 
-template<typename P, typename V, std::size_t i>
+template<typename P, typename V>
 class FibreDistanceVisualizationBlock
-  : public Dune::BlockLab::BlockBase<P, V, i>
+  : public Dune::BlockLab::BlockBase<P, V>
 {
   public:
-  using Traits = Dune::BlockLab::BlockTraits<P, V, i>;
+  using Traits = Dune::BlockLab::BlockTraits<P, V>;
 
   template<typename Context>
-  FibreDistanceVisualizationBlock(Context& ctx, const Dune::ParameterTree& config)
-    : prestress(ctx.getRootConfig().sub(config.get<std::string>("key")), ctx.getRootConfig())
+  FibreDistanceVisualizationBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::BlockBase<P, V>(ctx, config)
+    , prestress(config, ctx.getRootConfig())
   {}
 
   virtual ~FibreDistanceVisualizationBlock() = default;
@@ -162,7 +191,7 @@ class FibreDistanceVisualizationBlock
   {
     if constexpr (Traits::dim == 3)
     {
-      auto vector = this->solver->template getVector<i>();
+      auto vector = this->solver->template getVector<0>();
       auto es = vector->gridFunctionSpace().entitySet();
       using FEM = Dune::PDELab::PkLocalFiniteElementMap<typename Traits::EntitySet, double, typename Traits::Range, 1>;
       auto fem = std::make_shared<FEM>(es);
@@ -175,8 +204,18 @@ class FibreDistanceVisualizationBlock
       auto lambda = [this](const auto& e, const auto& x){ return this->prestress.distance_to_minimum(e, x); };
       auto gf = Dune::PDELab::makeGridFunctionFromCallable(es.gridView(), lambda);
       Dune::PDELab::interpolate(gf, *gfs, *container);
-      std::dynamic_pointer_cast<Dune::BlockLab::VisualizationBlock<P, V, i>>(this->parent)->add_dataset(container, "fibredistance");
+      std::dynamic_pointer_cast<Dune::BlockLab::VisualizationBlock<P, V>>(this->parent)->add_dataset(container, "fibredistance");
     }
+  }
+
+  static std::vector<std::string> blockData()
+  {
+    auto data = Dune::BlockLab::BlockBase<P, V>::blockData();
+    data.push_back(
+      "title: Distance to next fibre Visualization         \n"
+      "category: structures                                \n"
+    );
+    return data;
   }
 
   private:

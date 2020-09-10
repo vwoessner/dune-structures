@@ -14,7 +14,7 @@ class FibreReinforcedElasticityOperatorBlock
 {
   public:
   template<typename Context>
-  FibreReinforcedElasticityOperatorBlock(Context& ctx, const Dune::ParameterTree& config)
+  FibreReinforcedElasticityOperatorBlock(Context& ctx, const YAML::Node& config)
     : Dune::BlockLab::DisabledBlock<P, V, i>(ctx, config)
   {}
 };
@@ -35,8 +35,9 @@ class FibreReinforcedElasticityOperatorBlock<P, V, i, Dune::BlockLab::enableBloc
   using LocalOperator = FibreReinforcedBulkOperator<typename Traits::GridFunctionSpace, FGFS, TGFS, dim>;
 
   template<typename Context>
-  FibreReinforcedElasticityOperatorBlock(Context& ctx, const Dune::ParameterTree& config)
-    : rootparams(ctx.getRootConfig())
+  FibreReinforcedElasticityOperatorBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
+    , rootparams(ctx.getRootConfig())
     , params(config)
   {}
 
@@ -57,7 +58,7 @@ class FibreReinforcedElasticityOperatorBlock<P, V, i, Dune::BlockLab::enableBloc
     lop->setCoefficientTraction(traction->gridFunctionSpaceStorage(), traction);
 
     // ... and register it in the parameter system
-    this->solver->template introduce_parameter<std::shared_ptr<BaseOperator>>("reinforced_operator", lop);
+    this->solver->template introduce_parameter<std::shared_ptr<BaseOperator>>(this->getBlockName(), lop);
   }
 
   virtual void update_parameter(std::string name, typename Traits::Parameter param) override
@@ -65,19 +66,29 @@ class FibreReinforcedElasticityOperatorBlock<P, V, i, Dune::BlockLab::enableBloc
     if (name == "material")
     {
       auto material = std::get<Material>(param);
-      auto lop_pointer = this->solver->template param<std::shared_ptr<BaseOperator>>("reinforced_operator").get();
+      auto lop_pointer = this->solver->template param<std::shared_ptr<BaseOperator>>(this->getBlockName()).get();
       dynamic_cast<LocalOperator*>(lop_pointer)->setMaterial(material);
     }
     if (name == "adapted")
     {
-      auto lop_pointer = this->solver->template param<std::shared_ptr<BaseOperator>>("reinforced_operator").get();
+      auto lop_pointer = this->solver->template param<std::shared_ptr<BaseOperator>>(this->getBlockName()).get();
       dynamic_cast<LocalOperator*>(lop_pointer)->compute_grid_intersection();
     }
   }
 
+  static std::vector<std::string> blockData()
+  {
+    auto data = Dune::BlockLab::BlockBase<P, V, i>::blockData();
+    data.push_back(
+      "title: Fibre-reinforced Elasticity Operator         \n"
+      "category: operators                                 \n"
+    );
+    return data;
+  }
+
   private:
-  Dune::ParameterTree rootparams;
-  Dune::ParameterTree params;
+  YAML::Node rootparams;
+  YAML::Node params;
 };
 
 #endif
