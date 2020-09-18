@@ -71,14 +71,14 @@ int main(int argc, char** argv)
     Dune::BlockLab::registerBuiltinBlocks(ctx);
 
     // Add the structures-specific blocks to the solver
-    ctx.template registerBlock<ElasticityOperatorBlock>("elasticity");
+    // ctx.template registerBlock<ElasticityOperatorBlock>("elasticity");
     ctx.template registerBlock<MaterialInitializationBlock>("material");
-    ctx.template registerBlock<FibreReinforcedElasticityOperatorBlock>("reinforced_operator");
-    ctx.template registerBlock<ElasticityMassOperatorBlock>("mass_operator");
-    ctx.template registerBlock<OneToOneMappingCheckerBlock>("onetoone");
-    ctx.template registerBlock<FibreDistanceVisualizationBlock>("vis_fibredistance");
-    ctx.template registerBlock<PhysicalEntityVisualizationBlock>("vis_physical");
-    ctx.template registerBlock<VonMisesStressVisualizationBlock>("vis_vonmises");
+    //ctx.template registerBlock<FibreReinforcedElasticityOperatorBlock>("reinforced_operator");
+    // ctx.template registerBlock<ElasticityMassOperatorBlock>("mass_operator");
+    // ctx.template registerBlock<OneToOneMappingCheckerBlock>("onetoone");
+    // ctx.template registerBlock<FibreDistanceVisualizationBlock>("vis_fibredistance");
+    // ctx.template registerBlock<PhysicalEntityVisualizationBlock>("vis_physical");
+    // ctx.template registerBlock<VonMisesStressVisualizationBlock>("vis_vonmises");
   };
 
   // Construct additional types to inject into the parameter system
