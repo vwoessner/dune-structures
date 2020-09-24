@@ -46,19 +46,19 @@ int main(int argc, char** argv)
     };
 
   auto vectors = std::make_tuple(
-    std::make_tuple("solution", "Solution", [](auto gp)
+    std::make_tuple("Displacement Field", "P2 Lagrange Element", [](auto gp)
       {
         using GridProvider = typename decltype(gp)::element_type;
         auto leaf = std::make_shared<Dune::BlockLab::PkFemVectorProvider<GridProvider, 2>>(gp);
         return Dune::BlockLab::fieldProvider<GridProvider::Grid::dimension>(leaf);
       }),
-    std::make_tuple("force", "Body Force", [](auto gp)
+    std::make_tuple("Body Force", "P2 Lagrange Element", [](auto gp)
       {
         using GridProvider = typename decltype(gp)::element_type;
         auto leaf = std::make_shared<Dune::BlockLab::PkFemVectorProvider<GridProvider, 2>>(gp);
         return Dune::BlockLab::fieldProvider<GridProvider::Grid::dimension>(leaf);
       }),
-    std::make_tuple("traction", "Traction Force", [](auto gp)
+    std::make_tuple("Traction Force", "P2 Lagrange Element", [](auto gp)
       {
         using GridProvider = typename decltype(gp)::element_type;
         auto leaf = std::make_shared<Dune::BlockLab::PkFemVectorProvider<GridProvider, 2>>(gp);
