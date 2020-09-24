@@ -74,7 +74,7 @@ class PhysicalEntityVisualizationBlock
     auto data = Dune::BlockLab::BlockBase<P, V>::blockData();
     data.push_back(
       "title: Physical entity information visualization    \n"
-      "category: structures                                \n"
+      "category: visualization                             \n"
     );
     return data;
   }
@@ -156,12 +156,13 @@ class VonMisesStressVisualizationBlock<P, V, i, Dune::BlockLab::enableBlock<Dune
     auto data = Dune::BlockLab::BlockBase<P, V, i>::blockData();
     data.push_back(
       "title: Von-Mises Stress Visualization               \n"
-      "category: structures                                \n"
+      "category: visualization                             \n"
       "schema:                                             \n"
       "  continuous:                                       \n"
       "    type: boolean                                   \n"
-      "    title: Use Continuous Interpolation             \n"
       "    default: false                                  \n"
+      "    meta:                                           \n"
+      "      title: Use Continuous Interpolation           \n"
     );
     return data;
   }
@@ -213,7 +214,7 @@ class FibreDistanceVisualizationBlock
     auto data = Dune::BlockLab::BlockBase<P, V>::blockData();
     data.push_back(
       "title: Distance to next fibre Visualization         \n"
-      "category: structures                                \n"
+      "category: visualization                             \n"
     );
     return data;
   }

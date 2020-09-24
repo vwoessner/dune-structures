@@ -280,7 +280,7 @@ class MaterialInitializationBlock
       material_config,
       root_config
     );
-    this->solver->introduce_parameter("material", material);
+    this->solver->introduce_parameter("material", typename Traits::Parameter(material));
   }
 
   static std::vector<std::string> blockData()
@@ -291,29 +291,38 @@ class MaterialInitializationBlock
       "category: structures                                        \n"
       "schema:                                                     \n"
       "  materials:                                                \n"
-      "    title: Materials                                        \n"
       "    type: list                                              \n"
       "    schema:                                                 \n"
       "      type: dict                                            \n"
       "      schema:                                               \n"
       "        model:                                              \n"
-      "          title: Material Law                               \n"
+      "          type: string                                      \n"
+      "          default: linear                                   \n"
       "          allowed:                                          \n"
       "            - linear                                        \n"
+      "          meta:                                             \n"
+      "            title: Material Law                             \n"
       "        youngs_modulus:                                     \n"
       "          type: float                                       \n"
-      "          title: Youngs's modulus                           \n"
+      "          default: 1e5                                      \n"
       "          dependencies:                                     \n"
       "            model: linear                                   \n"
+      "          meta:                                             \n"
+      "            title: Youngs's modulus                         \n"
       "        poisson_ratio:                                      \n"
       "          type: float                                       \n"
-      "          title: Poisson ratio                              \n"
+      "          default: 0.4                                      \n"
       "          dependencies:                                     \n"
       "            model: linear                                   \n"
+      "          meta:                                             \n"
+      "            title: Poisson ratio                            \n"
       "        group:                                              \n"
-      "          title: Physical group                             \n"
       "          type: integer                                     \n"
       "          default: 0                                        \n"
+      "          meta:                                             \n"
+      "            title: Physical group                           \n"
+      "    meta:                                                   \n"
+      "      title: Materials                                      \n"
     );
     return data;
   }
