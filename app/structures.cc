@@ -86,7 +86,7 @@ int main(int argc, char** argv)
 
   using ParameterTuple = Dune::BlockLab::tuple_cat_t<std::tuple<std::shared_ptr<std::vector<int>>>, MaterialTuple>;
 
-  Dune::BlockLab::BlockLabApp app(argc, argv, init, grid, vectors, reg, ParameterTuple{});
+  Dune::BlockLab::BlockLabApp app(init, grid, vectors, reg, ParameterTuple{});
 
   app.addDefaultRunner();
   app.addFrontendExporter();
