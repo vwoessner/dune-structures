@@ -28,7 +28,7 @@ link_libraries(stdc++fs)
 
 add_subdirectory(doc)
 add_subdirectory(operators)
-add_subdirectory(app)
+add_subdirectory(apps)
 add_subdirectory(cmake/modules)
 add_subdirectory(dune)
 add_subdirectory(python)

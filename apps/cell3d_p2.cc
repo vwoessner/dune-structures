@@ -17,29 +17,19 @@
 #include<dune/blocklab/utilities/tuple.hh>
 #include<dune/pdelab/common/partitionviewentityset.hh>
 
-#include<dune/structures/elasticity.hh>
 #include<dune/structures/gridprovider.hh>
 #include<dune/structures/material.hh>
-#include<dune/structures/onetoone.hh>
-#include<dune/structures/visualization.hh>
-#include<dune/structures/reinforcedoperator.hh>
+#include<dune/structures/registry.hh>
 
 #include<memory>
 #include<tuple>
-
-
-template<typename... P>
-struct ParameterGatherer
-{
-  using Materials = std::tuple<std::shared_ptr<ElasticMaterialBase<Dune::PDELab::OverlappingEntitySet<typename P::Grid::Traits::LeafGridView>, double>>...>;
-};
 
 
 int main(int argc, char** argv)
 {
   auto init = Dune::BlockLab::initBlockLab(argc, argv);
 
-  using GridProvider = Dune::BlockLab::StructuredSimplexGridProvider<Dune::UGGrid<2>>;
+  using GridProvider = Dune::BlockLab::StructuresGridProvider<3>;
   auto grid = [](const auto& c)
     { 
       return std::make_shared<GridProvider>(c);
@@ -66,27 +56,10 @@ int main(int argc, char** argv)
       })
   );
 
-  // The registration function that we are using
-  auto reg = [](auto& ctx){
-    Dune::BlockLab::registerBuiltinBlocks(ctx);
+  using Material = std::shared_ptr<ElasticMaterialBase<Dune::PDELab::OverlappingEntitySet<typename GridProvider::Grid::Traits::LeafGridView>, double>>;
+  using ParameterTuple = std::tuple<std::shared_ptr<std::vector<int>>, Material>;
 
-    // Add the structures-specific blocks to the solver
-    ctx.template registerBlock<ElasticityOperatorBlock>("elasticity");
-    ctx.template registerBlock<MaterialInitializationBlock>("material");
-    ctx.template registerBlock<FibreReinforcedElasticityOperatorBlock>("reinforced_operator");
-    ctx.template registerBlock<ElasticityMassOperatorBlock>("mass_operator");
-    ctx.template registerBlock<OneToOneMappingCheckerBlock>("onetoone");
-    ctx.template registerBlock<FibreDistanceVisualizationBlock>("vis_fibredistance");
-    ctx.template registerBlock<PhysicalEntityVisualizationBlock>("vis_physical");
-    ctx.template registerBlock<VonMisesStressVisualizationBlock>("vis_vonmises");
-  };
-
-  // Construct additional types to inject into the parameter system
-  using MaterialTuple = ParameterGatherer<GridProvider>::Materials;
-
-  using ParameterTuple = Dune::BlockLab::tuple_cat_t<std::tuple<std::shared_ptr<std::vector<int>>>, MaterialTuple>;
-
-  Dune::BlockLab::BlockLabApp app(init, grid, vectors, reg, ParameterTuple{});
+  Dune::BlockLab::BlockLabApp app(init, grid, vectors, registerStructuresBlocks, ParameterTuple{});
 
   app.addDefaultRunner();
   app.addFrontendExporter();
