@@ -88,7 +88,7 @@ class EulerBernoulli2DLocalOperator
   enum { doAlphaVolume = true };
   enum { doAlphaSkeleton  = true };
 
-  EulerBernoulli2DLocalOperator(const YAML::Node& rootparams, const YAML::Node& params, std::shared_ptr<const GFS> gfs)
+  EulerBernoulli2DLocalOperator(const YAML::Node& params, std::shared_ptr<const GFS> gfs)
     : Dune::PDELab::NumericalJacobianVolume<EulerBernoulli2DLocalOperator<GFS, FGFS>>(1e-9)
     , Dune::PDELab::NumericalJacobianSkeleton<EulerBernoulli2DLocalOperator<GFS, FGFS>>(1e-9)
     , gv(gfs->gridView())
@@ -98,27 +98,20 @@ class EulerBernoulli2DLocalOperator
     enable_volume = params["enable_volume"].as<bool>(true);
     enable_skeleton = params["enable_skeleton"].as<bool>(true);
 
-	// Extract stabilization parameter
-    beta = params["stabilization_parameter"].as<double>(1000.0);
+    // Extract stabilization parameter
+    beta = params["stabilization_parameter"].as<double>();
 
     // Parse fibres from the configuration
-    for (auto fibre: rootparams["grid"]["fibres"])
+    for (auto fibre: params["fibres"])
     {
-      if (fibre["shape"].as<std::string>() == "cylinder")
-        fibre_parametrizations.push_back(std::make_shared<StraightFibre<2>>(fibre));
-      else
-        DUNE_THROW(Dune::Exception, "Fibre shape not supported!");
+      fibre_parametrizations.push_back(std::make_shared<StraightFibre<2>>(fibre));
 
       // Parse the Youngs modulus of the fibre.
-      auto modulus = fibre["youngs_modulus"].as<double>(0.0);
-      if (modulus == 0.0)
-        std::cout << "youngs_modulus not set for all fibres!" << std::endl;
+      auto modulus = fibre["youngs_modulus"].as<double>();
       fibre_modulus.push_back(modulus);
 
       // Parse the fibre radii
-      auto radius = fibre["radius"].as<double>(0.0);
-      if (radius == 0.0)
-        std::cout << "radius not set for all fibres!" << std::endl;
+      auto radius = fibre["radius"].as<double>();
       fibre_radii.push_back(radius);
     }
     std::cout << "Parsed a total of " << fibre_parametrizations.size() << " fibres from the configuration." << std::endl;
@@ -456,11 +449,10 @@ class FibreReinforcedBulkOperator
   using R = typename BaseOperator::R;
 
   FibreReinforcedBulkOperator(std::shared_ptr<const GFS> gfs,
-                              const YAML::Node& rootparams,
                               const YAML::Node& params,
                               std::shared_ptr<ElasticMaterialBase<typename GFS::Traits::EntitySet, double>> material)
     : bulkoperator(*gfs, *gfs, Dune::ParameterTree(), material)
-    , fibreoperator(rootparams, params, gfs)
+    , fibreoperator(params, gfs)
   {}
 
   virtual ~FibreReinforcedBulkOperator() = default;

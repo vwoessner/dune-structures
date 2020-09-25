@@ -1,0 +1,85 @@
+<xml xmlns="https://developers.google.com/blockly/xml">
+    <block type="solver" id="mRA-#I_R;n_^pJ-`Z[X6" deletable="false" x="137" y="138">
+        <statement name="grid">
+            <block type="grid" id="2Rcc(Pr/FQ%o-SS*$3^=" deletable="false">
+                <field name="N_0">40</field>
+                <field name="N_1">10</field>
+                <field name="lowerleft_0">0</field>
+                <field name="lowerleft_1">0</field>
+                <field name="refinement">0</field>
+                <field name="upperright_0">4</field>
+                <field name="upperright_1">1</field>
+            </block>
+        </statement>
+        <statement name="vectors">
+            <block type="Displacement Field" id="3=v]s)GDXiq40@gfEkPS" deletable="false">
+                <next>
+                    <block type="Body Force" id="lVo8$LVnk8,S|Fc`n|w6" deletable="false">
+                        <next>
+                            <block type="Traction Force" id="[~oKc@?hCJ1hP7:q0`V5" deletable="false"></block>
+                        </next>
+                    </block>
+                </next>
+            </block>
+        </statement>
+        <statement name="blocks">
+            <block type="material" id="9-:-|p0T_qAMmMd6/(XD">
+                <statement name="materials">
+                    <block type="subblock_materials" id="2UfS-#kpe}:|BK8=((/(">
+                        <field name="group">0</field>
+                        <field name="model">linear</field>
+                        <field name="poisson_ratio">0.3333</field>
+                        <field name="youngs_modulus">300</field>
+                    </block>
+                </statement>
+                <next>
+                    <block type="interpolation" id="8=D_]B*FD{7i0FiJ|;;y">
+                        <field name="functions">0</field>
+                        <field name="vector">0</field>
+                        <next>
+                            <block type="interpolation" id="]_[wA?M1?`L4~.;)U^Tx">
+                                <field name="functions">100, 0</field>
+                                <field name="vector">1</field>
+                                <next>
+                                    <block type="constraints" id="HJ`0|$x(BQ~ls)s|5o*$">
+                                        <field name="functions">x &lt; 1e-8</field>
+                                        <field name="vector">0</field>
+                                        <next>
+                                            <block type="linearsolver" id="]q^KTo!O%G_L_a4}l7g%">
+                                                <field name="vector">0</field>
+                                                <statement name="operator">
+                                                    <block type="elasticity" id="1E%:NkFk[{=?{D,.T1Yr">
+                                                        <field name="vector">0</field>
+                                                    </block>
+                                                </statement>
+                                                <next>
+                                                    <block type="visualization" id="6ZTou2s}-oVb9vCu`BFL">
+                                                        <field name="filename">output</field>
+                                                        <field name="instationary">FALSE</field>
+                                                        <field name="intervals">1</field>
+                                                        <field name="path">vtk</field>
+                                                        <statement name="blocks">
+                                                            <block type="vis_vector" id="]XQZG|0sfK%!0|^sBbJ)">
+                                                                <field name="vector">0</field>
+                                                                <next>
+                                                                    <block type="vis_vonmises" id="fRAZ3|(oh4,EI6{U8Ldh">
+                                                                        <field name="continuous">TRUE</field>
+                                                                        <field name="vector">0</field>
+                                                                    </block>
+                                                                </next>
+                                                            </block>
+                                                        </statement>
+                                                    </block>
+                                                </next>
+                                            </block>
+                                        </next>
+                                    </block>
+                                </next>
+                            </block>
+                        </next>
+                    </block>
+                </next>
+            </block>
+        </statement>
+    </block>
+</xml>

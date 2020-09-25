@@ -1,0 +1,59 @@
+solver:
+  vectors:
+    - Displacement Field_0
+    - Body Force_0
+    - Traction Force_0
+  grid:
+    N:
+      - 40
+      - 10
+    lowerleft:
+      - 0
+      - 0
+    refinement: 0
+    upperright:
+      - 4
+      - 1
+    _blockname: grid_0
+  blocks:
+    material:
+      _blockname: material_0
+      materials:
+        -
+          group: 0
+          model: linear
+          poisson_ratio: 0.3333
+          youngs_modulus: 300
+    interpolation:
+      _blockname: interpolation_0
+      functions: 0
+      vector: 0
+    interpolation:
+      _blockname: interpolation_1
+      functions: 0, -1
+      vector: 1
+    constraints:
+      _blockname: constraints_0
+      functions: x < 1e-8
+      vector: 0
+    linearsolver:
+      _blockname: linearsolver_0
+      operator:
+        elasticity:
+          _blockname: elasticity_0
+          vector: 0
+      vector: 0
+    visualization:
+      _blockname: visualization_0
+      blocks:
+        vis_vector:
+          _blockname: vis_vector_0
+          vector: 0
+        vis_vonmises:
+          _blockname: vis_vonmises_0
+          continuous: true
+          vector: 0
+      filename: output
+      instationary: false
+      intervals: 1
+      path: vtk

@@ -37,7 +37,6 @@ class FibreReinforcedElasticityOperatorBlock<P, V, i, Dune::BlockLab::enableBloc
   template<typename Context>
   FibreReinforcedElasticityOperatorBlock(Context& ctx, const YAML::Node& config)
     : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
-    , rootparams(ctx.getRootConfig())
     , params(config)
   {}
 
@@ -49,7 +48,7 @@ class FibreReinforcedElasticityOperatorBlock<P, V, i, Dune::BlockLab::enableBloc
     auto vector = this->solver->template getVector<i>();
     auto gfs = vector->gridFunctionSpaceStorage();
     auto material = this->solver->template param<Material>("material");
-    auto lop = std::make_shared<LocalOperator>(gfs, rootparams, params, material);
+    auto lop = std::make_shared<LocalOperator>(gfs, params, material);
 
     auto force = this->solver->template getVector<i + 1>();
     lop->setCoefficientForce(force->gridFunctionSpaceStorage(), force);
@@ -82,12 +81,52 @@ class FibreReinforcedElasticityOperatorBlock<P, V, i, Dune::BlockLab::enableBloc
     data.push_back(
       "title: Fibre-reinforced Elasticity Operator         \n"
       "category: operators                                 \n"
+      "schema:                                             \n"
+      "  stabilization_parameter:                          \n"
+      "    type: float                                     \n"
+      "    default: 1000                                   \n"
+      "    meta:                                           \n"
+      "      title: DG Stabilization Parameter             \n"
+      "  fibres:                                           \n"
+      "    type: list                                      \n"
+      "    schema:                                         \n"
+      "      type: dict                                    \n"
+      "      schema:                                       \n"
+      "        start:                                      \n"
+      "          type: list                                \n"
+      "          maxlength: 2                              \n"
+      "          minlength: 2                              \n"
+      "          schema:                                   \n"
+      "            type: float                             \n"
+      "            default: 0                              \n"
+      "          meta:                                     \n"
+      "            title: Start point                      \n"
+      "        end:                                        \n"
+      "          type: list                                \n"
+      "          maxlength: 2                              \n"
+      "          minlength: 2                              \n"
+      "          schema:                                   \n"
+      "            type: float                             \n"
+      "            default: 1                              \n"
+      "          meta:                                     \n"
+      "            title: End point                        \n"
+      "        radius:                                     \n"
+      "          type: float                               \n"
+      "          default: 0.1                              \n"
+      "          meta:                                     \n"
+      "            title: Radius                           \n"
+      "        youngs_modulus:                             \n"
+      "          type: float                               \n"
+      "          default: 1e5                              \n"
+      "          meta:                                     \n"
+      "            title: Young's modulus                  \n"
+      "    meta:                                           \n"
+      "      title: Fibres                                 \n"
     );
     return data;
   }
 
   private:
-  YAML::Node rootparams;
   YAML::Node params;
 };
 
