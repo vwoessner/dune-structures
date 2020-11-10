@@ -29,7 +29,7 @@ int main(int argc, char** argv)
 {
   auto init = Dune::BlockLab::initBlockLab(argc, argv);
 
-  using GridProvider = Dune::BlockLab::StructuresGridProvider<3>;
+  using GridProvider = StructuresGridProvider<3>;
   auto grid = [](const auto& c)
     { 
       return std::make_shared<GridProvider>(c);
@@ -64,6 +64,7 @@ int main(int argc, char** argv)
   app.addDefaultRunner();
   app.addFrontendExporter();
   app.addHelpMessage();
+  app.setTitle("3D Biological Cell Grid - Linear Elements");
 
   app.run();
 

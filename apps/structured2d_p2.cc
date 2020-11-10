@@ -64,6 +64,7 @@ int main(int argc, char** argv)
   app.addDefaultRunner();
   app.addFrontendExporter();
   app.addHelpMessage();
+  app.setTitle("Structured 2D Cube Grid - Quadratic Elements");
 
   app.run();
 
