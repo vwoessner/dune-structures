@@ -9,14 +9,13 @@ import numpy as np
 import shutil
 import subprocess
 import pytools as pt
-
-from dune.testtools.parametertree.parser import parse_ini_file
+import yaml
 
 
 def ini_list(d, key):
-    """ A helper function for the ini-list pattern:
+    """ This is an artifact of my upgrade ini -> yaml
 
-    Inifile:
+    This previously abstracted the following inifile pattern:
     sections = a, b, c
     [a]
     ...
@@ -24,13 +23,14 @@ def ini_list(d, key):
     ...
     [c]
 
-    This function will return a list of dict-objects that correspond to the content of sections a, b and c.
+    Now that configuration is given as YAML, it is basically no-op.
+    This function should vanish in a refactoring.
     """
-    keys = d.get(key, None)
-    if keys is None:
+    vals = d.get(key, None)
+    if vals is None:
         return
-    for skey in keys.split(","):
-        yield d[skey.strip()]
+    for val in vals:
+        yield val
 
 
 def as_bool(x):
@@ -386,7 +386,7 @@ def generate_cell_mesh(config, gmshexec="gmsh"):
 
 def entrypoint_generate_mesh():
     # Read the command line arguments to this script
-    config = parse_ini_file(sys.argv[1])["grid"]
+    config = yaml.safe_load(open(sys.argv[1]))
     gmshexec = "gmsh"
     if len(sys.argv) > 3:
         gmshexec = sys.argv[3]
