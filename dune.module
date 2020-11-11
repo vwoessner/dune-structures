@@ -7,4 +7,4 @@ Module: dune-structures
 Version: 0.1
 Maintainer: dominic.kempf@iwr.uni-heidelberg.de
 #depending on
-Depends: dune-codegen dune-uggrid
+Depends: dune-codegen dune-blocklab

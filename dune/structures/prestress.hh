@@ -20,7 +20,7 @@ class MaterialPrestressBase
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
   static constexpr int dim = GV::dimension;
 
-  virtual ~MaterialPrestressBase() {}
+  virtual ~MaterialPrestressBase() = default;
 
   virtual void evaluate(const Entity&, const Coord&, Dune::FieldMatrix<T, dim, dim>&) const = 0;
 };
@@ -53,8 +53,8 @@ class IsotropicPrestress
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
   static constexpr int dim = GV::dimension;
 
-  IsotropicPrestress(const Dune::ParameterTree& param)
-    : scale(param.get<T>("scale"))
+  IsotropicPrestress(const YAML::Node& param)
+    : scale(param["scale"].as<T>())
   {}
 
   virtual ~IsotropicPrestress() {}
@@ -81,9 +81,9 @@ class StraightFibrePrestress
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
   static constexpr int dim = GV::dimension;
 
-  StraightFibrePrestress(const Dune::ParameterTree& param)
-    : scale(param.get<T>("scale"))
-    , dir(param.get<Dune::FieldVector<T, dim>>("direction"))
+  StraightFibrePrestress(const YAML::Node& param)
+    : scale(param["scale"].as<T>())
+    , dir(param["direction"].as<Dune::FieldVector<T, dim>>())
   {
     T norm = dir.two_norm();
     for (int i=0; i<dim; ++i)
@@ -109,7 +109,7 @@ class CurvedFibrePrestressImpl
   : public NoPrestress<GV, T>
 {
   public:
-  CurvedFibrePrestressImpl(const Dune::ParameterTree&, const Dune::ParameterTree&)
+  CurvedFibrePrestressImpl(const YAML::Node&, const YAML::Node&)
   {
     DUNE_THROW(MaterialError, "Curved fibre prestress not implemented in 2d");
   }
@@ -123,24 +123,24 @@ class CurvedFibrePrestressImpl<GV, T, 3>
   using Entity = typename GV::template Codim<0>::Entity;
   using Coord = typename GV::template Codim<0>::Geometry::LocalCoordinate;
 
-  CurvedFibrePrestressImpl(const Dune::ParameterTree& param, const Dune::ParameterTree& rootconfig)
-    : scale(param.get<T>("scale", T(1.0)))
-    , sampling(param.get<int>("sampling", 50))
-    , subsampling(param.get<int>("subsampling", 100))
+  CurvedFibrePrestressImpl(const YAML::Node& param, const YAML::Node& rootconfig)
+    : scale(param["scale"].as<T>(T(1.0)))
+    , sampling(param["sampling"].as<int>(50))
+    , subsampling(param["subsampling"].as<int>(100))
   {
-    if (!param.hasKey("fibre"))
+    auto fibreconfig = param["fibre"];
+    if (!fibreconfig)
       DUNE_THROW(MaterialError, "CurvedFibrePrestress expects a fibre config!");
 
-    auto& fibreconfig = rootconfig.sub(param.get<std::string>("fibre"));
-    if (fibreconfig.get<std::string>("shape") != "overnucleus")
+    if (fibreconfig["shape"].as<std::string>() != "overnucleus")
       DUNE_THROW(MaterialError, "CurvedFibrePrestress only supports overnucleus fibres!");
 
     // Extracting control points from config. This makes quite some assumptions of course.
-    auto scale = rootconfig.get<T>("grid.scaling", T(1.0));
-    auto start = fibreconfig.get<Dune::FieldVector<T, 3>>("start") * scale;
-    auto middle = fibreconfig.get<Dune::FieldVector<T, 3>>("middle") * scale;
-    auto end = fibreconfig.get<Dune::FieldVector<T, 3>>("end") * scale;
-    auto slope = fibreconfig.get<T>("slope");
+    auto scale = rootconfig["grid"]["scaling"].as<T>(T(1.0));
+    auto start = fibreconfig["start"].as<Dune::FieldVector<T, 3>>() * scale;
+    auto middle = fibreconfig["middle"].as<Dune::FieldVector<T, 3>>() * scale;
+    auto end = fibreconfig["end"].as<Dune::FieldVector<T, 3>>() * scale;
+    auto slope = fibreconfig["slope"].as<T>();
 
     // Resize the control point data structure
     control_points.resize(2);
@@ -295,17 +295,21 @@ using CurvedFibrePrestress = CurvedFibrePrestressImpl<GV, T, GV::dimension>;
 
 
 template<typename GV, typename T>
-std::shared_ptr<MaterialPrestressBase<GV, T>> construct_prestress(const Dune::ParameterTree& params, const Dune::ParameterTree& rootparams)
+std::shared_ptr<MaterialPrestressBase<GV, T>> construct_prestress(const YAML::Node& params, const YAML::Node& rootparams)
 {
-  auto type = params.get<std::string>("type", "none");
+  std::string type;
+  if ((!params) || (!params["prestress_type"]))
+    type = "none";
+  else
+    type = params["presstress_type"].as<std::string>();
 
   if (type == "isotropic")
     return std::make_shared<IsotropicPrestress<GV, T>>(params);
 
-  if (type == "straight_fibre")
+  if (type == "directional")
     return std::make_shared<StraightFibrePrestress<GV, T>>(params);
 
-  if (type == "curved_fibre")
+  if (type == "curved")
     return std::make_shared<CurvedFibrePrestress<GV, T>>(params, rootparams);
 
   if (type != "none")

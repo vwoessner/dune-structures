@@ -42,9 +42,9 @@ class StraightFibre
   using GlobalCoordinate = Dune::FieldVector<double, dim>;
   virtual ~StraightFibre() = default;
 
-  StraightFibre(const Dune::ParameterTree& param)
-    : start(param.get<GlobalCoordinate>("start"))
-    , dir(param.get<GlobalCoordinate>("end") - start)
+  StraightFibre(const YAML::Node& param)
+    : start(param["start"].as<GlobalCoordinate>())
+    , dir(param["end"].as<GlobalCoordinate>() - start)
   {}
 
   virtual GlobalCoordinate eval(double t) const override

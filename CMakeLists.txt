@@ -30,9 +30,8 @@ add_subdirectory(doc)
 add_subdirectory(operators)
 add_subdirectory(apps)
 add_subdirectory(cmake/modules)
-add_subdirectory(dune/structures)
+add_subdirectory(dune)
 add_subdirectory(python)
-add_subdirectory(test)
 add_subdirectory(experiments)
 
 # finalize the dune project, e.g. generating config.h etc.

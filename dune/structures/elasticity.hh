@@ -1,6 +1,9 @@
 #ifndef DUNE_STRUCTURES_ELASTICITY_HH
 #define DUNE_STRUCTURES_ELASTICITY_HH
 
+#include<dune/blocklab/blocks/blockbase.hh>
+#include<dune/blocklab/blocks/enableif.hh>
+#include<dune/blocklab/utilities/yaml.hh>
 #include<dune/pdelab.hh>
 
 #include<iostream>
@@ -56,82 +59,131 @@ struct OperatorSwitchImpl<GFS, 2, Dune::PDELab::PkLocalFiniteElementMap<ES, doub
 };
 
 
-template<int degree, typename ES, typename RangeType = double>
-auto elasticity_setup(ES es)
+template<typename P, typename V, std::size_t i, typename enable = Dune::BlockLab::disabled>
+class ElasticityOperatorBlock
+  : public Dune::BlockLab::DisabledBlock<P, V, i>
 {
-  constexpr int dim = ES::dimension;
-
-  // Set up finite element maps...
-  using FEM = Dune::PDELab::PkLocalFiniteElementMap<ES, double, RangeType, degree>;
-  auto fem = std::make_shared<FEM>(es);
-
-  // Set up grid function spaces...
-  using VB = Dune::PDELab::ISTL::VectorBackend<Dune::PDELab::ISTL::Blocking::none>;
-  using CASS = Dune::PDELab::ConformingDirichletConstraints;
-  using GFS = Dune::PDELab::VectorGridFunctionSpace<ES, FEM, dim, VB, VB, CASS>;
-  auto gfs = std::make_shared<GFS>(es, fem);
-  gfs->name("displacement");
-  gfs->update();
-  std::cout << "Set up a grid function space with " << gfs->size() << " dofs!" << std::endl;
-
-  // Setting up constraints container
-  using CC = typename GFS::template ConstraintsContainer<RangeType>::Type;
-  auto cc = std::make_shared<CC>();
-  cc->clear();
-
-  // Setting up container
-  using V = Dune::PDELab::Backend::Vector<GFS, double>;
-  auto x = std::make_shared<V>(gfs);
-
-  // And two more containers for body force and traction fields. One might consider
-  // interpolation with lower order here.
-  using NoCon = Dune::PDELab::NoConstraints;
-  using FGFS = Dune::PDELab::VectorGridFunctionSpace<ES, FEM, dim, VB, VB, NoCon>;
-  using FV = Dune::PDELab::Backend::Vector<FGFS, double>;
-  using FCC = typename FGFS::template ConstraintsContainer<RangeType>::Type;
-
-  auto fgfs = std::make_shared<FGFS>(es, fem);
-  auto force = std::make_shared<FV>(fgfs, 0.0);
-  auto force_cc = std::make_shared<FCC>();
-  auto traction = std::make_shared<FV>(fgfs, 0.0);
-  auto traction_cc = std::make_shared<FCC>();
-
-  return std::make_tuple(x, cc, force, force_cc, traction, traction_cc);
-}
+  public:
+  template<typename Context>
+  ElasticityOperatorBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::DisabledBlock<P, V, i>(ctx, config)
+  {}
+};
 
 
-template<int degree, typename ES, typename RangeType = double>
-auto elastodynamics_setup(ES es)
+template<typename P, typename V, std::size_t i>
+class ElasticityOperatorBlock<P, V, i, Dune::BlockLab::enableBlock<Dune::BlockLab::accessesAdditionalVectors<P, V, i, 2>()>>
+  : public Dune::BlockLab::BlockBase<P, V, i>
 {
-  // Set up finite element maps...
-  using FEM = Dune::PDELab::PkLocalFiniteElementMap<ES, double, RangeType, degree>;
-  auto fem = std::make_shared<FEM>(es);
+  public:
+  using Traits = Dune::BlockLab::BlockTraits<P, V, i>;
+  using Material = std::shared_ptr<ElasticMaterialBase<typename Traits::EntitySet, double>>;
 
-  // Set up grid function spaces...
-  using VB = Dune::PDELab::ISTL::VectorBackend<Dune::PDELab::ISTL::Blocking::none>;
-  using CASS = Dune::PDELab::ConformingDirichletConstraints;
-  using GFS = Dune::PDELab::VectorGridFunctionSpace<ES, FEM, 3, VB, VB, CASS>;
-  using PGFS = Dune::PDELab::CompositeGridFunctionSpace<VB, Dune::PDELab::LexicographicOrderingTag, GFS, GFS>;
+  static constexpr int dim = Traits::dim;
+  using BaseOperator = Dune::BlockLab::AbstractLocalOperatorInterface<typename Traits::GridFunctionSpace>;
+  using FGFS = typename std::tuple_element<i + 1, V>::type::GridFunctionSpace;
+  using TGFS = typename std::tuple_element<i + 2, V>::type::GridFunctionSpace;
+  using LocalOperator = typename OperatorSwitch<typename Traits::GridFunctionSpace, dim, FGFS, TGFS>::Elasticity;
 
-  auto gfs1 = std::make_shared<GFS>(es, fem);
-  auto gfs2 = std::make_shared<GFS>(es, fem);
-  auto pgfs = std::make_shared<PGFS>(gfs1, gfs2);
-  gfs1->name("displacement");
-  gfs2->name("auxiliary");
-  pgfs->update();
-  std::cout << "Set up a grid function space with " << pgfs->size() << " dofs!" << std::endl;
+  template<typename Context>
+  ElasticityOperatorBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
+  {}
 
-  // Setting up constraints container
-  using CC = typename PGFS::template ConstraintsContainer<RangeType>::Type;
-  auto cc = std::make_shared<CC>();
-  cc->clear();
+  virtual ~ElasticityOperatorBlock() = default;
 
-  // Setting up container
-  using V = Dune::PDELab::Backend::Vector<PGFS, double>;
-  auto x = std::make_shared<V>(pgfs);
+  virtual void setup() override
+  {
+    // Construct the local operator...
+    auto vector = this->solver->template getVector<i>();
+    auto gfs = vector->gridFunctionSpaceStorage();
+    auto material = this->solver->template param<Material>("material");
+    auto lop = std::make_shared<LocalOperator>(*gfs, *gfs, Dune::ParameterTree(), material);
 
-  return std::make_pair(x, cc);
-}
+    auto force = this->solver->template getVector<i + 1>();
+    lop->setCoefficientForce(force->gridFunctionSpaceStorage(), force);
 
+    auto traction = this->solver->template getVector<i + 2>();
+    lop->setCoefficientTraction(traction->gridFunctionSpaceStorage(), traction);
+
+    // ... and register it in the parameter system
+    this->solver->template introduce_parameter<std::shared_ptr<BaseOperator>>(this->getBlockName(), lop);
+  }
+
+  virtual void update_parameter(std::string name, typename Traits::Parameter param) override
+  {
+    if (name == "material")
+    {
+      auto material = std::get<Material>(param);
+      auto lop_pointer = this->solver->template param<std::shared_ptr<BaseOperator>>(this->getBlockName()).get();
+      dynamic_cast<LocalOperator*>(lop_pointer)->setMaterial(material);
+    }
+  }
+
+  static std::vector<std::string> blockData()
+  {
+    auto data = Dune::BlockLab::BlockBase<P, V, i>::blockData();
+    data.push_back(
+      "title: Elasticity Operator                          \n"
+      "category: operators                                 \n"
+    );
+    return data;
+  }
+};
+
+
+
+template<typename P, typename V, std::size_t i, typename enable = Dune::BlockLab::disabled>
+class ElasticityMassOperatorBlock
+  : public Dune::BlockLab::DisabledBlock<P, V, i>
+{
+  public:
+  template<typename Context>
+  ElasticityMassOperatorBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::DisabledBlock<P, V, i>(ctx, config)
+  {}
+};
+
+template<typename P, typename V, std::size_t i>
+class ElasticityMassOperatorBlock<P, V, i, Dune::BlockLab::enableBlock<Dune::BlockLab::accessesAdditionalVectors<P, V, i, 2>()>>
+  : public Dune::BlockLab::BlockBase<P, V, i>
+{
+  public:
+  using Traits = Dune::BlockLab::BlockTraits<P, V, i>;
+
+  using BaseOperator = Dune::BlockLab::AbstractLocalOperatorInterface<typename Traits::GridFunctionSpace>;
+  using FGFS = typename std::tuple_element<i + 1, V>::type::GridFunctionSpace;
+  using TGFS = typename std::tuple_element<i + 2, V>::type::GridFunctionSpace;
+  using TemporalLocalOperator = typename OperatorSwitch<typename Traits::GridFunctionSpace,
+                                                        Traits::dim, FGFS, TGFS>::Mass;
+
+  template<typename Context>
+  ElasticityMassOperatorBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
+  {}
+
+  virtual ~ElasticityMassOperatorBlock() = default;
+
+  virtual void setup() override
+  {
+    // Construct the local operator...
+    auto vector = this->solver->template getVector<i>();
+    auto gfs = vector->gridFunctionSpaceStorage();
+    auto lop = std::make_shared<TemporalLocalOperator>(*gfs, *gfs, Dune::ParameterTree());
+
+    // ... and register it in the parameter system
+    this->solver->template introduce_parameter<std::shared_ptr<BaseOperator>>(this->getBlockName(), lop);
+  }
+
+  static std::vector<std::string> blockData()
+  {
+    auto data = Dune::BlockLab::BlockBase<P, V, i>::blockData();
+    data.push_back(
+      "title: Elasticity Mass Operator                     \n"
+      "category: operators                                 \n"
+    );
+    return data;
+  }
+};
 
 #endif

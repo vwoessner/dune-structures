@@ -7,6 +7,8 @@
  *  is intended as a debugging tool to diagnose such failures.
  */
 
+#include<dune/blocklab/blocks/blockbase.hh>
+#include<dune/blocklab/blocks/enableif.hh>
 #include<dune/common/fvector.hh>
 #include<dune/pdelab.hh>
 
@@ -84,5 +86,57 @@ bool is_onetoone(const GF& gf, bool verbose=false)
 
   return true;
 }
+
+
+
+template<typename P, typename V, std::size_t i, typename enabled = Dune::BlockLab::disabled>
+class OneToOneMappingCheckerBlock
+ : public Dune::BlockLab::DisabledBlock<P, V, i>
+{
+  public:
+  template<typename Context>
+  OneToOneMappingCheckerBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::DisabledBlock<P, V, i>(ctx, config)
+  {}
+};
+
+
+template<typename P, typename V, std::size_t i>
+class OneToOneMappingCheckerBlock<P, V, i, Dune::BlockLab::enableBlock<Dune::BlockLab::is3D<P, V, i>()>>
+ : public Dune::BlockLab::BlockBase<P, V, i>
+{
+  public:
+  using Traits = Dune::BlockLab::BlockTraits<P, V, i>;
+
+  template<typename Context>
+  OneToOneMappingCheckerBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
+  {}
+
+  virtual ~OneToOneMappingCheckerBlock() = default;
+
+  void apply() override
+  {
+    auto vector = this->solver->template getVector<i>();
+    auto& gfs = vector->gridFunctionSpace();
+    auto es = gfs.entitySet();
+
+    Dune::PDELab::VectorDiscreteGridFunction vdgf(gfs, *vector);
+
+    std::cout << "Checking one-to-one property of displacement field... ";
+    std::cout << (is_onetoone(vdgf) ? "Success!" : "Failure") << std::endl;
+  }
+
+  static std::vector<std::string> blockData()
+  {
+    auto data = Dune::BlockLab::BlockBase<P, V, i>::blockData();
+    data.push_back(
+      "title: One-to-one displacement mapping checker      \n"
+      "category: structures                                \n"
+    );
+    return data;
+  }
+  
+};
 
 #endif

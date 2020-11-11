@@ -197,7 +197,7 @@ dune.codegen.pdelab.signatures.construct_signature = notemplate_construct_signat
 def using_from_baseclass(_type):
     gfsu = lop_template_ansatz_gfs()
     gfsv = lop_template_test_gfs()
-    base = 'AbstractLocalOperatorInterface<{}, {}>'.format(gfsu, gfsv)
+    base = 'Dune::BlockLab::AbstractLocalOperatorInterface<{}, {}>'.format(gfsu, gfsv)
     return "using {} = typename {}::{};".format(_type, base, _type)
 
 
@@ -206,6 +206,6 @@ def using_from_baseclass(_type):
 def baseclass_hook():
     gfsu = lop_template_ansatz_gfs()
     gfsv = lop_template_test_gfs()
-    include_file('dune/structures/operatorinterface.hh', filetag="operatorfile")
+    include_file('dune/blocklab/operators/virtualinterface.hh', filetag="operatorfile")
     delete_cache_items("baseclass")
-    base_class('AbstractLocalOperatorInterface<{}, {}>'.format(gfsu, gfsv), classtag="operator")
+    base_class('Dune::BlockLab::AbstractLocalOperatorInterface<{}, {}>'.format(gfsu, gfsv), classtag="operator")

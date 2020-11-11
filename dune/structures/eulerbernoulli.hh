@@ -8,10 +8,12 @@
  *  Cut Finite Element Methods for Linear Elasticity Problems
  */
 
+#include<dune/blocklab/operators/virtualinterface.hh>
+#include<dune/blocklab/utilities/enumerate.hh>
+#include<dune/blocklab/utilities/stringsplit.hh>
 #include<dune/geometry/affinegeometry.hh>
 #include<dune/pdelab.hh>
 #include<dune/structures/elasticity.hh>
-#include<dune/structures/enumerate.hh>
 #include<dune/structures/material.hh>
 #include<dune/structures/parametrizedcurves.hh>
 
@@ -86,42 +88,30 @@ class EulerBernoulli2DLocalOperator
   enum { doAlphaVolume = true };
   enum { doAlphaSkeleton  = true };
 
-  EulerBernoulli2DLocalOperator(const Dune::ParameterTree& rootparams, const Dune::ParameterTree& params, std::shared_ptr<const GFS> gfs)
+  EulerBernoulli2DLocalOperator(const YAML::Node& params, std::shared_ptr<const GFS> gfs)
     : Dune::PDELab::NumericalJacobianVolume<EulerBernoulli2DLocalOperator<GFS, FGFS>>(1e-9)
     , Dune::PDELab::NumericalJacobianSkeleton<EulerBernoulli2DLocalOperator<GFS, FGFS>>(1e-9)
     , gv(gfs->gridView())
   {
     // Some debugging switches to reduce recompilations in debugging
-    bool verbose = params.get<bool>("verbose", false);
-    enable_volume = params.get<bool>("enable_volume", true);
-    enable_skeleton = params.get<bool>("enable_skeleton", true);
+    bool verbose = params["verbose"].as<bool>(false);
+    enable_volume = params["enable_volume"].as<bool>(true);
+    enable_skeleton = params["enable_skeleton"].as<bool>(true);
 
-	// Extract stabilization parameter
-    beta = params.get<double>("stabilization_parameter", 1.0);
+    // Extract stabilization parameter
+    beta = params["stabilization_parameter"].as<double>();
 
     // Parse fibres from the configuration
-    auto fibrestr = rootparams.get<std::string>("grid.fibres.fibres", "");
-    auto fibres = str_split(fibrestr);
-    for (auto fibre: fibres)
+    for (auto fibre: params["fibres"])
     {
-      str_trim(fibre);
-      auto fibreconfig = rootparams.sub("grid.fibres").sub(fibre);
-
-      if (fibreconfig.get<std::string>("shape") == "cylinder")
-        fibre_parametrizations.push_back(std::make_shared<StraightFibre<2>>(fibreconfig));
-      else
-        DUNE_THROW(Dune::Exception, "Fibre shape not supported!");
+      fibre_parametrizations.push_back(std::make_shared<StraightFibre<2>>(fibre));
 
       // Parse the Youngs modulus of the fibre.
-      auto modulus = fibreconfig.get<double>("youngs_modulus", 0.0);
-      if (modulus == 0.0)
-        std::cout << "youngs_modulus not set for all fibres!" << std::endl;
+      auto modulus = fibre["youngs_modulus"].as<double>();
       fibre_modulus.push_back(modulus);
 
       // Parse the fibre radii
-      auto radius = fibreconfig.get<double>("radius", 0.0);
-      if (radius == 0.0)
-        std::cout << "radius not set for all fibres!" << std::endl;
+      auto radius = fibre["radius"].as<double>();
       fibre_radii.push_back(radius);
     }
     std::cout << "Parsed a total of " << fibre_parametrizations.size() << " fibres from the configuration." << std::endl;
@@ -131,20 +121,21 @@ class EulerBernoulli2DLocalOperator
     if (verbose)
     {
       std::cout << "Fibre intersection summary:" << std::endl;
-      for (auto [fibindex, intersection] : enumerate(fibre_intersections))
+      for (auto [fibindex, intersection] : Dune::BlockLab::enumerate(fibre_intersections))
       {
-	for (auto [cellindex, range] : intersection.element_fibre_intersections)
-	{
-	   auto [start, end] = range;
-	   std::cout << "Cell " << cellindex << " intersects fibre " << fibindex
-	                       << " on the curve interval [" << start << "," << end << "]" << std::endl;
-	}
-	for (auto [indexpair, tparam] : intersection.facet_fibre_intersections)
-	{
-	   auto [inside, outside] = indexpair;
-           std::cout << "Facet between cell " << inside << " and " << outside << " intersects fibre "
-	             << fibindex << " at t=" << tparam << std::endl;
-	}
+        for (auto [cellindex, range] : intersection.element_fibre_intersections)
+        {
+          auto [start, end] = range;
+          std::cout << "Cell " << cellindex << " intersects fibre " << fibindex
+                    << " on the curve interval [" << start << "," << end << "]" << std::endl;
+        }
+
+        for (auto [indexpair, tparam] : intersection.facet_fibre_intersections)
+        {
+          auto [inside, outside] = indexpair;
+          std::cout << "Facet between cell " << inside << " and " << outside << " intersects fibre "
+                    << fibindex << " at t=" << tparam << std::endl;
+        }
       }
     }
   }
@@ -174,7 +165,7 @@ class EulerBernoulli2DLocalOperator
       auto fibintersection = fibre_intersections[fibindex];
       auto it = fibintersection.element_fibre_intersections.find(is.index(entity));
       if (it == fibintersection.element_fibre_intersections.end())
-	continue;
+        continue;
 
       auto fibre = fibre_parametrizations[fibindex];
 
@@ -443,10 +434,10 @@ class EulerBernoulli2DLocalOperator
 
 template<typename GFS, typename FGFS, typename TGFS, int dim>
 class FibreReinforcedBulkOperator
-  : public AbstractLocalOperatorInterface<GFS>
+  : public Dune::BlockLab::AbstractLocalOperatorInterface<GFS>
 {
   public:
-  using BaseOperator = AbstractLocalOperatorInterface<GFS>;
+  using BaseOperator = Dune::BlockLab::AbstractLocalOperatorInterface<GFS>;
   using BulkOperator = typename OperatorSwitch<GFS, dim, FGFS, TGFS>::Elasticity;
   using FibreOperator = EulerBernoulli2DLocalOperator<GFS, FGFS>;
 
@@ -458,11 +449,10 @@ class FibreReinforcedBulkOperator
   using R = typename BaseOperator::R;
 
   FibreReinforcedBulkOperator(std::shared_ptr<const GFS> gfs,
-                              const Dune::ParameterTree& rootparams,
-                              const Dune::ParameterTree& params,
+                              const YAML::Node& params,
                               std::shared_ptr<ElasticMaterialBase<typename GFS::Traits::EntitySet, double>> material)
-    : bulkoperator(*gfs, *gfs, params, material)
-    , fibreoperator(rootparams, params, gfs)
+    : bulkoperator(*gfs, *gfs, Dune::ParameterTree(), material)
+    , fibreoperator(params, gfs)
   {}
 
   virtual ~FibreReinforcedBulkOperator() = default;
