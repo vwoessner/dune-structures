@@ -12,27 +12,6 @@ import pytools as pt
 import yaml
 
 
-def ini_list(d, key):
-    """ This is an artifact of my upgrade ini -> yaml
-
-    This previously abstracted the following inifile pattern:
-    sections = a, b, c
-    [a]
-    ...
-    [b]
-    ...
-    [c]
-
-    Now that configuration is given as YAML, it is basically no-op.
-    This function should vanish in a refactoring.
-    """
-    vals = d.get(key, None)
-    if vals is None:
-        return
-    for val in vals:
-        yield val
-
-
 def as_bool(x):
     if isinstance(x, bool):
         return x
@@ -167,7 +146,7 @@ def cell_geometry_3d(geo, config):
     # Maybe add some fibres
     fibres = []
     fibreconfig = config.get("fibres", {})
-    for i, fconfig in enumerate(ini_list(fibreconfig, "fibres")):
+    for i, fconfig in enumerate(fibreconfig):
         fibre = None
         shape = fconfig.get("shape", "cylinder")
         if shape == "cylinder":
@@ -228,7 +207,7 @@ def cell_geometry_3d(geo, config):
     if nucleusconfig.get("enabled", True):
         meshwidth = as_float(nucleusconfig.get("meshwidth", cytoconfig.get("meshwidth", 0.1)))
         geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{{}}}; }} }} = {};".format(nucleus.id, meshwidth))
-    for i, fconfig in enumerate(ini_list(fibreconfig, "fibres")):
+    for i, fconfig in enumerate(fibreconfig):
         meshwidth = as_float(fconfig.get("meshwidth", 0.02))
         geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{{}}}; }} }} = {};".format(fibres[i].id, meshwidth))
 
@@ -289,7 +268,7 @@ def cell_geometry_2d(geo, config):
     # Maybe add some fibres
     fibres = []
     fibreconfig = config.get("fibres", {})
-    for i, fconfig in enumerate(ini_list(fibreconfig, "fibres")):
+    for i, fconfig in enumerate(fibreconfig):
         fibre = None
         # For compatibility with 3d we accept "cylinder" as a shape, although we are dealing
         # with rectangles of course. Makes sense in our setting though.
@@ -318,7 +297,7 @@ def cell_geometry_2d(geo, config):
 
     # Implement mesh widths
     geo.add_raw_code("Characteristic Length{{ PointsOf{{ Surface{{:}}; }} }} = {};".format(cytoconfig.get("meshwidth", 0.1)))
-    for i, fconfig in enumerate(ini_list(fibreconfig, "fibres")):
+    for i, fconfig in enumerate(fibreconfig):
         meshwidth = as_float(fconfig.get("meshwidth", 0.02))
         geo.add_raw_code("Characteristic Length{{ PointsOf{{ Surface{{{}}}; }} }} = {};".format(fibres[i].id, meshwidth))
 
