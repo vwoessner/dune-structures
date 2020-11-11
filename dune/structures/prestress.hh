@@ -298,18 +298,18 @@ template<typename GV, typename T>
 std::shared_ptr<MaterialPrestressBase<GV, T>> construct_prestress(const YAML::Node& params, const YAML::Node& rootparams)
 {
   std::string type;
-  if ((!params) || (!params[type]))
+  if ((!params) || (!params["prestress_type"]))
     type = "none";
   else
-    type = params["type"].as<std::string>();
+    type = params["presstress_type"].as<std::string>();
 
   if (type == "isotropic")
     return std::make_shared<IsotropicPrestress<GV, T>>(params);
 
-  if (type == "straight_fibre")
+  if (type == "directional")
     return std::make_shared<StraightFibrePrestress<GV, T>>(params);
 
-  if (type == "curved_fibre")
+  if (type == "curved")
     return std::make_shared<CurvedFibrePrestress<GV, T>>(params, rootparams);
 
   if (type != "none")
