@@ -145,7 +145,7 @@ def cell_geometry_3d(geo, config):
 
     # Maybe add some fibres
     fibres = []
-    fibreconfig = config.get("fibres", {})
+    fibreconfig = config.get("fibres", [])
     for i, fconfig in enumerate(fibreconfig):
         fibre = None
         shape = fconfig.get("shape", "cylinder")
