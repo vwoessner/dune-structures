@@ -1,0 +1,13 @@
+version: "3.4"
+
+services:
+  frontend:
+    image: "registry.dune-project.org/dominic/dune-structures/frontend"
+    depends_on:
+      - redis
+    ports:
+      - "5000:5000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+  redis:
+    image: "redis"

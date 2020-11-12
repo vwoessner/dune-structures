@@ -8,5 +8,3 @@ set(DUNE_CODEGEN_ADDITIONAL_PYTHON_SOURCES ${DUNE_CODEGEN_ADDITIONAL_PYTHON_SOUR
 # Search for additional packages needed by dune-structures
 find_package(ParMETIS 4)
 find_package(Gmsh)
-
-include(pandocology)
