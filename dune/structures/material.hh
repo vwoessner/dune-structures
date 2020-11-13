@@ -257,6 +257,7 @@ class MaterialInitializationBlock
   public:
   using Traits = Dune::BlockLab::BlockTraits<P, V>;
   using Material = std::shared_ptr<ElasticMaterialBase<typename Traits::EntitySet, double>>;
+  static constexpr int dim = Traits::dim;
 
   template<typename Context>
   MaterialInitializationBlock(Context& ctx, const YAML::Node& config)
@@ -329,14 +330,30 @@ class MaterialInitializationBlock
       "              allowed:                                      \n"
       "                - none                                      \n"
       "                - isotropic                                 \n"
+      "                - directional                               \n"
       "              default: none                                 \n"
       "              meta:                                         \n"
       "                title: Prestress Model                      \n"
       "            scale:                                          \n"
       "              type: float                                   \n"
       "              default: 0.0                                  \n"
+      "              dependencies:                                 \n"
+      "                type:                                       \n"
+      "                  - isotropic                               \n"
+      "                  - directional                             \n"
       "              meta:                                         \n"
       "                title: Scale                                \n"
+      "            direction:                                      \n"
+      "              type: list                                    \n"
+      "              minlength: " + std::to_string(dim) + "        \n"
+      "              maxlength: " + std::to_string(dim) + "        \n"
+      "              dependencies:                                 \n"
+      "                shape: directional                          \n"
+      "              schema:                                       \n"
+      "                type: float                                 \n"
+      "                default: 1.0                                \n"
+      "              meta:                                         \n"
+      "                title: Direction                            \n"
       "          meta:                                             \n"
       "            title: Prestress                                \n"
       "    meta:                                                   \n"
