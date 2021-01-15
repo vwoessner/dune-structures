@@ -162,7 +162,7 @@ class EulerBernoulli2DLocalOperator
     for (std::size_t fibindex=0; fibindex<fibre_parametrizations.size(); ++fibindex)
     {
       // Check whether this fiber actually intersects the cell
-      auto fibintersection = fibre_intersections[fibindex];
+      auto& fibintersection = fibre_intersections[fibindex];
       auto it = fibintersection.element_fibre_intersections.find(is.index(entity));
       if (it == fibintersection.element_fibre_intersections.end())
         continue;
@@ -285,7 +285,7 @@ class EulerBernoulli2DLocalOperator
       bool flipped = false;
 
       // Check whether this fiber actually intersects the cell
-      auto fibintersection = fibre_intersections[fibindex];
+      auto& fibintersection = fibre_intersections[fibindex];
       auto it = fibintersection.facet_fibre_intersections.find(std::make_pair(is.index(ig.inside()), is.index(ig.outside())));
       if (it == fibintersection.facet_fibre_intersections.end())
       {
