@@ -300,8 +300,8 @@ class EulerBernoulli2DLocalOperator
       using namespace Dune::Indices;
       auto child_0 = child(lfsu_s, _0);
       auto child_1 = child(lfsu_s, _1);
-      auto cellgeo_s = (flipped ? ig.outside() : ig.inside()).geometry();
-      auto cellgeo_n = (flipped ? ig.inside() : ig.outside()).geometry();
+      auto cellgeo_s = ig.inside().geometry();
+      auto cellgeo_n = ig.outside().geometry();
 
       using Evaluator = BasisEvaluator<typename LFSU::template Child<0>::Type::Traits::FiniteElementType::Traits::LocalBasisType>;
       Evaluator basis_s(child_0.finiteElement().localBasis());
@@ -323,8 +323,8 @@ class EulerBernoulli2DLocalOperator
       for (std::size_t c=0; c<2; ++c)
         for (std::size_t i=0; i<child_0.size(); i++)
         {
-          u_s[c] += (flipped ? x_n : x_s)(child(lfsu_s, c), i) * basis_s.function(i);
-          u_n[c] += (flipped ? x_s : x_n)(child(lfsu_n, c), i) * basis_n.function(i);
+          u_s[c] += x_s(child(lfsu_s, c), i) * basis_s.function(i);
+          u_n[c] += x_n(child(lfsu_n, c), i) * basis_n.function(i);
         }
 
       // And the jacobian of displacement
@@ -333,8 +333,8 @@ class EulerBernoulli2DLocalOperator
         for (std::size_t d=0; d<2; ++d)
           for (std::size_t i=0; i<child_0.size(); ++i)
           {
-            d1u_s[c][d] += (flipped ? x_n : x_s)(child(lfsu_s, c), i) * basis_s.jacobian(i, d);
-            d1u_n[c][d] += (flipped ? x_s : x_n)(child(lfsu_n, c), i) * basis_n.jacobian(i, d);
+            d1u_s[c][d] += x_s(child(lfsu_s, c), i) * basis_s.jacobian(i, d);
+            d1u_n[c][d] += x_n(child(lfsu_n, c), i) * basis_n.jacobian(i, d);
           }
 
       // And finally the hessian of the displacement
@@ -344,8 +344,8 @@ class EulerBernoulli2DLocalOperator
           for (std::size_t d1=0; d1<2; ++d1)
             for (std::size_t i=0; i<child_0.size(); ++i)
             {
-              d2u_s[c][d0][d1] += (flipped ? x_n : x_s)(child(lfsu_s, c), i) * basis_s.hessian(i, d0, d1);
-              d2u_n[c][d0][d1] += (flipped ? x_s : x_n)(child(lfsu_n, c), i) * basis_n.hessian(i, d0, d1);
+              d2u_s[c][d0][d1] += x_s(child(lfsu_s, c), i) * basis_s.hessian(i, d0, d1);
+              d2u_n[c][d0][d1] += x_n(child(lfsu_n, c), i) * basis_n.hessian(i, d0, d1);
             }
 
       // Evaluate the jacobian inverse transposed in inside/outside cell
@@ -383,12 +383,12 @@ class EulerBernoulli2DLocalOperator
         auto dt2vn_s_0 = (t[1] * (jit_s[1][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1] + t[0] * (jit_s[0][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1]) * t[1] + (t[1] * (jit_s[1][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1] + t[0] * (jit_s[0][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0))) * (-1) * t[1]) * t[0];
         auto dt2vn_s_1 = (t[1] * t[0] * (jit_s[1][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0))) + t[0] * t[0] * (jit_s[0][1] * (jit_s[1][1] * basis_s.hessian(i, 1, 1) + jit_s[1][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[1][1] * basis_s.hessian(i, 0, 1) + jit_s[1][0] * basis_s.hessian(i, 0, 0)))) * t[1] + (t[1] * t[0] * (jit_s[1][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[1][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0))) + t[0] * t[0] * (jit_s[0][1] * (jit_s[0][1] * basis_s.hessian(i, 1, 1) + jit_s[0][0] * basis_s.hessian(i, 1, 0)) + jit_s[0][0] * (jit_s[0][1] * basis_s.hessian(i, 0, 1) + jit_s[0][0] * basis_s.hessian(i, 0, 0)))) * t[0];
 
-        double flip_factor = flipped ? 1.0 : -1.0;
-        (flipped ? r_s : r_n).accumulate(lfsu_n.child(0), i, E*I*(-sk_dt2un*dtvn_n_0 - flip_factor * dt2vn_n_0 * sk_dtun + flip_factor * penalty * sk_dtun * dtvn_n_0));
-        (flipped ? r_s : r_n).accumulate(lfsu_n.child(1), i, E*I*(-sk_dt2un*dtvn_n_1 - flip_factor * dt2vn_n_1 * sk_dtun + flip_factor * penalty * sk_dtun * dtvn_n_1));
+        double flip_factor = flipped ? -1.0 : 1.0;
+        r_n.accumulate(lfsu_n.child(0), i, -E*I*(- flip_factor * sk_dt2un*dtvn_n_0 + flip_factor * 0.5 * dt2vn_n_0 * sk_dtun + penalty * sk_dtun * dtvn_n_0));
+        r_n.accumulate(lfsu_n.child(1), i, -E*I*(- flip_factor * sk_dt2un*dtvn_n_1 + flip_factor * 0.5 * dt2vn_n_1 * sk_dtun + penalty * sk_dtun * dtvn_n_1));
 
-        (flipped ? r_n : r_s).accumulate(lfsu_s.child(0), i, -E*I*(-sk_dt2un*dtvn_s_0 - flip_factor * dt2vn_s_0 * sk_dtun + flip_factor * penalty * sk_dtun * dtvn_s_0));
-        (flipped ? r_n : r_s).accumulate(lfsu_s.child(1), i, -E*I*(-sk_dt2un*dtvn_s_1 - flip_factor * dt2vn_s_1 * sk_dtun + flip_factor * penalty * sk_dtun * dtvn_s_1));
+        r_s.accumulate(lfsu_s.child(0), i, -E*I*(flip_factor * sk_dt2un*dtvn_s_0 + flip_factor * 0.5 * dt2vn_s_0 * sk_dtun - penalty * sk_dtun * dtvn_s_0));
+        r_s.accumulate(lfsu_s.child(1), i, -E*I*(flip_factor * sk_dt2un*dtvn_s_1 + flip_factor * 0.5 * dt2vn_s_1 * sk_dtun - penalty * sk_dtun * dtvn_s_1));
       }
     }
   }
@@ -493,7 +493,6 @@ class FibreReinforcedBulkOperator
 
   virtual void alpha_skeleton(const IG& ig, const LFSU& lfsu_s, const X& x_s, const LFSV& lfsv_s, const LFSU& lfsu_n, const X& x_n, const LFSV& lfsv_n, R& r_s, R& r_n) const
   {
-    bulkoperator.alpha_skeleton(ig, lfsu_s, x_s, lfsv_s, lfsu_n, x_n, lfsv_n, r_s, r_n);
     fibreoperator.alpha_skeleton(ig, lfsu_s, x_s, lfsv_s, lfsu_n, x_n, lfsv_n, r_s, r_n);
   }
 
