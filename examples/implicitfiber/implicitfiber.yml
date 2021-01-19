@@ -60,7 +60,7 @@ solver:
                 - -0.5
                 - 0.749
               youngs_modulus: 10000
-          stabilization_parameter: 1000
+          stabilization_parameter: 1.0
           vector: 0
       vector: 0
     visualization:

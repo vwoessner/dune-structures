@@ -84,7 +84,7 @@ class FibreReinforcedElasticityOperatorBlock<P, V, i, Dune::BlockLab::enableBloc
       "schema:                                             \n"
       "  stabilization_parameter:                          \n"
       "    type: float                                     \n"
-      "    default: 1000                                   \n"
+      "    default: 1.0                                    \n"
       "    meta:                                           \n"
       "      title: DG Stabilization Parameter             \n"
       "  fibres:                                           \n"
