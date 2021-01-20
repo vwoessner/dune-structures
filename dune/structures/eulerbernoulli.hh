@@ -362,7 +362,11 @@ class EulerBernoulli2DLocalOperator
       auto I = (d*d*d) / 12.0;
 
       // Compute the penalty factor
-      auto penalty = beta / ig.geometry().volume();
+      auto fiber_segment_s = fibintersection.element_fibre_intersections.find(is.index(ig.inside()));
+      auto fiber_segment_n = fibintersection.element_fibre_intersections.find(is.index(ig.outside()));
+      auto len_s = (fibre->eval(fiber_segment_s->second.second) - fibre->eval(fiber_segment_s->second.first)).two_norm();
+      auto len_n = (fibre->eval(fiber_segment_n->second.second) - fibre->eval(fiber_segment_n->second.first)).two_norm();
+      auto penalty = beta / std::min(len_s, len_n);
 
       // The needed tangential derivative quantities. These expressions are generated
       // using the generate_tangential_derivatives Python script.
