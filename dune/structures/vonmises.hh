@@ -1,43 +1,52 @@
 #ifndef DUNE_STRUCTURES_VON_MISES_HH
 #define DUNE_STRUCTURES_VON_MISES_HH
 
-#include<dune/pdelab.hh>
-#include<dune/structures/material.hh>
+#include <dune/pdelab.hh>
+#include <dune/structures/material.hh>
 
-#include<array>
-#include<memory>
+#include <array>
+#include <memory>
 
 /** Calculate von Mises Stress
  *
- *  TODO: I am not 100% sure if my calculations are correct for the 2D case. Do a bit more literature research on that.
+ *  TODO: I am not 100% sure if my calculations are correct for the 2D case. Do
+ * a bit more literature research on that.
  * */
 template<typename Container, int dim>
 class VonMisesStressGridFunction
-    : public Dune::PDELab::GridFunctionBase<
-      Dune::PDELab::GridFunctionTraits<typename Container::GridFunctionSpace::Traits::EntitySet,
-                                       typename Container::field_type,
-                                       1,
-                                       Dune::FieldVector<typename Container::field_type,1> >,
-      VonMisesStressGridFunction<Container, dim>
-      >
+  : public Dune::PDELab::GridFunctionBase<
+      Dune::PDELab::GridFunctionTraits<
+        typename Container::GridFunctionSpace::Traits::EntitySet,
+        typename Container::field_type,
+        1,
+        Dune::FieldVector<typename Container::field_type, 1>>,
+      VonMisesStressGridFunction<Container, dim>>
 {
-  private:
-  using DisplacementFunction = Dune::PDELab::VectorDiscreteGridFunction<typename Container::GridFunctionSpace, Container>;
-  using DisplacementFunctionGradient = Dune::PDELab::VectorDiscreteGridFunctionGradient<typename Container::GridFunctionSpace, Container>;
-  using Material = ElasticMaterialBase<typename Container::GridFunctionSpace::Traits::EntitySet, typename Container::field_type>;
+private:
+  using DisplacementFunction = Dune::PDELab::VectorDiscreteGridFunction<
+    typename Container::GridFunctionSpace,
+    Container>;
+  using DisplacementFunctionGradient =
+    Dune::PDELab::VectorDiscreteGridFunctionGradient<
+      typename Container::GridFunctionSpace,
+      Container>;
+  using Material = ElasticMaterialBase<
+    typename Container::GridFunctionSpace::Traits::EntitySet,
+    typename Container::field_type>;
 
-  public:
+public:
   using Traits = Dune::PDELab::GridFunctionTraits<
-      typename Container::GridFunctionSpace::Traits::EntitySet,
-      typename Container::field_type,
-      1,
-      Dune::FieldVector<typename Container::field_type,1>
-  >;
+    typename Container::GridFunctionSpace::Traits::EntitySet,
+    typename Container::field_type,
+    1,
+    Dune::FieldVector<typename Container::field_type, 1>>;
 
-  VonMisesStressGridFunction(const Container& cont, std::shared_ptr<Material> material)
-    : displacement_grad_f(cont.gridFunctionSpace(), cont),
-      material(material)
-  {}
+  VonMisesStressGridFunction(const Container& cont,
+                             std::shared_ptr<Material> material)
+    : displacement_grad_f(cont.gridFunctionSpace(), cont)
+    , material(material)
+  {
+  }
 
   inline void evaluate(const typename Traits::ElementType& e,
                        const typename Traits::DomainType& x,
@@ -54,28 +63,29 @@ class VonMisesStressGridFunction
     typename Traits::RangeType sum = 0.0;
 
     // Offdiagonal part of the deviatoric stress tensor
-    for (int i=0; i<dim; ++i)
-      for (int j=0; j<i; ++j)
+    for (int i = 0; i < dim; ++i)
+      for (int j = 0; j < i; ++j)
       {
-        auto entry = lame2 * (displacement_grad[i][j] + displacement_grad[j][i]);
+        auto entry =
+          lame2 * (displacement_grad[i][j] + displacement_grad[j][i]);
         sum += 2.0 * entry * entry;
       }
 
     // Calculate divergence
     typename Traits::RangeType div = 0.0;
-    for (int i=0; i<dim; ++i)
+    for (int i = 0; i < dim; ++i)
       div += displacement_grad[i][i];
 
     std::array<typename Traits::RangeType, dim> sig;
-    for(int i=0; i<dim; ++i)
+    for (int i = 0; i < dim; ++i)
       sig[i] = lame1 * div + 2.0 * lame2 * displacement_grad[i][i];
 
     // Diagonal part of the deviatoric stress tensor
-    for (int i=0; i<dim; ++i)
+    for (int i = 0; i < dim; ++i)
     {
       typename Traits::RangeType entry = 0.0;
-      for (int j=0; j<dim; ++j)
-        entry += (i == j ? 2./3. : -1./3.) * sig[j];
+      for (int j = 0; j < dim; ++j)
+        entry += (i == j ? 2. / 3. : -1. / 3.) * sig[j];
       sum += entry * entry;
     }
 
@@ -83,12 +93,12 @@ class VonMisesStressGridFunction
     y = std::sqrt(1.5 * sum);
   }
 
-  inline const typename Traits::GridViewType& getGridView () const
+  inline const typename Traits::GridViewType& getGridView() const
   {
     return displacement_grad_f.getGridView();
   }
 
-  private:
+private:
   DisplacementFunctionGradient displacement_grad_f;
   std::shared_ptr<Material> material;
 };

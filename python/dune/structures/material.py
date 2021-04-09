@@ -70,18 +70,21 @@ class MaterialLawBase(object):
 
     def cauchy_green_invariants(self, u):
         B = self.left_cauchy_green(u)
-        return [Variable(tr(B), label=Label(44)),
-                Variable(0.5*(tr(B)**2 - tr(dot(B, B))), label=Label(45)),
-                Variable(det(B), label=Label(46))
-                ]
+        return [
+            Variable(tr(B), label=Label(44)),
+            Variable(0.5 * (tr(B) ** 2 - tr(dot(B, B))), label=Label(45)),
+            Variable(det(B), label=Label(46)),
+        ]
 
     def isochoric_cauchy_green_invariants(self, u):
         I1, I2, _ = self.cauchy_green_invariants(u)
         F = self.deformation_gradient(u)
         J = Variable(det(F), label=Label(47))
-        return [Variable((J ** (-2.0/3.0)) * I1, label=Label(48)),
-                Variable((J ** (-4.0/3.0)) * I2, label=Label(49)),
-                J]
+        return [
+            Variable((J ** (-2.0 / 3.0)) * I1, label=Label(48)),
+            Variable((J ** (-4.0 / 3.0)) * I2, label=Label(49)),
+            J,
+        ]
 
 
 class InfinitesimalStrainBaseMaterialLaw(MaterialLawBase):
@@ -104,7 +107,7 @@ class CauchyGreenInvariantBasedMaterialLaw(MaterialLawBase):
         I = self.cauchy_green_invariants(u)
         energy = self.strain_energy(u)
 
-        gamma1 = diff(energy, I[0]) + I[0]*diff(energy, I[1])
+        gamma1 = diff(energy, I[0]) + I[0] * diff(energy, I[1])
         gamma2 = -diff(energy, I[1])
         gamma3 = I[2] * diff(energy, I[2])
 
@@ -127,7 +130,7 @@ class LinearMaterial(InfinitesimalStrainBaseMaterialLaw):
     def strain_energy(self, u):
         epsilon = self.infinitesimal_strain(u)
         mu, lmbda = self.ufl_parameters(u)
-        return 0.5 * lmbda * (tr(epsilon)**2) + mu*tr(epsilon * epsilon)
+        return 0.5 * lmbda * (tr(epsilon) ** 2) + mu * tr(epsilon * epsilon)
 
 
 class StVenantKirchhoffMaterial(CauchyGreenStrainBasedMaterialLaw):
@@ -142,7 +145,7 @@ class StVenantKirchhoffMaterial(CauchyGreenStrainBasedMaterialLaw):
     def strain_energy(self, u):
         E = self.cauchy_green_strain(u)
         mu, lmbda = self.ufl_parameters(u)
-        return 0.5 * lmbda * (tr(E)**2) + mu * tr(dot(E, E))
+        return 0.5 * lmbda * (tr(E) ** 2) + mu * tr(dot(E, E))
 
 
 class NeoHookeanMaterial(IsochoricCauchyGreenInvariantBasedMaterialLaw):
@@ -156,7 +159,7 @@ class NeoHookeanMaterial(IsochoricCauchyGreenInvariantBasedMaterialLaw):
 
     def strain_energy(self, u):
         I1bar = self.isochoric_cauchy_green_invariants(u)[0]
-        param, = self.ufl_parameters(u)
+        (param,) = self.ufl_parameters(u)
         return 0.5 * param * (I1bar - 3)
 
     # The following implementation is not yet based on isochoric invariants!

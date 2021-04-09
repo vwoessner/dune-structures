@@ -1,50 +1,56 @@
 #ifndef DUNE_STRUCTURES_SOLVERSTEPS_INSTATIONARY_HH
 #define DUNE_STRUCTURES_SOLVERSTEPS_INSTATIONARY_HH
 
-#include<dune/common/parametertree.hh>
-#include<dune/pdelab.hh>
-#include<dune/structures/callableadapters.hh>
-#include<dune/structures/solversteps/base.hh>
-#include<dune/structures/solversteps/interpolation.hh>
-#include<dune/structures/solversteps/newton.hh>
-#include<dune/structures/solversteps/traits.hh>
-#include<dune/structures/solversteps/variation.hh>
+#include <dune/common/parametertree.hh>
+#include <dune/pdelab.hh>
+#include <dune/structures/callableadapters.hh>
+#include <dune/structures/solversteps/base.hh>
+#include <dune/structures/solversteps/interpolation.hh>
+#include <dune/structures/solversteps/newton.hh>
+#include <dune/structures/solversteps/traits.hh>
+#include <dune/structures/solversteps/variation.hh>
 
-#include<memory>
-
+#include <memory>
 
 template<std::size_t i, typename... V>
-class OneStepMethodStep
-  : public TransitionSolverStepBase<V...>
+class OneStepMethodStep : public TransitionSolverStepBase<V...>
 {
-  public:
+public:
   using Traits = VectorStepTraits<i, V...>;
 
-  using VirtLocalOperator = AbstractLocalOperatorInterface<typename Traits::GridFunctionSpace>;
+  using VirtLocalOperator =
+    AbstractLocalOperatorInterface<typename Traits::GridFunctionSpace>;
 
+  using GridOperator =
+    Dune::PDELab::GridOperator<typename Traits::GridFunctionSpace,
+                               typename Traits::GridFunctionSpace,
+                               VirtLocalOperator,
+                               Dune::PDELab::ISTL::BCRSMatrixBackend<>,
+                               typename Traits::ctype,
+                               typename Traits::Range,
+                               typename Traits::Range,
+                               typename Traits::ConstraintsContainer,
+                               typename Traits::ConstraintsContainer>;
 
-  using GridOperator = Dune::PDELab::GridOperator<typename Traits::GridFunctionSpace,
-                                                  typename Traits::GridFunctionSpace,
-                                                  VirtLocalOperator,
-                                                  Dune::PDELab::ISTL::BCRSMatrixBackend<>,
-                                                  typename Traits::ctype,
-                                                  typename Traits::Range,
-                                                  typename Traits::Range,
-                                                  typename Traits::ConstraintsContainer,
-                                                  typename Traits::ConstraintsContainer>;
-
-  using InstationaryGridOperator = Dune::PDELab::OneStepGridOperator<GridOperator, GridOperator>;
+  using InstationaryGridOperator =
+    Dune::PDELab::OneStepGridOperator<GridOperator, GridOperator>;
 
   using LinearSolver = Dune::PDELab::ISTLBackend_SEQ_UMFPack;
-  using NewtonSolver = Dune::PDELab::Newton<InstationaryGridOperator, LinearSolver, typename Traits::Vector>;
-  using OneStepMethod = Dune::PDELab::OneStepMethod<double, InstationaryGridOperator, NewtonSolver, typename Traits::Vector>;
+  using NewtonSolver = Dune::PDELab::
+    Newton<InstationaryGridOperator, LinearSolver, typename Traits::Vector>;
+  using OneStepMethod = Dune::PDELab::OneStepMethod<double,
+                                                    InstationaryGridOperator,
+                                                    NewtonSolver,
+                                                    typename Traits::Vector>;
 
   OneStepMethodStep(const Dune::ParameterTree& params)
     : params(params)
-    , theta(std::make_shared<Dune::PDELab::OneStepThetaParameter<double>>(params.get<double>("theta", 1.0)))
+    , theta(std::make_shared<Dune::PDELab::OneStepThetaParameter<double>>(
+        params.get<double>("theta", 1.0)))
     , time(0.0)
     , timestep(0.0)
-  {}
+  {
+  }
 
   virtual ~OneStepMethodStep() {}
 
@@ -56,23 +62,31 @@ class OneStepMethodStep
     vector.swap(swapvector);
   }
 
-  virtual void update_parameter(std::string name, typename Traits::Parameter param) override
+  virtual void update_parameter(std::string name,
+                                typename Traits::Parameter param) override
   {
     if (name == "time")
       time = std::get<double>(param);
     if (name == "timestep")
       timestep = std::get<double>(param);
-    if ((name == params.get<std::string>("spatial_operator")) || (name == params.get<std::string>("temporal_operator")))
+    if ((name == params.get<std::string>("spatial_operator"))
+        || (name == params.get<std::string>("temporal_operator")))
     {
       // One of the operator changed - rebuild the one step method object
       auto vector = this->solver->template getVector<i>();
       auto cc = this->solver->template getConstraintsContainer<i>();
       auto gfs = vector->gridFunctionSpaceStorage();
       Dune::PDELab::ISTL::BCRSMatrixBackend<> mb(21);
-      auto slop = this->solver->template param<std::shared_ptr<VirtLocalOperator>>(params.template get<std::string>("spatial_operator"));
-      auto tlop = this->solver->template param<std::shared_ptr<VirtLocalOperator>>(params.template get<std::string>("temporal_operator"));
-      auto sgo = std::make_shared<GridOperator>(*gfs, *cc, *gfs, *cc, *slop, mb);
-      auto tgo = std::make_shared<GridOperator>(*gfs, *cc, *gfs, *cc, *tlop, mb);
+      auto slop =
+        this->solver->template param<std::shared_ptr<VirtLocalOperator>>(
+          params.template get<std::string>("spatial_operator"));
+      auto tlop =
+        this->solver->template param<std::shared_ptr<VirtLocalOperator>>(
+          params.template get<std::string>("temporal_operator"));
+      auto sgo =
+        std::make_shared<GridOperator>(*gfs, *cc, *gfs, *cc, *slop, mb);
+      auto tgo =
+        std::make_shared<GridOperator>(*gfs, *cc, *gfs, *cc, *tlop, mb);
       igo = std::make_shared<InstationaryGridOperator>(*sgo, *tgo);
 
       linearsolver = std::make_shared<LinearSolver>(0);
@@ -83,7 +97,7 @@ class OneStepMethodStep
     }
   }
 
-  protected:
+protected:
   std::shared_ptr<GridOperator> sgo;
   std::shared_ptr<GridOperator> tgo;
   std::shared_ptr<InstationaryGridOperator> igo;
@@ -98,35 +112,45 @@ class OneStepMethodStep
   double timestep;
 };
 
-
 template<std::size_t i, typename... V>
-class VariableBoundaryOneStepMethodStep
-  : public OneStepMethodStep<i, V...>
+class VariableBoundaryOneStepMethodStep : public OneStepMethodStep<i, V...>
 {
-  public:
+public:
   using Traits = VectorStepTraits<i, V...>;
 
-  using FunctionSignature = typename Traits::Range(typename Traits::GlobalCoordinate);
+  using FunctionSignature =
+    typename Traits::Range(typename Traits::GlobalCoordinate);
 
-  VariableBoundaryOneStepMethodStep(const Dune::ParameterTree& params, std::function<FunctionSignature> singlefunc)
+  VariableBoundaryOneStepMethodStep(const Dune::ParameterTree& params,
+                                    std::function<FunctionSignature> singlefunc)
     : OneStepMethodStep<i, V...>(params)
   {
     funcs.fill(singlefunc);
   }
 
-  template<typename... FUNCS,
-           typename std::enable_if<Dune::TypeTree::TreeInfo<typename Traits::GridFunctionSpace>::leafCount == sizeof...(FUNCS), int>::type = 0>
-  VariableBoundaryOneStepMethodStep(const Dune::ParameterTree& params, FUNCS... funcs)
-    : OneStepMethodStep<i, V...>(params)
-    , funcs{funcs...}
-  {}
-
+  template<
+    typename... FUNCS,
+    typename std::enable_if<
+      Dune::TypeTree::TreeInfo<typename Traits::GridFunctionSpace>::leafCount
+        == sizeof...(FUNCS),
+      int>::type = 0>
   VariableBoundaryOneStepMethodStep(const Dune::ParameterTree& params,
-                                    const std::array<std::function<FunctionSignature>,
-                                                     Dune::TypeTree::TreeInfo<typename Traits::GridFunctionSpace>::leafCount>& funcs)
+                                    FUNCS... funcs)
+    : OneStepMethodStep<i, V...>(params)
+    , funcs{ funcs... }
+  {
+  }
+
+  VariableBoundaryOneStepMethodStep(
+    const Dune::ParameterTree& params,
+    const std::array<
+      std::function<FunctionSignature>,
+      Dune::TypeTree::TreeInfo<typename Traits::GridFunctionSpace>::leafCount>&
+      funcs)
     : OneStepMethodStep<i, V...>(params)
     , funcs(funcs)
-  {}
+  {
+  }
 
   virtual ~VariableBoundaryOneStepMethodStep() {}
 
@@ -134,17 +158,20 @@ class VariableBoundaryOneStepMethodStep
   {
     auto vector = this->solver->template getVector<i>();
     auto& gfs = vector->gridFunctionSpace();
-    auto func = makeInstationaryGridFunctionTreeFromCallables(*this->solver, gfs, funcs);
+    auto func =
+      makeInstationaryGridFunctionTreeFromCallables(*this->solver, gfs, funcs);
 
-    this->onestepmethod->apply(this->time, this->timestep, *vector, func, *this->swapvector);
+    this->onestepmethod->apply(
+      this->time, this->timestep, *vector, func, *this->swapvector);
     vector.swap(this->swapvector);
   }
 
-  private:
+private:
   // Store the lambdas
-  std::array<std::function<FunctionSignature>,
-             Dune::TypeTree::TreeInfo<typename Traits::GridFunctionSpace>::leafCount
-             > funcs;
+  std::array<
+    std::function<FunctionSignature>,
+    Dune::TypeTree::TreeInfo<typename Traits::GridFunctionSpace>::leafCount>
+    funcs;
 };
 
 #endif

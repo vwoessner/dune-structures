@@ -38,7 +38,11 @@ class GMSHError(Exception):
 
 @pt.memoize
 def get_gmsh_version(gmshexec):
-    out = subprocess.check_output([gmshexec, "--version"], stderr=subprocess.STDOUT).strip().decode("utf8")
+    out = (
+        subprocess.check_output([gmshexec, "--version"], stderr=subprocess.STDOUT)
+        .strip()
+        .decode("utf8")
+    )
 
     def mysplit(s, delims):
         if len(delims) == 0:
@@ -53,11 +57,15 @@ def get_gmsh_version(gmshexec):
 
 @pt.memoize
 def get_gmsh_build_flags(gmshexec):
-    out = subprocess.check_output([gmshexec, "-info"], stderr=subprocess.STDOUT).strip().decode("utf8")
+    out = (
+        subprocess.check_output([gmshexec, "-info"], stderr=subprocess.STDOUT)
+        .strip()
+        .decode("utf8")
+    )
     out = out.split("\n")
     for line in out:
         if line.startswith("Build options"):
-            line = line[line.find(":") + 1:]
+            line = line[line.find(":") + 1 :]
             return [o.strip() for o in line.split()]
 
     raise GMSHError("The output format of 'gmsh -info' was unexpected!")
@@ -103,14 +111,17 @@ def cell_geometry_3d(geo, config):
 
             # Construct a planar surface that can be rotated
             spline = geo.add_bspline([b0, b1, b2])
-            loop = geo.add_line_loop([spline, geo.add_line(b2, b3), geo.add_line(b3, b0)])
+            loop = geo.add_line_loop(
+                [spline, geo.add_line(b2, b3), geo.add_line(b3, b0)]
+            )
             surf = geo.add_plane_surface(loop)
 
-            cell = geo.extrude(surf,
-                               rotation_axis=[0.0, 0.0, 1.0],
-                               point_on_axis=[0.0, 0.0, 0.0],
-                               angle=2.0*np.pi
-                               )
+            cell = geo.extrude(
+                surf,
+                rotation_axis=[0.0, 0.0, 1.0],
+                point_on_axis=[0.0, 0.0, 0.0],
+                angle=2.0 * np.pi,
+            )
 
             # Only return the volume ID
             return cell[1]
@@ -139,7 +150,9 @@ def cell_geometry_3d(geo, config):
     if nucleusconfig.get("enabled", True):
         # Add the nucleus shape and intersect it with the cytoplasma
         nucleus = add_shape(nucleusconfig)
-        nucleus = geo.boolean_intersection([cyto, nucleus], delete_first=False, delete_other=True)
+        nucleus = geo.boolean_intersection(
+            [cyto, nucleus], delete_first=False, delete_other=True
+        )
 
         add_material(nucleus, nucleusconfig)
 
@@ -168,8 +181,20 @@ def cell_geometry_3d(geo, config):
             p_s = geo.add_point(start)
             p_m = geo.add_point(middle)
             p_e = geo.add_point(end)
-            p_c0 = geo.add_point([(1.0 - slope) * start[0] + slope * middle[0], (1.0 - slope) * start[1] + slope * middle[1], middle[2]])
-            p_c1 = geo.add_point([(1.0 - slope) * middle[0] + slope * end[0], (1.0 - slope) * middle[1] + slope * end[1], middle[2]])
+            p_c0 = geo.add_point(
+                [
+                    (1.0 - slope) * start[0] + slope * middle[0],
+                    (1.0 - slope) * start[1] + slope * middle[1],
+                    middle[2],
+                ]
+            )
+            p_c1 = geo.add_point(
+                [
+                    (1.0 - slope) * middle[0] + slope * end[0],
+                    (1.0 - slope) * middle[1] + slope * end[1],
+                    middle[2],
+                ]
+            )
 
             # Connect them with BSpline
             s0 = geo.add_bspline([p_s, p_c0, p_m])
@@ -181,20 +206,29 @@ def cell_geometry_3d(geo, config):
 
             # Build a (rotated!) disk that we later extrude
             disk = geo.add_disk(start, radius)
-            angle = np.pi / 2.0 - np.arctan((middle[2] - start[2])/(slope * (middle[0] - start[0])))
-            geo.add_raw_code("rdisk = Rotate {{ {{ 0.0, 1.0, 0.0 }}, {{ {} }}, {} }} {{ Surface{{{}}}; }};".format(", ".join(str(x) for x in start), angle, disk.id))
+            angle = np.pi / 2.0 - np.arctan(
+                (middle[2] - start[2]) / (slope * (middle[0] - start[0]))
+            )
+            geo.add_raw_code(
+                "rdisk = Rotate {{ {{ 0.0, 1.0, 0.0 }}, {{ {} }}, {} }} {{ Surface{{{}}}; }};".format(
+                    ", ".join(str(x) for x in start), angle, disk.id
+                )
+            )
 
             # Do the extrusion
             geo.add_raw_code("bla[] = Extrude { Surface{rdisk}; } Using Wire {w0};")
 
             from pygmsh.opencascade.volume_base import VolumeBase
+
             fibre = VolumeBase(id0="bla[]")
         else:
             raise NotImplementedError("Fibre shape '{}' not known".format(shape))
 
         # And intersect it with the cytoplasma
         assert fibre is not None
-        fibre = geo.boolean_intersection([cyto, fibre], delete_first=False, delete_other=True)
+        fibre = geo.boolean_intersection(
+            [cyto, fibre], delete_first=False, delete_other=True
+        )
 
         # Add physical information to this fibre
         add_material(fibre, fconfig)
@@ -203,13 +237,27 @@ def cell_geometry_3d(geo, config):
         fibres.append(fibre)
 
     # Implement mesh widths
-    geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{:}}; }} }} = {};".format(cytoconfig.get("meshwidth", 0.1)))
+    geo.add_raw_code(
+        "Characteristic Length{{ PointsOf{{ Volume{{:}}; }} }} = {};".format(
+            cytoconfig.get("meshwidth", 0.1)
+        )
+    )
     if nucleusconfig.get("enabled", True):
-        meshwidth = as_float(nucleusconfig.get("meshwidth", cytoconfig.get("meshwidth", 0.1)))
-        geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{{}}}; }} }} = {};".format(nucleus.id, meshwidth))
+        meshwidth = as_float(
+            nucleusconfig.get("meshwidth", cytoconfig.get("meshwidth", 0.1))
+        )
+        geo.add_raw_code(
+            "Characteristic Length{{ PointsOf{{ Volume{{{}}}; }} }} = {};".format(
+                nucleus.id, meshwidth
+            )
+        )
     for i, fconfig in enumerate(fibreconfig):
         meshwidth = as_float(fconfig.get("meshwidth", 0.02))
-        geo.add_raw_code("Characteristic Length{{ PointsOf{{ Volume{{{}}}; }} }} = {};".format(fibres[i].id, meshwidth))
+        geo.add_raw_code(
+            "Characteristic Length{{ PointsOf{{ Volume{{{}}}; }} }} = {};".format(
+                fibres[i].id, meshwidth
+            )
+        )
 
     # The cytoplasma is defined by the outer shape minus all inclusions
     cytogeos = [cyto]
@@ -227,8 +275,9 @@ def cell_geometry_3d(geo, config):
         geo.add_raw_code("Mesh.Algorithm = 5;")
 
     # Apply a global scaling to the resulting mesh
-    geo.add_raw_code("Mesh.ScalingFactor = {};".format(as_float(config.get("scaling", 1.0))))
-
+    geo.add_raw_code(
+        "Mesh.ScalingFactor = {};".format(as_float(config.get("scaling", 1.0)))
+    )
 
 
 def cell_geometry_2d(geo, config):
@@ -287,7 +336,9 @@ def cell_geometry_2d(geo, config):
 
         # And intersect it with the cytoplasma
         assert fibre is not None
-        fibre = geo.boolean_intersection([cyto, fibre], delete_first=False, delete_other=True)
+        fibre = geo.boolean_intersection(
+            [cyto, fibre], delete_first=False, delete_other=True
+        )
 
         # Add physical information to this fibre
         add_material(fibre, fconfig)
@@ -296,10 +347,18 @@ def cell_geometry_2d(geo, config):
         fibres.append(fibre)
 
     # Implement mesh widths
-    geo.add_raw_code("Characteristic Length{{ PointsOf{{ Surface{{:}}; }} }} = {};".format(cytoconfig.get("meshwidth", 0.1)))
+    geo.add_raw_code(
+        "Characteristic Length{{ PointsOf{{ Surface{{:}}; }} }} = {};".format(
+            cytoconfig.get("meshwidth", 0.1)
+        )
+    )
     for i, fconfig in enumerate(fibreconfig):
         meshwidth = as_float(fconfig.get("meshwidth", 0.02))
-        geo.add_raw_code("Characteristic Length{{ PointsOf{{ Surface{{{}}}; }} }} = {};".format(fibres[i].id, meshwidth))
+        geo.add_raw_code(
+            "Characteristic Length{{ PointsOf{{ Surface{{{}}}; }} }} = {};".format(
+                fibres[i].id, meshwidth
+            )
+        )
 
     # The cytoplasma is defined by the outer shape minus all inclusions
     cyto = geo.boolean_fragments([cyto], fibres, delete_other=False)
@@ -310,14 +369,18 @@ def cell_geometry_2d(geo, config):
         geo.add_physical(geos, physical)
 
     # Apply a global scaling to the resulting mesh
-    geo.add_raw_code("Mesh.ScalingFactor = {};".format(as_float(config.get("scaling", 1.0))))
+    geo.add_raw_code(
+        "Mesh.ScalingFactor = {};".format(as_float(config.get("scaling", 1.0)))
+    )
 
 
 def generate_cell_mesh(config, gmshexec="gmsh"):
     """ The entry point for the creation of a cell mesh """
     geo = pygmsh.opencascade.Geometry()
 
-    geo.add_comment("Generated for gmsh version {}".format(".".join(get_gmsh_version(gmshexec))))
+    geo.add_comment(
+        "Generated for gmsh version {}".format(".".join(get_gmsh_version(gmshexec)))
+    )
 
     # Call the actual geometry implementation for this space dimension
     dim = as_int(config.get("dimension", 3))
@@ -326,10 +389,14 @@ def generate_cell_mesh(config, gmshexec="gmsh"):
     elif dim == 3:
         cell_geometry_3d(geo, config)
     else:
-        raise NotImplementedError("dimension={} is not supported in mesh generation".format(dim))
+        raise NotImplementedError(
+            "dimension={} is not supported in mesh generation".format(dim)
+        )
 
     # Maybe skip mesh generation if we have a cache hit
-    cachefile = "{}.msh".format(hashlib.sha256("\n".join(geo.get_code()).encode()).hexdigest())
+    cachefile = "{}.msh".format(
+        hashlib.sha256("\n".join(geo.get_code()).encode()).hexdigest()
+    )
     if os.path.exists(cachefile):
         print("A cached version of this mesh was found!")
         shutil.copyfile(cachefile, config.get("filename"))
@@ -341,14 +408,16 @@ def generate_cell_mesh(config, gmshexec="gmsh"):
     if as_bool(geoconfig.get("enabled", False)):
         filename = geoconfig.get("filename", config.get("filename"))
         filename = "{}.geo".format(os.path.splitext(filename)[0])
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             f.write(geo.get_code() + "\n")
 
     # Finalize the grid generation
     try:
         mesh = pygmsh.generate_mesh(geo, gmsh_path=gmshexec)
     except AssertionError:
-        raise GMSHError("Gmsh failed. Check if nucleus intersects fibres (which is not supported)!")
+        raise GMSHError(
+            "Gmsh failed. Check if nucleus intersects fibres (which is not supported)!"
+        )
 
     # Export this mesh into several formats as requested
     mshconfig = exportconfig.get("msh", {})
