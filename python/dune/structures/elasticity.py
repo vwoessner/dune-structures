@@ -1,6 +1,10 @@
 from dune.codegen.options import get_option
 from dune.codegen.ufl.execution import *
-from dune.structures.codegen import UFLPhysicalParameter, UFLMaterialLawIndex, UFLPrestress
+from dune.structures.codegen import (
+    UFLPhysicalParameter,
+    UFLMaterialLawIndex,
+    UFLPrestress,
+)
 from dune.testtools.parametertree.parser import parse_ini_file
 from ufl.cell import simplex
 
@@ -21,7 +25,6 @@ def _elasticity_form_impl(u, v, cell, materials):
     form = sum((material_form(m) for m in materials), Form([]))
 
     return form
-
 
 
 def elasticity_form(materials, degree=1, dim=3):

@@ -1,0 +1,8 @@
+---
+BasedOnStyle: Mozilla
+
+# Break before braces, except for one-line statements
+BreakBeforeBraces: Allman
+
+# Do not break before assignment operators
+BreakBeforeBinaryOperators: NonAssignment

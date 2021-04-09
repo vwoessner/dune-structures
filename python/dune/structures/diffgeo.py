@@ -24,7 +24,6 @@ from pymbolic.mapper import IdentityMapper
 import pymbolic.primitives as prim
 
 
-
 def generate_tangential_derivatives():
     # The 2 here is the polynomial order of the finite element
     FE = VectorElement("CG", triangle, 2)
@@ -36,19 +35,19 @@ def generate_tangential_derivatives():
     n = perp(t)
 
     cell_quantities = {
-        "dtut" : inner(t, grad(inner(u, t))),
-        "dtvt" : inner(t, grad(inner(v, t))),
-        "dt2un" : inner(t, grad(inner(t, grad(inner(u, n))))),
-        "dt2vn" : inner(t, grad(inner(t, grad(inner(v, n))))),
+        "dtut": inner(t, grad(inner(u, t))),
+        "dtvt": inner(t, grad(inner(v, t))),
+        "dt2un": inner(t, grad(inner(t, grad(inner(u, n))))),
+        "dt2vn": inner(t, grad(inner(t, grad(inner(v, n))))),
     }
 
     facet_quantities = {
-        "sk_dt2un" : avg(inner(t, grad(inner(t, grad(inner(u, n)))))),
-        "dt2vn_n" : inner(t, grad(inner(t, grad(inner(v('-'), n))))),
-        "dt2vn_s" : inner(t, grad(inner(t, grad(inner(v('+'), n))))),
-        "sk_dtun" : jump(inner(t, grad(inner(u, n)))),
-        "dtvn_n" : inner(t, grad(inner(v('-'), n))),
-        "dtvn_s" : inner(t, grad(inner(v('+'), n))),
+        "sk_dt2un": avg(inner(t, grad(inner(t, grad(inner(u, n)))))),
+        "dt2vn_n": inner(t, grad(inner(t, grad(inner(v("-"), n))))),
+        "dt2vn_s": inner(t, grad(inner(t, grad(inner(v("+"), n))))),
+        "sk_dtun": jump(inner(t, grad(inner(u, n)))),
+        "dtvn_n": inner(t, grad(inner(v("-"), n))),
+        "dtvn_s": inner(t, grad(inner(v("+"), n))),
     }
 
     def print_code(name, expr, measure):
@@ -59,14 +58,14 @@ def generate_tangential_derivatives():
         expr = remove_complex_nodes(expr)
 
         # This weird check would go away if we reproduced more of the UFL preprocessing here...
-        if name.startswith('sk'):
+        if name.startswith("sk"):
             expr = apply_restrictions(expr)
 
         expr = pushdown_indexed(expr)
 
         print("\n\n\nQuantity: {}".format(name))
         for snippet in ufl_to_code(expr, measure):
-            print(snippet + '\n\n')
+            print(snippet + "\n\n")
 
     for name, expr in cell_quantities.items():
         print_code(name, expr, "cell")
@@ -118,7 +117,9 @@ class AdHocVisitor(GenericAccumulationMixin, UFL2LoopyVisitor):
         return prim.Call(prim.Variable(name), (prim.Variable("i"),) + indices)
 
     def coefficient(self, o):
-        name = restricted_name(o.cargo["name"], o.cargo.get("restriction", self.restriction))
+        name = restricted_name(
+            o.cargo["name"], o.cargo.get("restriction", self.restriction)
+        )
 
         if self.grad_count > 0:
             if "diff" in o.cargo:
@@ -137,22 +138,31 @@ class AdHocVisitor(GenericAccumulationMixin, UFL2LoopyVisitor):
         i, j = self.indices
         self.indices = None
 
-        return prim.Subscript(prim.Variable(restricted_name("jit", self.restriction)), (j, i))
+        return prim.Subscript(
+            prim.Variable(restricted_name("jit", self.restriction)), (j, i)
+        )
 
 
 class IndexNester(IdentityMapper):
     def map_subscript(self, expr):
         if len(expr.index) > 1:
-            return self.rec(prim.Subscript(prim.Subscript(expr.aggregate, expr.index[:1]), expr.index[1:]))
+            return self.rec(
+                prim.Subscript(
+                    prim.Subscript(expr.aggregate, expr.index[:1]), expr.index[1:]
+                )
+            )
         else:
             return expr
 
+
 def ufl_to_code(expr, measure):
     from dune.codegen.generation import global_context
+
     with global_context(integral_type="cell", form_identifier="foo"):
         visitor = AdHocVisitor(measure)
         nester = IndexNester()
         from pymbolic.mapper.c_code import CCodeMapper
+
         ccm = CCodeMapper()
         exprs = visitor(expr)
         exprs = [nester(e) for e in exprs]
