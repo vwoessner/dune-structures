@@ -1,11 +1,20 @@
-add_executable(structured2d_p2 EXCLUDE_FROM_ALL structured2d_p2.cc)
-add_executable(structured3d_p1 EXCLUDE_FROM_ALL structured3d_p1.cc)
+set(APPS
+    structured2d_p2
+    structured3d_p1
+    cell3d_p1
+    cell3d_p2
+)
 
-add_executable(cell3d_p1 EXCLUDE_FROM_ALL cell3d_p1.cc)
-add_executable(cell3d_p2 EXCLUDE_FROM_ALL cell3d_p2.cc)
+# Add apps as executables, register with frontend, make depend on code generator
+foreach(exe ${APPS})
+    add_executable(${exe} ${exe}.cc)
+    blocklab_add_app_to_frontend(TARGET ${exe})
+    add_dependencies(${exe} generation)
+endforeach()
 
-# Register all these apps for the frontend target
-blocklab_add_app_to_frontend(TARGET structured2d_p2)
-blocklab_add_app_to_frontend(TARGET structured3d_p1)
-blocklab_add_app_to_frontend(TARGET cell3d_p1)
-blocklab_add_app_to_frontend(TARGET cell3d_p2)
+# Register tests
+foreach(num 23_1 23_2 23_3 24_1 24_2)
+    add_test(NAME run_hansbo_${num}
+        COMMAND structured2d_p2 run ${PROJECT_SOURCE_DIR}/experiments/hansbo_reproduction/fig${num}.yml
+)
+endforeach()
