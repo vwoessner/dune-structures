@@ -1,0 +1,63 @@
+default:
+  image: registry.dune-project.org/lukas.riedel/dune-structures:env
+
+variables:
+  # Add project directory to dunecontrol path
+  DUNE_CONTROL_PATH: /duneci/modules:$CI_PROJECT_DIR
+  CMAKE_FLAGS_DEFAULT:
+    -DDUNE_PYTHON_VIRTUALENV_SETUP=True
+  CMAKE_FLAGS: $CMAKE_FLAGS_DEFAULT
+  # Allow recursive cloning of submodules
+  GIT_SUBMODULE_STRATEGY: recursive
+  # Always void failing 'assert' statement
+  CXXFLAGS_DEFAULT: -DNDEBUG
+  CXXFLAGS: $CXXFLAGS_DEFAULT
+
+workflow:
+  rules:
+    # Trigger pipeline after pushes, starting from web, or scheduling
+    - if: "$CI_PIPELINE_SOURCE == 'push'
+           || $CI_PIPELINE_SOURCE == 'web'
+           || $CI_PIPELINE_SOURCE == 'schedule'"
+
+stages:
+  - build
+  - test
+
+# --- BUILD STAGE ---
+
+# Build release
+build:all:
+  stage: build
+  script:
+    - dunecontrol --current all
+  artifacts:
+    paths:
+      - build-cmake/
+    expire_in: 6h
+
+# Build with debugging and warnings (fail on warnings)
+build:debug:
+  extends: build:all
+  allow_failure: true
+  variables:
+    # Fail on warnings
+    CXXFLAGS: $CXXFLAGS_DEFAULT -Wall -Werror
+    # NOTE: '-Werror' causes QuadMath compile test to fail, so skip it here
+    CMAKE_FLAGS:
+      $CMAKE_FLAGS_DEFAULT
+      -DCMAKE_BUILD_TYPE=Debug
+      -DQuadMath_COMPILES=True
+
+# --- TEST STAGE ---
+
+# Run tests
+test:all:
+  stage: test
+  needs: ["build:all"]
+  script:
+    - dunecontrol --current bexec make test
+  artifacts:
+    paths:
+      - build-cmake/experiments/hansbo_reproduction/
+    expire_in: 1 day
