@@ -9,8 +9,7 @@ variables:
   CMAKE_FLAGS: $CMAKE_FLAGS_DEFAULT
   # Allow recursive cloning of submodules
   GIT_SUBMODULE_STRATEGY: recursive
-  # Always void failing 'assert' statement
-  CXXFLAGS_DEFAULT: -DNDEBUG
+  CXXFLAGS_DEFAULT: ""
   CXXFLAGS: $CXXFLAGS_DEFAULT
 
 workflow:
