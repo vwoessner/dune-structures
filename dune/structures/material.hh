@@ -84,9 +84,10 @@ public:
 
   virtual int material_law_index(const Entity& e) const = 0;
 
-  T parameter_unrolled(const Entity& e, int i, T x...) const
+  template<typename... Coord>
+  T parameter_unrolled(const Entity& e, int i, Coord... x) const
   {
-    return this->parameter(e, Dune::FieldVector<T, dim>{ x }, i);
+    return this->parameter(e, Dune::FieldVector<T, dim>({ x... }), i);
   }
 
   GV gridView() const { return gv; }
