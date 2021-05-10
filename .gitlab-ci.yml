@@ -35,6 +35,13 @@ build:all:
       - build-cmake/
     expire_in: 6h
 
+# Build tests
+build:tests:
+  extends: build:all
+  script:
+    - dunecontrol --current configure
+    - dunecontrol --current bexec make build_tests
+
 # Build with debugging and warnings (fail on warnings)
 build:debug:
   extends: build:all
@@ -50,12 +57,21 @@ build:debug:
 
 # --- TEST STAGE ---
 
-# Run tests
+# Run all tests
 test:all:
   stage: test
+  needs: ["build:tests"]
+  before_script:
+    - cd $CI_PROJECT_DIR/build-cmake
+  script:
+    - ctest -R test --output-on-failure
+
+# Run simulations
+test:run_simulations:
+  extends: test:all
   needs: ["build:all"]
   script:
-    - dunecontrol --current bexec make test
+    - ctest -R run --output-on-failure
   artifacts:
     paths:
       - build-cmake/experiments/hansbo_reproduction/

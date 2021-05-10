@@ -3,6 +3,7 @@
 
 #include <dune/blocklab/blocks/blockbase.hh>
 #include <dune/blocklab/utilities/stringsplit.hh>
+#include <dune/common/exceptions.hh>
 #include <dune/common/fmatrix.hh>
 #include <dune/common/fvector.hh>
 #include <dune/common/parametertree.hh>
@@ -216,8 +217,15 @@ private:
     while (lookup_entity.hasFather())
       lookup_entity = lookup_entity.father();
 
-    return materials.find((*physical_entity_mapping)[is->index(lookup_entity)])
-      ->second;
+    const auto it =
+      materials.find((*physical_entity_mapping)[is->index(lookup_entity)]);
+    if (it == materials.end())
+    {
+      DUNE_THROW(Dune::InvalidStateException,
+                 "Grid mapping index not found in defined materials!");
+    }
+
+    return it->second;
   }
 
   const typename GV::IndexSet* is;
@@ -244,6 +252,47 @@ parse_material(const GV& gv,
   return coll;
 }
 
+/// Check if material definitions and mappings match
+/**
+ *  Iterates over all grid elements and checks if parameters for the given
+ *  physical mapping index can be retrieved.
+ *
+ *  \param material Shared pointer to ElasticMaterialBase
+ *  \throw IOError if a physical group on the grid is not given in the material
+ *                 specification
+ */
+template<typename Material>
+void
+sanitize_material(const std::shared_ptr<Material> material)
+{
+  // NOTE: GridView of material is actually a PartitionView
+  const auto gv = material->gridView();
+  const auto& index_set = gv.indexSet();
+  const auto groups = material->getPhysicalGroups();
+
+  // Iterate over grid elements
+  for (auto it = gv.template begin<0>(); it != gv.template end<0>(); ++it)
+  {
+    const auto& element = *it;
+    const auto index = index_set.index(element);
+    const auto center_local =
+      element.geometry().local(element.geometry().center());
+
+    // Try evaluating the parameterization
+    try
+    {
+      material->parameter(element, center_local, 0);
+    }
+    catch (Dune::InvalidStateException& e)
+    {
+      const auto group = groups->at(index);
+      DUNE_THROW(Dune::IOError,
+                 "Material group " + std::to_string(group)
+                   + " is missing in the material configuration!");
+    }
+  }
+}
+
 template<typename P, typename V>
 class MaterialInitializationBlock : public Dune::BlockLab::BlockBase<P, V>
 {
@@ -257,7 +306,7 @@ public:
   MaterialInitializationBlock(Context& ctx, const YAML::Node& config)
     : Dune::BlockLab::BlockBase<P, V>(ctx, config)
     , root_config(ctx.getRootConfig())
-    , material_config(config["materials"])
+    , material_config(config)
   {
   }
 
@@ -279,8 +328,14 @@ public:
       this->solver->template getVector<0>()->gridFunctionSpace().entitySet(),
       this->solver->template param<std::shared_ptr<std::vector<int>>>(
         "physical"),
-      material_config,
+      material_config["materials"],
       root_config);
+
+    if (material_config["debug"].as<bool>(false))
+    {
+      sanitize_material(material);
+    }
+
     this->solver->introduce_parameter("material",
                                       typename Traits::Parameter(material));
   }
@@ -362,7 +417,10 @@ public:
         "          meta:                                             \n"
         "            title: Prestress                                \n"
         "    meta:                                                   \n"
-        "      title: Materials                                      \n");
+        "      title: Materials                                      \n"
+        "  debug:                                                    \n"
+        "    type: boolean                                           \n"
+        "    default: false                                          \n");
     return data;
   }
 
