@@ -64,7 +64,7 @@ test:all:
   before_script:
     - cd $CI_PROJECT_DIR/build-cmake
   script:
-    - ctest -R test --output-on-failure
+    - ctest -R test -E python --output-on-failure
 
 # Run simulations
 test:run_simulations:
@@ -76,3 +76,11 @@ test:run_simulations:
     paths:
       - build-cmake/experiments/hansbo_reproduction/
     expire_in: 1 day
+
+# Test Python code
+test:python:
+  stage: test
+  needs: []
+  script:
+    - dunecontrol --current configure
+    - dunecontrol --current bexec make test_python
