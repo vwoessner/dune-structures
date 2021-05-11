@@ -14,3 +14,5 @@ from dune.structures.material import (
     NeoHookeanMaterial,
     StVenantKirchhoffMaterial,
 )
+
+from dune.structures.vtk import VTKVertexReader

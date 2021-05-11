@@ -17,6 +17,9 @@ setup(
         "pyaml",
         "pygmsh",
         "meshio",
+        "vtk",
+        "numpy",
+        "pytest",
     ],
     entry_points={
         "console_scripts": [
