@@ -31,8 +31,9 @@ build:all:
   script:
     - dunecontrol --current all
   artifacts:
+    # NOTE: Only upload required apps to reduce artifacts size
     paths:
-      - build-cmake/
+      - build-cmake/apps/structured2d_p2
     expire_in: 6h
 
 # Build tests
@@ -41,6 +42,10 @@ build:tests:
   script:
     - dunecontrol --current configure
     - dunecontrol --current bexec make build_tests
+  artifacts:
+    # NOTE: Only upload tests to reduce artifacts size
+    paths:
+      - build-cmake/test
 
 # Build with debugging and warnings (fail on warnings)
 build:debug:
@@ -54,6 +59,8 @@ build:debug:
       $CMAKE_FLAGS_DEFAULT
       -DCMAKE_BUILD_TYPE=Debug
       -DQuadMath_COMPILES=True
+  artifacts:
+    paths: []
 
 # --- TEST STAGE ---
 
@@ -62,6 +69,8 @@ test:all:
   stage: test
   needs: ["build:tests"]
   before_script:
+    # NOTE: Reconfigure because build tree is not complete!
+    - dunecontrol --current configure
     - cd $CI_PROJECT_DIR/build-cmake
   script:
     - ctest -R test -E python --output-on-failure
@@ -84,3 +93,16 @@ test:python:
   script:
     - dunecontrol --current configure
     - dunecontrol --current bexec make test_python
+
+# Test the CLI
+test:cli:
+  extends: test:all
+  needs: ["build:all"]
+  script:
+    - source activate
+    - structures run structured2d_p2
+                     ../experiments/hansbo_reproduction/fig23_1.yml
+    - if structures run structured2d_p2 does_not_exist.yml;
+      then exit 1; else echo "\nFailed as expected"; fi
+    - if structures run does_not_exist ../experiments/hansbo_reproduction/fig23_1.yml;
+      then exit 1; else echo "\nFailed as expected"; fi
