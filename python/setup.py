@@ -25,6 +25,7 @@ setup(
         "console_scripts": [
             "generate_cell_mesh = dune.structures.gmsh:entrypoint_generate_mesh",
             "generate_tangential_derivatives = dune.structures.diffgeo:generate_tangential_derivatives",
+            "structures = dune.structures.cli:cli"
         ]
     },
 )
