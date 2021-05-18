@@ -63,6 +63,14 @@ solver:
             _blockname: vis_vonmises_0
             continuous: true
             vector: 0
+          # Default index: 1
+          vis_stress:
+            _blockname: vis_stress_0
+            vector: 0
+          vis_stress:
+            _blockname: vis_stress_1
+            vector: 0
+            index: 0
         filename: output
         instationary: false
         intervals: 1
