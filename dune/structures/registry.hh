@@ -22,6 +22,7 @@ auto registerStructuresBlocks = [](auto& ctx) {
     "vis_fibredistance");
   ctx.template registerBlock<PhysicalEntityVisualizationBlock>("vis_physical");
   ctx.template registerBlock<VonMisesStressVisualizationBlock>("vis_vonmises");
+  ctx.template registerBlock<StressEVVisualizationBlock>("vis_stress");
 };
 
 #endif
