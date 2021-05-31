@@ -122,6 +122,30 @@ compute_grid_fibre_intersection(
       {
         index = is.index(e);
         element = e;
+
+        // Also add the initial intersection, if curve starts at it
+        if (t < tol)
+        {
+          for (const auto& intersection : intersections(gv, element))
+          {
+            if (not intersection.neighbor())
+            {
+              continue;
+            }
+
+            const auto geo_outside = intersection.outside().geometry();
+            if (referenceElement(geo_outside)
+                  .checkInside(geo_outside.local(fibre->eval(t - tol))))
+            {
+              // Fetch indices of inside and outside
+              ret.facet_fibre_intersections[std::make_pair(
+                is.index(intersection.outside()),
+                is.index(intersection.inside()))] = t;
+              break;
+            }
+          }
+        }
+
         break;
       }
     }
@@ -178,6 +202,12 @@ compute_grid_fibre_intersection(
           bisect_b = mid;
       }
 
+      // Corner case: The fiber ends exactly at an intersection inside the grid
+      if (t + tol >= 1.0)
+      {
+        break;
+      }
+
       // Store the fibre segment that we found
       ret.element_fibre_intersections[index] = std::make_pair(t, bisect_a);
       t = bisect_a;
@@ -204,7 +234,7 @@ compute_grid_fibre_intersection(
     }
   }
 
-  return std::move(ret);
+  return ret;
 }
 
 #endif

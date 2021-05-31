@@ -458,26 +458,41 @@ public:
     for (std::size_t fibindex = 0; fibindex < fibre_parametrizations.size();
          ++fibindex)
     {
-      // The notion of inside and outside is quite complex in this situation.
-      // We are traversing the 2D grid, whose intersections have inside and
-      // outside. But these do not necessarily match the notion of inside and
-      // outside of the 1D discretization. We therefore need to remap these
-      // references in some cases.
-      bool flipped = false;
+      // Check whether this fiber intersects the cell
+      const auto& fibintersection = fibre_intersections[fibindex];
+      const auto index_s = is.index(ig.inside());
+      const auto index_n = is.index(ig.outside());
 
-      // Check whether this fiber actually intersects the cell
-      auto& fibintersection = fibre_intersections[fibindex];
+      // Check default order
       auto it = fibintersection.facet_fibre_intersections.find(
-        std::make_pair(is.index(ig.inside()), is.index(ig.outside())));
+        std::make_pair(index_s, index_n));
       if (it == fibintersection.facet_fibre_intersections.end())
       {
+        // Check reversed order
         it = fibintersection.facet_fibre_intersections.find(
-          std::make_pair(is.index(ig.outside()), is.index(ig.inside())));
+          std::make_pair(index_n, index_s));
+
         if (it == fibintersection.facet_fibre_intersections.end())
           continue;
-
-        flipped = true;
       }
+
+      // Fetch fiber parameterization
+      auto fibre = fibre_parametrizations[fibindex];
+
+      // Global position of the fiber intersection
+      auto tparam = fibre->eval(it->second);
+
+      // Check flipping by comparing tangent and face normal
+      /** NOTE:
+       *  The notion of inside and outside is quite complex in this situation.
+       *  We are traversing the 2D grid, whose intersections have inside and
+       *  outside. But these do not necessarily match the notion of inside and
+       *  outside of the 1D discretization. We therefore need to remap these
+       *  references in some cases.
+       */
+      const auto t = fibre->tangent(it->second);
+      const auto normal = ig.unitOuterNormal(ig.geometry().local(tparam));
+      const double flip_factor = t * normal < 0.0 ? -1.0 : 1.0;
 
       // Extract some necessary information
       using namespace Dune::Indices;
@@ -490,9 +505,6 @@ public:
         0>::Type::Traits::FiniteElementType::Traits::LocalBasisType>;
       Evaluator basis_s(child_0.finiteElement().localBasis());
       Evaluator basis_n(child_0.finiteElement().localBasis());
-
-      auto fibre = fibre_parametrizations[fibindex];
-      auto tparam = fibre->eval(it->second);
 
       // Position in reference element of the inside/outside cell
       auto pos_s = cellgeo_s.local(tparam);
@@ -540,9 +552,6 @@ public:
       auto jit_s = cellgeo_s.jacobianInverseTransposed(pos_s);
       auto jit_n = cellgeo_n.jacobianInverseTransposed(pos_n);
 
-      // The tangential vector for the curve
-      auto t = fibre->tangent(it->second);
-
       // Extract physical parameter of the fibre
       auto E = fibre_modulus[fibindex];
       auto d = fibre_radii[fibindex];
@@ -550,17 +559,9 @@ public:
       auto I = (d * d * d) / 12.0;
 
       // Compute the penalty factor
-      auto fiber_segment_s =
-        fibintersection.element_fibre_intersections.find(is.index(ig.inside()));
-      auto fiber_segment_n = fibintersection.element_fibre_intersections.find(
-        is.index(ig.outside()));
-      auto len_s = (fibre->eval(fiber_segment_s->second.second)
-                    - fibre->eval(fiber_segment_s->second.first))
-                     .two_norm();
-      auto len_n = (fibre->eval(fiber_segment_n->second.second)
-                    - fibre->eval(fiber_segment_n->second.first))
-                     .two_norm();
-      auto penalty = beta / std::min(len_s, len_n);
+      const auto h_F = std::min(cellgeo_s.volume(), cellgeo_n.volume())
+                       / ig.geometry().volume();
+      const auto penalty = beta / h_F;
 
       // The needed tangential derivative quantities. These expressions are
       // generated using the generate_tangential_derivatives Python script.
@@ -867,7 +868,6 @@ public:
                            + jit_s[0][0] * basis_s.hessian(i, 0, 0))))
               * t[0];
 
-        double flip_factor = flipped ? -1.0 : 1.0;
         r_n.accumulate(lfsu_n.child(0),
                        i,
                        -E * I
