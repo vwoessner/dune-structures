@@ -31,7 +31,7 @@ main(int argc, char** argv)
                            "    refinement: 1\n"
                            "    _blockname: grid_0\n"
                            "  blocks:\n"
-                           "    material:\n"
+                           "    - _type: material\n"
                            "      _blockname: material_0\n"
                            "      debug: True\n"
                            "      materials:\n"
