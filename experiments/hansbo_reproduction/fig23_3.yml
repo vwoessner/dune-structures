@@ -16,7 +16,7 @@ solver:
         - 1
       _blockname: grid_0
     blocks:
-      material:
+      - _type: material
         _blockname: material_0
         materials:
           -
@@ -24,19 +24,19 @@ solver:
             model: linear
             poisson_ratio: 0.3333
             youngs_modulus: 300
-      interpolation:
+      - _type: interpolation
         _blockname: interpolation_0
         functions: 0
         vector: 0
-      interpolation:
+      - _type: interpolation
         _blockname: interpolation_1
         functions: 0, -1
         vector: 1
-      constraints:
+      - _type: constraints
         _blockname: constraints_0
         functions: x < 1e-8
         vector: 0
-      linearsolver:
+      - _type: linearsolver
         _blockname: linearsolver_0
         operator:
           reinforced_operator:
@@ -53,21 +53,21 @@ solver:
                 youngs_modulus: 1000000
             vector: 0
         vector: 0
-      visualization:
+      - _type: visualization
         _blockname: visualization_0
         blocks:
-          vis_vector:
+          - _type: vis_vector
             _blockname: vis_vector_0
             vector: 0
-          vis_vonmises:
+          - _type: vis_vonmises
             _blockname: vis_vonmises_0
             continuous: true
             vector: 0
           # Default index: 1
-          vis_stress:
+          - _type: vis_stress
             _blockname: vis_stress_0
             vector: 0
-          vis_stress:
+          - _type: vis_stress
             _blockname: vis_stress_1
             vector: 0
             index: 0
