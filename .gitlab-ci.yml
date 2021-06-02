@@ -34,6 +34,7 @@ build:all:
     # NOTE: Only upload required apps to reduce artifacts size
     paths:
       - build-cmake/apps/structured2d_p2
+      - build-cmake/apps/cell2d_p2
     expire_in: 6h
 
 # Build tests
