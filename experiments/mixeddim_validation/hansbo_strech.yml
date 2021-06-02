@@ -1,0 +1,72 @@
+solver:
+  vectors:
+    - Displacement Field_0
+    - Body Force_0
+    - Traction Force_0
+  grid:
+    _blockname: grid_0
+    cytoplasm:
+      meshwidth: 0.1
+      group: 0
+      shape: box
+      lowerleft: [0.0, 0.0]
+      size: [4.0, 1.0]
+    fibres:
+      - shape: cylinder
+        meshwidth: 0.025
+        start: [-0.5, 0.249]
+        end: [4.5, 0.249]
+        radius: 0.05
+        group: 1
+      - shape: cylinder
+        meshwidth: 0.025
+        start: [-0.5, 0.751]
+        end: [4.5, 0.751]
+        radius: 0.05
+        group: 1
+  blocks:
+    - _type: material
+      _blockname: material_0
+      materials:
+        - group: 0
+          model: linear
+          poisson_ratio: 0.3333
+          youngs_modulus: 300
+        - group: 1
+          model: linear
+          poisson_ratio: 0.3333
+          youngs_modulus: 1e4
+    - _type: interpolation
+      _blockname: interpolation_0
+      functions: 0
+      vector: 0
+    - _type: interpolation
+      _blockname: interpolation_1
+      functions: 100, 0
+      vector: 1
+    - _type: constraints
+      _blockname: constraints_0
+      functions: x < 1e-8
+      vector: 0
+    - _type: linearsolver
+      _blockname: linearsolver_0
+      operator:
+        elasticity:
+          _blockname: elasticity_0
+          vector: 0
+    - _type: visualization
+      _blockname: visualization_0
+      blocks:
+        - _type: vis_vector
+          _blockname: vis_vector_0
+          vector: 0
+        - _type: vis_vonmises
+          _blockname: vis_vonmises_0
+          continuous: true
+          vector: 0
+        - _type: vis_physical
+          _blockname: vis_physical_0
+      filename: hansbo_stretch
+      instationary: false
+      intervals: 1
+      path: vtk
