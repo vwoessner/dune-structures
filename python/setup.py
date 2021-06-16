@@ -20,6 +20,7 @@ setup(
         "vtk",
         "numpy",
         "pytest",
+        "ruamel.yaml"
     ],
     entry_points={
         "console_scripts": [
