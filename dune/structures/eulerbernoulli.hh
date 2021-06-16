@@ -14,6 +14,7 @@
 #include <dune/geometry/affinegeometry.hh>
 #include <dune/pdelab.hh>
 #include <dune/structures/elasticity.hh>
+#include <dune/structures/fiberparameters.hh>
 #include <dune/structures/material.hh>
 #include <dune/structures/parametrizedcurves.hh>
 
@@ -118,13 +119,8 @@ public:
       fibre_parametrizations.push_back(
         std::make_shared<StraightFibre<2>>(fibre));
 
-      // Parse the Youngs modulus of the fibre.
-      auto modulus = fibre["youngs_modulus"].as<double>();
-      fibre_modulus.push_back(modulus);
-
-      // Parse the fibre radii
-      auto radius = fibre["radius"].as<double>();
-      fibre_radii.push_back(radius);
+      // Construct fiber parameters from config node
+      fiber_parameters.emplace_back(fibre);
     }
     std::cout << "Parsed a total of " << fibre_parametrizations.size()
               << " fibres from the configuration." << std::endl;
@@ -275,11 +271,13 @@ public:
             force[k] += local_coefficient_force_vector(lfsv.child(k), i)
                         * basis.function(i);
 
-        // Extract physical parameter of the fibre
-        auto E = fibre_modulus[fibindex];
-        auto d = fibre_radii[fibindex];
-        auto A = d;
-        auto I = (d * d * d) / 12.0;
+        // Extract physical parameters of the fibre
+        const auto& fiber_param = fiber_parameters[fibindex];
+        const auto E = fiber_param.youngs_modulus;
+        const auto d = fiber_param.radius;
+        const auto prestress = fiber_param.prestress;
+        const auto A = d;
+        const auto I = (d * d * d) / 12.0;
 
         // The needed tangential derivative quantities. These expressions are
         // generated using the generate_tangential_derivatives Python script.
@@ -421,18 +419,18 @@ public:
                              + jit[0][0] * basis.hessian(i, 0, 0))))
                 * t[0];
 
-          r.accumulate(lfsu.child(0),
-                       i,
-                       (E * A * dtut * dtvt_0 + E * I * dt2un * dt2vn_0
-                        - A * force[0] * basis.function(i))
-                         * ip.weight()
-                         * global_linegeo.integrationElement(ip.position()));
-          r.accumulate(lfsu.child(1),
-                       i,
-                       (E * A * dtut * dtvt_1 + E * I * dt2un * dt2vn_1
-                        - A * force[1] * basis.function(i))
-                         * ip.weight()
-                         * global_linegeo.integrationElement(ip.position()));
+          r.accumulate(
+            lfsu.child(0),
+            i,
+            (E * A * dtut * dtvt_0 + E * I * dt2un * dt2vn_0
+             + A * prestress * dtvt_0 - A * force[0] * basis.function(i))
+              * ip.weight() * global_linegeo.integrationElement(ip.position()));
+          r.accumulate(
+            lfsu.child(1),
+            i,
+            (E * A * dtut * dtvt_1 + E * I * dt2un * dt2vn_1
+             + A * prestress * dtvt_1 - A * force[1] * basis.function(i))
+              * ip.weight() * global_linegeo.integrationElement(ip.position()));
         }
       }
     }
@@ -553,10 +551,10 @@ public:
       auto jit_n = cellgeo_n.jacobianInverseTransposed(pos_n);
 
       // Extract physical parameter of the fibre
-      auto E = fibre_modulus[fibindex];
-      auto d = fibre_radii[fibindex];
-      auto A = d;
-      auto I = (d * d * d) / 12.0;
+      const auto& fiber_param = fiber_parameters[fibindex];
+      const auto E = fiber_param.youngs_modulus;
+      const auto d = fiber_param.radius;
+      const auto I = (d * d * d) / 12.0;
 
       // Compute the penalty factor
       const auto h_F = std::min(cellgeo_s.volume(), cellgeo_n.volume())
@@ -907,8 +905,7 @@ private:
   std::vector<std::shared_ptr<FibreParametrizationBase<2>>>
     fibre_parametrizations;
   std::vector<FibreGridIntersection> fibre_intersections;
-  std::vector<double> fibre_modulus;
-  std::vector<double> fibre_radii;
+  std::vector<FiberParameters<double>> fiber_parameters;
 
   // Store a force vector - code adapted of how the generated code does it.
   // That is not the nicest way of doing it, but we do not need additional

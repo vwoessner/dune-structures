@@ -71,7 +71,7 @@ solver:
             _blockname: vis_stress_1
             vector: 0
             index: 0
-        filename: output
+        filename: fig23_3
         instationary: false
         intervals: 1
         path: vtk

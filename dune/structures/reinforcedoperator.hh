@@ -142,6 +142,11 @@ public:
                    "          default: 1e5                              \n"
                    "          meta:                                     \n"
                    "            title: Young's modulus                  \n"
+                   "        prestress:                                  \n"
+                   "          type: float                               \n"
+                   "          default: 0.0                              \n"
+                   "          meta:                                     \n"
+                   "            title: Isotropic fiber prestress        \n"
                    "    meta:                                           \n"
                    "      title: Fibres                                 \n");
     return data;
