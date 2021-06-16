@@ -45,21 +45,13 @@ solver:
               -
                 end:
                   - 4.5
-                  - 0.249
+                  - 0.501
                 radius: 0.1
                 start:
                   - -0.5
-                  - 0.249
-                youngs_modulus: 10000
-              -
-                end:
-                  - 4.5
-                  - 0.751
-                radius: 0.1
-                start:
-                  - -0.5
-                  - 0.751
-                youngs_modulus: 10000
+                  - 0.501
+                youngs_modulus: 1000000
+                prestress: 100000
             vector: 0
         vector: 0
       - _type: visualization
@@ -72,7 +64,15 @@ solver:
             _blockname: vis_vonmises_0
             continuous: true
             vector: 0
-        filename: fig23_2
+          # Default index: 1
+          - _type: vis_stress
+            _blockname: vis_stress_0
+            vector: 0
+          - _type: vis_stress
+            _blockname: vis_stress_1
+            vector: 0
+            index: 0
+        filename: fig23_3_prestress
         instationary: false
         intervals: 1
         path: vtk

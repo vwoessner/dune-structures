@@ -13,7 +13,7 @@ foreach(exe ${APPS})
 endforeach()
 
 # Register tests
-foreach(num 23_1 23_2 23_3 24_1 24_2)
+foreach(num 23_1 23_2 23_3 23_3_prestress 24_1 24_2)
     add_test(NAME run_hansbo_${num}
         COMMAND structured2d_p2 run ${PROJECT_SOURCE_DIR}/experiments/hansbo_reproduction/fig${num}.yml
 )

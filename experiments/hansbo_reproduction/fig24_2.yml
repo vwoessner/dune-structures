@@ -72,7 +72,7 @@ solver:
             _blockname: vis_vonmises_0
             continuous: true
             vector: 0
-        filename: output
+        filename: fig24_2
         instationary: false
         intervals: 1
         path: vtk
