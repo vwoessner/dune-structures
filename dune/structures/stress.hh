@@ -112,11 +112,6 @@ public:
     Dune::FMatrixHelp::eigenValuesVectors(stress, eigenvalues, eigenvectors);
 
     // Output selected eigenvector
-    auto idx =
-      std::distance(eigenvalues.begin(),
-                    std::max_element(eigenvalues.begin(), eigenvalues.end()));
-    std::cout << "Index of largest eigenvalue: " << std::to_string(idx)
-              << std::endl;
     y = eigenvectors[_vector_idx] * eigenvalues[_vector_idx];
   }
 
