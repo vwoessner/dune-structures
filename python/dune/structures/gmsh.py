@@ -305,7 +305,7 @@ def cell_geometry_2d(geo, config):
             raise NotImplementedError
 
     def add_material(geoobj, config):
-        physical = as_int(config.get("physical", 0))
+        physical = as_int(config.get("group", 0))
         if physical is not None:
             material_to_geo.setdefault(physical, [])
             material_to_geo[physical].append(geoobj)
