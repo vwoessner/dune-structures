@@ -68,19 +68,17 @@ public:
     // Evaluate the strain tensor
     using RF = typename Traits::RangeFieldType;
     Dune::FieldMatrix<RF, dim, dim> strain;
+    RF strain_trace{ 0.0 };
     for (size_t i = 0; i < dim; ++i)
     {
       for (size_t j = 0; j <= i; ++j)
       {
-        RF sum = displacement_grad[i][j] + displacement_grad[j][i];
-        for (size_t k = 0; k < dim; ++k)
-        {
-          sum += displacement_grad[i][k] + displacement_grad[j][k];
-        }
-        sum = 0.5 * sum;
-        strain[i][j] = sum;
-        if (i != j)
-          strain[j][i] = sum;
+        strain[i][j] =
+          0.5 * (displacement_grad[i][j] + displacement_grad[j][i]);
+        if (i == j)
+          strain_trace += strain[i][i];
+        else
+          strain[j][i] = strain[i][j];
       }
     }
 
@@ -97,7 +95,7 @@ public:
         stress[i][j] = 2 * lame2 * strain[i][j];
         if (i == j)
         {
-          stress[i][i] += lame1 * strain[i][i];
+          stress[i][i] += lame1 * strain_trace;
         }
         else
         {
@@ -112,11 +110,6 @@ public:
     Dune::FMatrixHelp::eigenValuesVectors(stress, eigenvalues, eigenvectors);
 
     // Output selected eigenvector
-    auto idx =
-      std::distance(eigenvalues.begin(),
-                    std::max_element(eigenvalues.begin(), eigenvalues.end()));
-    std::cout << "Index of largest eigenvalue: " << std::to_string(idx)
-              << std::endl;
     y = eigenvectors[_vector_idx] * eigenvalues[_vector_idx];
   }
 

@@ -308,6 +308,7 @@ public:
   StressEVVisualizationBlock(Context& ctx, const YAML::Node& config)
     : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
     , _index(config["index"].as<int>())
+    , _continuous(config["continuous"].as<bool>())
   {
   }
 
@@ -329,34 +330,67 @@ public:
                                                                       material);
     stress.set_index(_index);
 
-    using FEM =
-      Dune::PDELab::PkLocalFiniteElementMap<typename Traits::EntitySet,
-                                            double,
-                                            typename Traits::Range,
-                                            1>;
-    auto fem = std::make_shared<FEM>(es);
+    if (_continuous)
+    {
+      // P1 representation
+      using FEM =
+        Dune::PDELab::PkLocalFiniteElementMap<typename Traits::EntitySet,
+                                              double,
+                                              typename Traits::Range,
+                                              1>;
+      auto fem = std::make_shared<FEM>(es);
 
-    using VGFS =
-      Dune::PDELab::VectorGridFunctionSpace<typename Traits::EntitySet,
-                                            FEM,
-                                            Traits::dim,
-                                            typename Traits::VectorBackend,
-                                            typename Traits::VectorBackend,
-                                            Dune::PDELab::NoConstraints>;
-    auto vgfs = std::make_shared<VGFS>(es, fem);
-    using StressVector =
-      Dune::PDELab::Backend::Vector<VGFS, typename Traits::ctype>;
-    auto stress_container = std::make_shared<StressVector>(vgfs);
+      using VGFS =
+        Dune::PDELab::VectorGridFunctionSpace<typename Traits::EntitySet,
+                                              FEM,
+                                              Traits::dim,
+                                              typename Traits::VectorBackend,
+                                              typename Traits::VectorBackend,
+                                              Dune::PDELab::NoConstraints>;
+      auto vgfs = std::make_shared<VGFS>(es, fem);
+      using StressVector =
+        Dune::PDELab::Backend::Vector<VGFS, typename Traits::ctype>;
+      auto stress_container = std::make_shared<StressVector>(vgfs);
 
-    Dune::PDELab::interpolate(stress, *vgfs, *stress_container);
-    std::dynamic_pointer_cast<Dune::BlockLab::VisualizationBlock<P, V>>(
-      this->parent)
-      ->add_dataset(stress_container, "stress_ev_" + std::to_string(_index));
+      Dune::PDELab::interpolate(stress, *vgfs, *stress_container);
+      std::dynamic_pointer_cast<Dune::BlockLab::VisualizationBlock<P, V>>(
+        this->parent)
+        ->add_dataset(stress_container, "stress_ev_" + std::to_string(_index));
+    }
+    else
+    {
+      // P0 representation
+      using P0FEM =
+        Dune::PDELab::P0LocalFiniteElementMap<typename Traits::ctype,
+                                              typename Traits::Range,
+                                              Traits::dim>;
+      auto fem =
+        std::make_shared<P0FEM>(Dune::GeometryTypes::simplex(Traits::dim));
+      using VGFS =
+        Dune::PDELab::VectorGridFunctionSpace<typename Traits::EntitySet,
+                                              P0FEM,
+                                              Traits::dim,
+                                              typename Traits::VectorBackend,
+                                              typename Traits::VectorBackend,
+                                              Dune::PDELab::NoConstraints>;
+      auto vgfs = std::make_shared<VGFS>(es, fem);
+      vgfs->setDataSetType(
+        Dune::PDELab::GridFunctionOutputParameters::Output::cellData);
+      using StressVector =
+        Dune::PDELab::Backend::Vector<VGFS, typename Traits::ctype>;
+      auto stress_container = std::make_shared<StressVector>(vgfs);
+
+      Dune::PDELab::interpolate(stress, *vgfs, *stress_container);
+      std::dynamic_pointer_cast<Dune::BlockLab::VisualizationBlock<P, V>>(
+        this->parent)
+        ->add_dataset(stress_container, "stress_ev_" + std::to_string(_index));
+    }
   }
 
   static std::vector<std::string> blockData()
   {
     auto data = Dune::BlockLab::BlockBase<P, V, i>::blockData();
+    // clang-format off
     data.push_back("title: Stress Tensor Eigenvector Visualization   \n"
                    "category: visualization                          \n"
                    "schema:                                          \n"
@@ -365,17 +399,24 @@ public:
                    "    default: "
                    + std::to_string(Traits::dim - 1)
                    + "                                  \n"
-                     "    min: 0                                       \n"
-                     "    max: "
+                   "    min: 0                                       \n"
+                   "    max: "
                    + std::to_string(Traits::dim - 1)
                    + "                                       \n"
-                     "    meta:                                        \n"
-                     "      title: Index of the eigenvector to print   \n");
+                   "    meta:                                        \n"
+                   "      title: Index of the eigenvector to print   \n"
+                   "  continuous:                                    \n"
+                   "    type: boolean                                \n"
+                   "    default: true                                \n"
+                   "    meta:                                        \n"
+                   "      title: P1 representation                   \n");
+    // clang-format on
     return data;
   }
 
 private:
   size_t _index;
+  bool _continuous;
   Material material;
 };
 
