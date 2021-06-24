@@ -35,6 +35,7 @@ build:all:
     paths:
       - build-cmake/apps/structured2d_p2
       - build-cmake/apps/cell2d_p2
+      - build-cmake/apps/gmsh2d_p2
     expire_in: 6h
 
 # Build tests

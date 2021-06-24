@@ -1,0 +1,65 @@
+solver:
+    vectors:
+      - Displacement Field_0
+      - Body Force_0
+      - Traction Force_0
+    grid:
+      filename: cube.msh
+      _blockname: grid_0
+    blocks:
+      - _type: material
+        _blockname: material_0
+        materials:
+          -
+            group: 0
+            model: linear
+            poisson_ratio: 0.3333
+            youngs_modulus: 300
+            prestress:
+              type: isotropic
+              scale: 50
+      # Initial Displacement
+      - _type: interpolation
+        _blockname: interpolation_0
+        functions: 0
+        vector: 0
+      # Body Force
+      - _type: interpolation
+        _blockname: interpolation_1
+        functions: 0
+        vector: 1
+      # Traction Force
+      - _type: interpolation
+        _blockname: interpolation_2
+        functions: "((x > 1 - 1e-8 && y < 0.525 && y > 0.475) ? 400 : 0), 0"
+        vector: 2
+      - _type: constraints
+        _blockname: constraints_0
+        functions: "
+          (x < 0.051 && y < 0.051) ||
+          (x > 1 - 0.051 && y < 0.051) ||
+          (x < 0.051 && y > 1 - 0.051) ||
+          (x > 1 - 0.051 && y > 1 - 0.051) "
+        vector: 0
+      - _type: linearsolver
+        _blockname: linearsolver_0
+        operator:
+          reinforced_operator:
+            _blockname: reinforced_operator_0
+            fibres:
+            vector: 0
+        vector: 0
+      - _type: visualization
+        _blockname: visualization_0
+        blocks:
+          - _type: vis_vector
+            _blockname: vis_vector_0
+            vector: 0
+          - _type: vis_vonmises
+            _blockname: vis_vonmises_0
+            continuous: true
+            vector: 0
+        filename: cube
+        instationary: false
+        intervals: 1
+        path: vtk
