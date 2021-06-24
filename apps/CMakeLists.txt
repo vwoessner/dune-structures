@@ -4,6 +4,7 @@ set(APPS
     cell2d_p2
     cell3d_p1
     cell3d_p2
+    gmsh2d_p2
 )
 
 # Add apps as executables, register with frontend, make depend on code generator
