@@ -15,4 +15,4 @@ from dune.structures.material import (
     StVenantKirchhoffMaterial,
 )
 
-from dune.structures.vtk import VTKVertexReader
+from dune.structures.vtk import VTKVertexReader, VTKCellReader

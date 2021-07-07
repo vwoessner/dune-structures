@@ -10,6 +10,11 @@
           0 1 1 0 1 1
         </DataArray>
       </PointData>
+      <CellData Scalars="scalars2">
+        <DataArray type="Float32" Name="scalars2" NumberOfComponents="1" format="ascii">
+          0 4
+        </DataArray>
+      </CellData>
       <Points>
         <DataArray type="Float32" Name="Coordinates" NumberOfComponents="3" format="ascii">
           0 0 0 1 0 0 0 1 0 1 1 0 0 1 0 1 0 0
