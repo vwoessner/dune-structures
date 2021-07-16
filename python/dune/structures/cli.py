@@ -76,13 +76,21 @@ def fibergrowth(executable, input_file, logger, **kwargs):
 
         # Compute and write new fibers
         logger.info("Running fibergrowth algorithm iteration {}".format(iteration))
-        yaml_data = fibergrowth_cfg(simulation_input_file)
+
+        # Odd
+        if iteration % 2:
+            yaml_data = fibergrowth_cfg(simulation_input_file, recombine=False)
+        # Even
+        else:
+            yaml_data = fibergrowth_cfg(simulation_input_file, create=False)
+
         get_block_by_name(yaml_data, "visualization_0")["filename"] = format_iteration(
             str(output_placeholder), iteration
         )
         simulation_input_file = os.path.join(
             input_dir, input_filename + "-{:03d}".format(iteration) + ext
         )
+
         write_yaml_config(simulation_input_file, yaml_data)
 
         # Run simulation
