@@ -1,10 +1,16 @@
+import os
 from collections import namedtuple
 
 import numpy as np
 from numpy.polynomial import Polynomial
 from ruamel.yaml import YAML
 
+import matplotlib.pyplot as plt
+
 from scipy.optimize import minimize
+from scipy.interpolate import griddata
+from scipy.ndimage import gaussian_filter
+from skimage.feature import peak_local_max
 
 from dune.structures import VTKVertexReader, VTKCellReader
 from dune.structures.fibergrowth.line import Line, three_line_integral, angle_between
@@ -42,10 +48,65 @@ def choose_from_magnitude(
     return idx[: int(len(idx) * percentage)]
 
 
-def load_data(filename, dataset="stress_ev_1_"):
+def choose_from_local_maxima(
+    positions, values, precision, min_distance, filter_sigma, filename
+):
+    # Create coordinate mesh
+    x_min, x_max = np.amin(positions[..., 0]), np.amax(positions[..., 0])
+    y_min, y_max = np.amin(positions[..., 1]), np.amax(positions[..., 1])
+    x_prec = int(abs(x_max - x_min) * precision)
+    y_prec = int(abs(y_max - y_min) * precision)
+    x = np.linspace(x_min, x_max, x_prec)
+    y = np.linspace(y_min, y_max, y_prec)
+    xx, yy = np.meshgrid(x, y)
+
+    # Interpolate data into mesh
+    values_grid = griddata(positions, values, (xx, yy), method="linear", fill_value=0.0)
+
+    # Add a gaussian filter
+    values_grid = gaussian_filter(values_grid, sigma=filter_sigma * precision)
+
+    # print(values_grid.shape)
+    # print(x_prec, precision * min_distance)
+
+    # Evaluate local maxima
+    idx = peak_local_max(
+        values_grid,
+        min_distance=int(precision * min_distance),
+        exclude_border=False,
+        threshold_rel=0.1,
+        p_norm=2,  # Euclidian distance
+    )
+
+    plt.imshow(values_grid)
+    plt.plot(idx[..., 1], idx[..., 0], "ro")
+
+    name, ext = os.path.splitext(filename)
+    filename = name + "-max.png"
+    plt.savefig(filename)
+
+    # Return positions and values
+    # print(values_grid.shape)
+    # print(xx.shape, yy.shape)
+    # print(idx.shape)
+    # print(idx)
+    x_values = xx[idx[..., 0], idx[..., 1]]
+    y_values = yy[idx[..., 0], idx[..., 1]]
+    values = values_grid[idx[..., 0], idx[..., 1]]
+    points = np.array([[x, y] for x, y in zip(x_values, y_values)])
+    return points, values
+
+
+def load_stress_ev(filename, dataset="stress_ev_1_"):
     vtkfile = VTKCellReader(filename)
 
     return vtkfile.cell_centers, vtkfile[dataset]
+
+
+def load_stress_mises(filename, dataset="vonmises_"):
+    vtkfile = VTKVertexReader(filename)
+
+    return vtkfile.points, vtkfile[dataset]
 
 
 def recombine_fibers(fibers, max_distance, max_angle, **kwargs):
@@ -150,6 +211,15 @@ def recombine_fibers(fibers, max_distance, max_angle, **kwargs):
         x_end = np.amax(x)
         new_line = Line([x_start, fit(x_start)], [x_end, fit(x_end)])
 
+        # Increase radius if fiber length is not increased significantly
+        fiber_data = dict(**fibers[idx_1])
+        fiber_data_2 = dict(**fibers[idx_2])
+        length_init = max(line1.length, line2.length)
+        radius = max(fiber_data["radius"], fiber_data_2["radius"])
+        if new_line.length < length_init * 1.1:
+            radius = fiber_data["radius"] + fiber_data_2["radius"]
+        fiber_data["radius"] = radius
+
         # start_mean = np.mean([line1.start, line2.start], axis=0)
         # end_mean = np.mean([line1.end, line2.end], axis=0)
 
@@ -162,7 +232,6 @@ def recombine_fibers(fibers, max_distance, max_angle, **kwargs):
         # new_line = Line([pos[0], pos[1]], [pos[2], pos[3]])
         # new_line = Line([start_mean[0], start_mean[1]], [end_mean[0], end_mean[1]])
 
-        fiber_data = dict(**fibers[idx_1])
         fiber_data["start"] = [new_line.start.item(i) for i in range(2)]
         fiber_data["end"] = [new_line.end.item(i) for i in range(2)]
         new_fiber = Fiber(**fiber_data)
@@ -190,10 +259,17 @@ def compute_new_fibers(
     min_length,
     max_length,
     prestress,
+    fib_create_dist,
+    gauss_sigma,
     **kwargs
 ):
-    # Load the data
-    points, stress_vectors = load_data(datafile, ev_dataset)
+    # Load the stress EVs
+    points, stress_vectors = load_stress_ev(datafile, ev_dataset)
+
+    # Make sure stress EVs are normalized
+    stress_vectors = (
+        stress_vectors.T / np.sqrt(np.sum(stress_vectors ** 2, axis=-1))
+    ).T
 
     # Compute rectangular bounds
     bounds = np.zeros((3, 2))
@@ -206,25 +282,46 @@ def compute_new_fibers(
                 return False
         return True
 
+    # Collapse points into 2D
+    points = points[..., 0:2]
+
     # Choose start positions of new fibers
-    idx_new = choose_from_magnitude(stress_vectors)
-    print("Possible fiber start positions:")
-    print(points[idx_new])
+    # idx_new = choose_from_magnitude(stress_vectors)
+    # print("Possible fiber start positions:")
+    # print(points[idx_new])
+
+    pp, stress_magnitudes = load_stress_mises(datafile)
+    # stress_magnitudes = np.sqrt(np.sum(stress_vectors ** 2, axis=-1))
+    pos, values = choose_from_local_maxima(
+        pp[..., 0:2],
+        stress_magnitudes,
+        precision=20,
+        min_distance=fib_create_dist,
+        filename=datafile,
+        filter_sigma=gauss_sigma,
+    )
+
+    # Find closest location of VTK values
+    idx_new = []
+    for point in pos:
+        distances = np.sqrt(np.sum((points - point) ** 2, axis=1))
+        idx_new.append(np.argmin(distances))
 
     # Create fibers
     scale = scale
     fibers = []
-    for idx in idx_new:
+    for idx, magnitude in zip(idx_new, values):
         center = points[idx]
-        direction = scale * stress_vectors[idx]
-        start = center - direction / 2
-        end = start + direction / 2
+        direction = scale * magnitude * stress_vectors[idx, 0:2]  # 2D!
 
-        length = np.sqrt(np.sum((end - start) ** 2))
+        length = np.sqrt(np.sum(direction ** 2))
         if length > max_length:
             direction = direction * max_length / length
         elif length < min_length:
             direction = direction * min_length / length
+
+        start = center - direction / 2
+        end = start + direction / 2
 
         # Outside? Then flip the fiber
         # if not is_inside(end):
