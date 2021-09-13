@@ -2,6 +2,10 @@ import os
 import argparse
 import subprocess
 import logging
+import matplotlib.pyplot as plt
+import numpy as np
+from numpy.random import default_rng
+import pandas as pd
 
 from dune.structures.fibergrowth.evaluate import (
     load_yaml_config,
@@ -10,6 +14,16 @@ from dune.structures.fibergrowth.evaluate import (
     write_yaml_config,
     fibergrowth_cfg,
     get_block_by_name,
+)
+
+from dune.structures.fibergrowth.genetic_opt import (
+    generate_initial_population,
+    write_population_cfgs,
+    run_and_evaluate_parallel,
+    selection,
+    crossover,
+    mutation,
+    evaluate_fiber_lengths,
 )
 
 # TODO: Hardcoded path! Should be configured by CMake instead
@@ -98,6 +112,85 @@ def fibergrowth(executable, input_file, logger, **kwargs):
         run(executable, simulation_input_file, logger=logger)
 
 
+def genetic_opt(executable, input_file, logger, **kwargs):
+    # Check the executable
+    exe = os.path.abspath(os.path.join(APP_PATH, executable))
+    if not os.path.isfile(exe):
+        raise FileNotFoundError("Executable not found: {}".format(exe))
+
+    # Load optimization data
+
+    # Determine file paths
+    input_file = os.path.abspath(input_file)
+    input_dir, input_filename = os.path.split(input_file)
+
+    # Load the overall input file
+    yaml_input = load_yaml_config(input_file)
+    optimization_data = yaml_input["genetic_optimization"]
+    # output_placeholder = get_block_by_name(yaml_input, "visualization_0")["filename"]
+
+    # Fetch the RNG
+    rng = default_rng(optimization_data["seed"])
+
+    # Generate initial population
+    population = generate_initial_population(optimization_data, rng)
+
+    for it in range(optimization_data["iterations"]):
+        print("Iteration {}".format(it))
+        # Write YAML input files
+        iter_dir = os.path.join(input_dir, "iteration-{:03d}".format(it))
+        yaml_file_paths = write_population_cfgs(
+            iter_dir, input_filename, yaml_input, population
+        )
+
+        # Run and evaluate
+        stresses = run_and_evaluate_parallel(exe, yaml_file_paths, processes=8)
+        lengths = evaluate_fiber_lengths(population, optimization_data)
+        scores = np.column_stack((stresses, lengths))
+
+        # Write the data
+        data = pd.DataFrame(
+            {
+                "filepath": [os.path.basename(path) for path in yaml_file_paths],
+                "stress": stresses,
+                "length": lengths,
+            }
+        )
+        data.sort_values(by="stress", inplace=True)
+        with open(os.path.join(iter_dir, "results.yml"), "w", newline="") as file:
+            data.to_csv(file)
+
+        # Visualize population
+        # print(population)
+        # print(stresses)
+        # genome_size = [len(genome) for genome in population]
+        # print(genome_size)
+        plt.plot(lengths, stresses, "o")
+        plt.yscale("log")
+        plt.axhline(np.mean(stresses))
+        plt.savefig(os.path.join(iter_dir, "eval.pdf"))
+        # plt.close()
+
+        # Selection, crossover, mutation
+        population = selection(population, scores, optimization_data, rng)
+        population = crossover(population, optimization_data, rng)
+        # print(population)
+        mutation(population, optimization_data, rng)
+
+        # Shuffle genomes
+        for genome in population:
+            rng.shuffle(genome)
+
+    # Iterate:
+    # Run simulations (parallel)
+    # Evaluate fitness (parallel)
+    # Selection according to fitness
+    # Crossover breeding until population is full
+    # Mutation: Vary fibers
+    # Mutation: New fibers
+    # Write YAML input files for next iteration
+
+
 def create_argparse():
     # Parent parser
     parser = argparse.ArgumentParser(
@@ -140,6 +233,18 @@ def create_argparse():
         help="YAML configuration input file for the fibergrowth algorithm (META-FILE)",
     )
     parse_fib.set_defaults(func=fibergrowth)
+
+    # "Genetic Optimization" parser
+    parse_fib = sub.add_parser(
+        "optimization", help="Run the iterative genetic optimization algorithm"
+    )
+    parse_fib.add_argument("executable", type=str, help="Name of the app to execute")
+    parse_fib.add_argument(
+        "input_file",
+        type=os.path.realpath,
+        help="YAML configuration input file for the optimization algorithm (META-FILE)",
+    )
+    parse_fib.set_defaults(func=genetic_opt)
 
     return parser
 
