@@ -10,6 +10,7 @@
 #include <dune/structures/vonmises.hh>
 
 #include <dune/pdelab/gridfunctionspace/vectorgridfunctionspace.hh>
+#include <dune/pdelab/test/l2norm.hh>
 
 #include <filesystem>
 #include <memory>
@@ -118,6 +119,7 @@ public:
   VonMisesStressVisualizationBlock(Context& ctx, const YAML::Node& config)
     : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
     , continuous(config["continuous"].as<bool>())
+    , report_l2(config["report_l2"].as<bool>())
   {
   }
 
@@ -135,6 +137,7 @@ public:
     auto vector = this->solver->template getVector<i>();
     auto es = vector->gridFunctionSpace().entitySet();
     auto gfs = vector->gridFunctionSpaceStorage();
+    gfs->ordering();
 
     // A grid function for the stress
     VonMisesStressGridFunction<typename Traits::Vector, Traits::dim> stress(
@@ -189,6 +192,12 @@ public:
         this->parent)
         ->add_dataset(stress_container, "vonmises");
     }
+
+    if (report_l2)
+    {
+      std::cout << std::scientific << "stress l2: " << l2norm(stress, 2)
+                << std::defaultfloat << std::endl;
+    }
   }
 
   static std::vector<std::string> blockData()
@@ -201,13 +210,18 @@ public:
                    "    type: boolean                                   \n"
                    "    default: false                                  \n"
                    "    meta:                                           \n"
-                   "      title: Use Continuous Interpolation           \n");
+                   "      title: Use Continuous Interpolation           \n"
+                   "  report_l2:                                        \n"
+                   "    type: boolean                                   \n"
+                   "    default: false                                  \n"
+                   "    meta:                                           \n"
+                   "      title: Report the global L2 norm of the error \n");
     return data;
   }
 
 private:
   Material material;
-  bool continuous;
+  bool continuous, report_l2;
 };
 
 template<typename P, typename V>
