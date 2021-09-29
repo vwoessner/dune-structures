@@ -85,6 +85,14 @@ class Line:
     def direction(self):
         return (self.end - self.start) / self.length
 
+    @property
+    def center(self):
+        return np.mean(np.stack((self.start, self.end)))
+
+    @property
+    def angle(self):
+        return np.arccos(self.direction[0])
+
     def func(self):
         """Return a functional representation of the line in the fashion ``y = f(x)``.
         Returns ``None`` if ``x`` is out of bounds of the line.
@@ -98,6 +106,15 @@ class Line:
         #     else None
         # )
         return LineFunc.from_line(self)
+
+    @classmethod
+    def from_center(cls, center, length, angle):
+        dx = length * np.sin(angle) / 2
+        dy = length * np.cos(angle) / 2
+        delta = np.array([dx, dy])
+        start = center - delta
+        end = center + delta
+        return Line(start, end)
 
 
 class LineFunc:
