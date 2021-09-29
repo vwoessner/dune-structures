@@ -1,6 +1,6 @@
 import re
 import numpy as np
-from numpy.random import default_rng
+from numpy.random import default_rng, shuffle
 import subprocess as sp
 import os
 import copy
@@ -9,7 +9,15 @@ import multiprocessing as mp
 from ruamel.yaml import YAML
 
 from .line import Line
-from .evaluate import Fiber, get_block_by_name, write_yaml_config
+from .evaluate import (
+    Fiber,
+    get_block_by_name,
+    write_yaml_config,
+    load_yaml_config,
+    load_stress_ev,
+    load_stress_mises,
+    choose_from_local_maxima,
+)
 
 # OptData = namedtuple(
 #     "OptData", ["population_size", "x_bounds", "y_bounds", "max_fibers"]
@@ -28,6 +36,57 @@ def random_fiber(x_bounds, y_bounds):
     rng = default_rng()
     start, end = rng.uniform(low, high, size=(2, 2))
     return Line(start, end)
+
+
+def random_fiber_from_stress(
+    yaml_config_file, gauss_sigma, scale, fib_create_dist, rng
+):
+    # Load VTK
+    directory = os.path.dirname(yaml_config_file)
+    cfg = load_yaml_config(yaml_config_file)
+    vtk_output = os.path.join(
+        directory, get_block_by_name(cfg, "visualization_0")["filename"] + ".vtu"
+    )
+
+    # Load stresses
+    points, stress_ev = load_stress_ev(vtk_output)
+    points_mises, stress_mises = load_stress_mises(vtk_output)
+
+    # Make sure stress EVs are normalized
+    stress_ev = (stress_ev.T / np.sqrt(np.sum(stress_ev ** 2, axis=-1))).T
+
+    # Collapse points into 2D
+    points = points[..., 0:2]
+
+    # Evaluate local maxima
+    pos, values = choose_from_local_maxima(
+        points_mises[..., 0:2],
+        stress_mises,
+        precision=20,
+        min_distance=fib_create_dist,
+        filename=vtk_output,
+        filter_sigma=gauss_sigma,
+    )
+
+    # Find closest location of VTK values
+    idx_new = []
+    for point in pos:
+        distances = np.sqrt(np.sum((points - point) ** 2, axis=1))
+        idx_new.append(np.argmin(distances))
+
+    # Random selection with magnitude as weight
+    idx = rng.choice(
+        list(range(len(idx_new))),
+        p=np.log(values) / np.sum(np.log(values)),  # LOG for scaling!
+        replace=False,
+        shuffle=False,
+    )
+
+    # Set Fiber
+    center = points[idx_new[idx]]
+    length = scale * values[idx]
+    direction = length * stress_ev[idx_new[idx], 0:2]  # 2D!
+    return Line(center + direction / 2, center - direction / 2)
 
 
 def load_optimization_data(filename):
@@ -68,8 +127,31 @@ def crossover(population, data, rng):
     return new_pop
 
 
-def mutation(population, data, rng):
-    for genome in population:
+def mutation(population, yaml_file_paths, data, rng):
+    for genome, yaml_file in zip(population, yaml_file_paths):
+        rand = rng.uniform(size=2)
+        if (
+            rand[0] < data["fiber_create_probability"]
+            and len(genome) < data["max_num_fibers"]
+        ):
+            # Create fiber
+            # genome.append(random_fiber(data["x_bounds"], data["y_bounds"]))
+            genome.append(
+                random_fiber_from_stress(
+                    yaml_file,
+                    data["gauss_sigma"],
+                    data["scale"],
+                    data["fib_create_dist"],
+                    rng,
+                )
+            )
+        if (
+            rand[1] < data["fiber_delete_probability"]
+            and len(genome) > data["min_num_fibers"]
+        ):
+            # Delete random fiber
+            genome.pop(rng.integers(0, len(genome)))
+
         # Change fibers
         rand = rng.uniform(size=len(genome))
         # print(rand)
@@ -88,15 +170,6 @@ def mutation(population, data, rng):
                 end = gene.end
                 end = rng.multivariate_normal(end, cov)
                 genome[idx] = Line(start, end)
-
-        rand = rng.uniform(size=2)
-        prob = data["fiber_create_probability"]
-        if rand[0] < prob and len(genome) < data["max_num_fibers"]:
-            # Create fiber
-            genome.append(random_fiber(data["x_bounds"], data["y_bounds"]))
-        if rand[1] < prob and len(genome) > data["min_num_fibers"]:
-            # Delete random fiber
-            genome.pop(rng.integers(0, len(genome)))
 
 
 def selection(population, scores, data, rng):

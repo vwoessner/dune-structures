@@ -81,9 +81,10 @@ def choose_from_local_maxima(
     plt.imshow(values_grid)
     plt.plot(idx[..., 1], idx[..., 0], "ro")
 
-    name, ext = os.path.splitext(filename)
-    filename = name + "-max.png"
+    name, _ = os.path.splitext(filename)
+    filename = name + "-max.pdf"
     plt.savefig(filename)
+    plt.close()
 
     # Return positions and values
     # print(values_grid.shape)

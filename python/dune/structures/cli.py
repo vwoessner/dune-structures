@@ -169,13 +169,14 @@ def genetic_opt(executable, input_file, logger, **kwargs):
         plt.yscale("log")
         plt.axhline(np.mean(stresses))
         plt.savefig(os.path.join(iter_dir, "eval.pdf"))
-        # plt.close()
+        plt.close()
 
         # Selection, crossover, mutation
         population = selection(population, scores, optimization_data, rng)
         population = crossover(population, optimization_data, rng)
         # print(population)
-        mutation(population, optimization_data, rng)
+        # NOTE: Population was already changed, stress is outdated!
+        mutation(population, yaml_file_paths, optimization_data, rng)
 
         # Shuffle genomes
         for genome in population:
