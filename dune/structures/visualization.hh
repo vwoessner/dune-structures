@@ -120,6 +120,7 @@ public:
     : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
     , continuous(config["continuous"].as<bool>())
     , report_l2(config["report_l2"].as<bool>())
+    , report_inf(config["report_inf"].as<bool>())
   {
   }
 
@@ -166,6 +167,11 @@ public:
       std::dynamic_pointer_cast<Dune::BlockLab::VisualizationBlock<P, V>>(
         this->parent)
         ->add_dataset(stress_container, "vonmises");
+
+      if (report_inf)
+      {
+        report_inf_to_cout(stress_container);
+      }
     }
     else
     {
@@ -191,6 +197,11 @@ public:
       std::dynamic_pointer_cast<Dune::BlockLab::VisualizationBlock<P, V>>(
         this->parent)
         ->add_dataset(stress_container, "vonmises");
+
+      if (report_inf)
+      {
+        report_inf_to_cout(stress_container);
+      }
     }
 
     if (report_l2)
@@ -215,13 +226,26 @@ public:
                    "    type: boolean                                   \n"
                    "    default: false                                  \n"
                    "    meta:                                           \n"
-                   "      title: Report the global L2 norm of the error \n");
+                   "      title: Report the global L2 norm of the stress\n"
+                   "  report_inf:                                       \n"
+                   "    type: boolean                                   \n"
+                   "    default: false                                  \n"
+                   "    meta:                                           \n"
+                   "      title: Report the infinity norm of the stress \n");
     return data;
   }
 
 private:
   Material material;
-  bool continuous, report_l2;
+  bool continuous, report_l2, report_inf;
+
+  /// Report the infinity norm of a backend vector to the terminal
+  template<class BackendVector>
+  void report_inf_to_cout(const std::shared_ptr<BackendVector> vec)
+  {
+    std::cout << std::scientific << "stress inf: " << vec->infinity_norm()
+              << std::defaultfloat << std::endl;
+  }
 };
 
 template<typename P, typename V>
