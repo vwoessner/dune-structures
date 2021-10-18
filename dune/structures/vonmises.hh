@@ -1,17 +1,13 @@
 #ifndef DUNE_STRUCTURES_VON_MISES_HH
 #define DUNE_STRUCTURES_VON_MISES_HH
 
-#include <dune/pdelab.hh>
+#include <dune/pdelab/gridfunctionspace/gridfunctionspaceutilities.hh>
 #include <dune/structures/material.hh>
 
 #include <array>
 #include <memory>
 
-/** Calculate von Mises Stress
- *
- *  TODO: I am not 100% sure if my calculations are correct for the 2D case. Do
- * a bit more literature research on that.
- * */
+/// Calculate von Mises Stress
 template<typename Container, int dim>
 class VonMisesStressGridFunction
   : public Dune::PDELab::GridFunctionBase<
@@ -60,37 +56,48 @@ public:
     auto lame1 = material->parameter(e, x, 0);
     auto lame2 = material->parameter(e, x, 1);
 
-    typename Traits::RangeType sum = 0.0;
+    using RF = typename Traits::RangeType;
 
-    // Offdiagonal part of the deviatoric stress tensor
-    for (int i = 0; i < dim; ++i)
-      for (int j = 0; j < i; ++j)
-      {
-        auto entry =
-          lame2 * (displacement_grad[i][j] + displacement_grad[j][i]);
-        sum += 2.0 * entry * entry;
-      }
-
-    // Calculate divergence
-    typename Traits::RangeType div = 0.0;
-    for (int i = 0; i < dim; ++i)
-      div += displacement_grad[i][i];
-
-    std::array<typename Traits::RangeType, dim> sig;
-    for (int i = 0; i < dim; ++i)
-      sig[i] = lame1 * div + 2.0 * lame2 * displacement_grad[i][i];
-
-    // Diagonal part of the deviatoric stress tensor
+    // Calculate the Cauchy stress tensor
+    Dune::FieldMatrix<RF, dim, dim> stress;
     for (int i = 0; i < dim; ++i)
     {
-      typename Traits::RangeType entry = 0.0;
-      for (int j = 0; j < dim; ++j)
-        entry += (i == j ? 2. / 3. : -1. / 3.) * sig[j];
-      sum += entry * entry;
+      for (int j = 0; j <= i; ++j)
+      {
+        const RF val =
+          lame2 * (displacement_grad[i][j] + displacement_grad[j][i]);
+        stress[i][j] = val;
+        stress[j][i] = val;
+      }
+    }
+    RF trace = 0.0;
+    for (int i = 0; i < dim; ++i)
+    {
+      trace += displacement_grad[i][i];
+    }
+    for (int i = 0; i < dim; ++i)
+    {
+      stress[i][i] += lame1 * trace;
     }
 
-    using std::sqrt;
-    y = std::sqrt(1.5 * sum);
+    // Calculate von Mises stress
+    RF sum = 0.0;
+    // Diagonal
+    for (int i = 0; i < dim; ++i)
+    {
+      sum += stress[i][i] * stress[i][i];
+    }
+    // Off-diagonal
+    for (int i = 0; i < dim; ++i)
+    {
+      int j = i + 1;
+      if (i == dim - 1)
+        j = 0;
+
+      sum += 3 * stress[i][j] * stress[i][j] - stress[i][i] * stress[j][j];
+    }
+
+    y = std::sqrt(sum);
   }
 
   inline const typename Traits::GridViewType& getGridView() const
