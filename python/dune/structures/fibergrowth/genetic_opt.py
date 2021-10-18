@@ -23,7 +23,7 @@ from .evaluate import (
 #     "OptData", ["population_size", "x_bounds", "y_bounds", "max_fibers"]
 # )
 
-REGEX = r"stress l2: (-?[\d.]+e(?:\+|\-)?\d+)"
+REGEX = r"stress {kind}: (-?[\d.]+e(?:\+|\-)?\d+)"
 
 
 def transpose_bounds(x_bounds, y_bounds):
@@ -260,24 +260,47 @@ def evaluate_fiber_lengths(population, data):
     return [np.sum([fiber.length for fiber in genome]) for genome in population]
 
 
-def run_and_evaluate_parallel(executable, yaml_file_paths, processes=1):
+def run_and_evaluate_parallel(
+    executable, yaml_file_paths, optimization_data, processes=1
+):
     # def run_eval(path):
     #     return run_and_evaluate(executable, path)
 
     with mp.Pool(processes) as pool:
         return pool.starmap(
-            run_and_evaluate, [(executable, path) for path in yaml_file_paths]
+            run_and_evaluate,
+            [(executable, path, optimization_data) for path in yaml_file_paths],
         )
 
 
-def run_and_evaluate(executable, yaml_file_path):
+def run_and_evaluate(executable, yaml_file_path, optimization_data):
     directory = os.path.dirname(yaml_file_path)
     output = sp.check_output(
         [executable, "run", yaml_file_path], cwd=directory, encoding="utf8"
     )
-    match = re.search(REGEX, output)
+    try:
+        matches = [
+            float((re.search(REGEX.format(kind=kind), output)).group(1))
+            for kind in optimization_data["stress_eval_kind"]
+        ]
+    except AttributeError:
+        print("Error evaluating regex expressions from output:")
+        print(output)
+        print("Regex expressions:")
+        for kind in optimization_data["stress_eval_kind"]:
+            print(REGEX.format(kind=kind))
+        raise RuntimeError
+
+    merger = optimization_data["stress_eval_merge"]
+    if merger == "sum":
+        return np.sum(matches)
+    elif merger == "mult":
+        return np.prod(matches)
+    else:
+        raise RuntimeError("Unknown stress evaluation merger: {}".format(merger))
+
     # print(output, match.group(1))
-    return float(match.group(1))
+    # return float(match.group(1))
 
 
 def genome_to_cfg(yaml_cfg, genome):

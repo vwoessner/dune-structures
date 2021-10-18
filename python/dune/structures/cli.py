@@ -144,7 +144,9 @@ def genetic_opt(executable, input_file, logger, **kwargs):
         )
 
         # Run and evaluate
-        stresses = run_and_evaluate_parallel(exe, yaml_file_paths, processes=8)
+        stresses = run_and_evaluate_parallel(
+            exe, yaml_file_paths, optimization_data, processes=8
+        )
         lengths = evaluate_fiber_lengths(population, optimization_data)
         scores = np.column_stack((stresses, lengths))
 
