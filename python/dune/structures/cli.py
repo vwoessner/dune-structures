@@ -162,19 +162,23 @@ def genetic_opt(executable, input_file, logger, **kwargs):
         with open(os.path.join(iter_dir, "results.yml"), "w", newline="") as file:
             data.to_csv(file)
 
+        # Selection
+        population, select = selection(population, scores, optimization_data, rng)
+
         # Visualize population
-        # print(population)
-        # print(stresses)
-        # genome_size = [len(genome) for genome in population]
-        # print(genome_size)
-        plt.plot(lengths, stresses, "o")
-        plt.yscale("log")
+        lengths, stresses = np.asarray(lengths), np.asarray(stresses)
+        plt.plot(lengths[~select], stresses[~select], "o", label="removed")
+        plt.plot(lengths[select], stresses[select], "o", label="selected")
+        # plt.yscale("log")
         plt.axhline(np.mean(stresses))
+        plt.title("Population after Iteration {}".format(it))
+        plt.xlabel("Total Fiber Length [m]")
+        plt.ylabel("Stress L2-Norm [Pa]")
+        plt.legend()
         plt.savefig(os.path.join(iter_dir, "eval.pdf"))
         plt.close()
 
-        # Selection, crossover, mutation
-        population = selection(population, scores, optimization_data, rng)
+        # Crossover, Mutation
         population = crossover(population, optimization_data, rng)
         # print(population)
         # NOTE: Population was already changed, stress is outdated!
