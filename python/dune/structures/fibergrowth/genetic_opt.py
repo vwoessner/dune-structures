@@ -91,7 +91,7 @@ def random_fiber_from_stress(yaml_config_file, data, rng):
 
     # Set Fiber
     center = points[idx_new[idx]]
-    length = data["scale"] * values[idx]
+    length = rng.normal(data["scale_mean"], data["scale_stddev"]) * values[idx]
     direction = length * stress_ev[idx_new[idx], 0:2]  # 2D!
     radius = random_radius(data, rng)
     return Line(center + direction / 2, center - direction / 2, radius)
@@ -132,10 +132,11 @@ def crossover(population, data, rng):
 
 
 def mutation(population, yaml_file_paths, data, rng):
+    data_mutate = data["mutation"]
     for genome, yaml_file in zip(population, yaml_file_paths):
         rand = rng.uniform(size=2)
         if (
-            rand[0] < data["fiber_create_probability"]
+            rand[0] < data_mutate["fiber_create_probability"]
             and len(genome) < data["max_num_fibers"]
         ):
             # Create fiber
@@ -143,12 +144,12 @@ def mutation(population, yaml_file_paths, data, rng):
             genome.append(
                 random_fiber_from_stress(
                     yaml_file,
-                    data,
+                    data_mutate["create"],
                     rng,
                 )
             )
         if (
-            rand[1] < data["fiber_delete_probability"]
+            rand[1] < data_mutate["fiber_delete_probability"]
             and len(genome) > data["min_num_fibers"]
         ):
             # Delete random fiber
@@ -157,20 +158,22 @@ def mutation(population, yaml_file_paths, data, rng):
         # Change fibers
         rand = rng.uniform(size=len(genome))
         # print(rand)
-        var = data["fiber_mutation_translation_stddev"] ** 2
-        cov = [[var, 0], [0, var]]
-        prob = data["fiber_mutate_probability"]
+        prob = data_mutate["fiber_mutate_probability"]
         # print(rand < prob)
         # print((rand < prob).nonzero())
         to_mutate = rand < prob
         # print(to_mutate)
+
+        data_mutate = data_mutate["mutate"]  # NOTE: Config level!
+        var = data_mutate["translation_stddev"] ** 2
+        cov = [[var, 0], [0, var]]
         if to_mutate.any():
             for idx in np.argwhere(to_mutate)[0]:
                 gene = genome[idx]
                 center = rng.multivariate_normal(gene.center, cov)
-                length = rng.normal(gene.length, data["fiber_mutation_length_stddev"])
+                length = rng.normal(gene.length, data_mutate["length_stddev"])
                 angle = rng.normal(
-                    gene.angle, data["fiber_mutation_rotation_stddev"] * np.pi / 180.0
+                    gene.angle, data_mutate["rotation_stddev"] * np.pi / 180.0
                 )
                 radius = max(
                     rng.normal(gene.radius, data["fiber_radius_stddev"]), MIN_RADIUS
