@@ -62,7 +62,7 @@ def three_line_integral(line_ref, line1, line2):
 
 
 class Line:
-    def __init__(self, start, end):
+    def __init__(self, start, end, radius):
         start = np.array(start)
         end = np.array(end)
         if start.shape != end.shape:
@@ -77,6 +77,10 @@ class Line:
         self.start = start
         self.end = end
 
+        self.radius = float(radius)
+        if self.radius < 0:
+            raise RuntimeError("Line radius must be positive!")
+
     @property
     def length(self):
         return np.sqrt(np.sum((self.end - self.start) ** 2))
@@ -87,7 +91,7 @@ class Line:
 
     @property
     def center(self):
-        return np.mean(np.stack((self.start, self.end)))
+        return np.mean(np.stack((self.start, self.end)), axis=0)
 
     @property
     def angle(self):
@@ -108,13 +112,13 @@ class Line:
         return LineFunc.from_line(self)
 
     @classmethod
-    def from_center(cls, center, length, angle):
+    def from_center(cls, center, length, angle, radius):
         dx = length * np.sin(angle) / 2
         dy = length * np.cos(angle) / 2
         delta = np.array([dx, dy])
         start = center - delta
         end = center + delta
-        return Line(start, end)
+        return Line(start, end, radius)
 
 
 class LineFunc:

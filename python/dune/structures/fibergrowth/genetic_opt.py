@@ -1,6 +1,6 @@
 import re
 import numpy as np
-from numpy.random import default_rng, shuffle
+
 import subprocess as sp
 import os
 import copy
@@ -25,22 +25,29 @@ from .evaluate import (
 
 REGEX = r"stress {kind}: (-?[\d.]+e(?:\+|\-)?\d+)"
 
+MIN_RADIUS = 1e-4
+
 
 def transpose_bounds(x_bounds, y_bounds):
     bounds = np.vstack((x_bounds, y_bounds)).T
     return bounds[0], bounds[1]
 
 
-def random_fiber(x_bounds, y_bounds):
-    low, high = transpose_bounds(x_bounds, y_bounds)
-    rng = default_rng()
+def random_radius(yaml_data, rng):
+    return max(
+        rng.normal(yaml_data["fiber_radius_mean"], yaml_data["fiber_radius_stddev"]),
+        MIN_RADIUS,
+    )
+
+
+def random_fiber(yaml_data, rng):
+    low, high = transpose_bounds(yaml_data["x_bounds"], yaml_data["y_bounds"])
     start, end = rng.uniform(low, high, size=(2, 2))
-    return Line(start, end)
+    radius = random_radius(yaml_data, rng)
+    return Line(start, end, radius)
 
 
-def random_fiber_from_stress(
-    yaml_config_file, gauss_sigma, scale, fib_create_dist, rng
-):
+def random_fiber_from_stress(yaml_config_file, data, rng):
     # Load VTK
     directory = os.path.dirname(yaml_config_file)
     cfg = load_yaml_config(yaml_config_file)
@@ -63,9 +70,9 @@ def random_fiber_from_stress(
         points_mises[..., 0:2],
         stress_mises,
         precision=20,
-        min_distance=fib_create_dist,
+        min_distance=data["fib_create_dist"],
         filename=vtk_output,
-        filter_sigma=gauss_sigma,
+        filter_sigma=data["gauss_sigma"],
     )
 
     # Find closest location of VTK values
@@ -77,16 +84,17 @@ def random_fiber_from_stress(
     # Random selection with magnitude as weight
     idx = rng.choice(
         list(range(len(idx_new))),
-        p=np.log(values) / np.sum(np.log(values)),  # LOG for scaling!
+        p=np.sqrt(values) / np.sum(np.sqrt(values)),  # Scaling!
         replace=False,
         shuffle=False,
     )
 
     # Set Fiber
     center = points[idx_new[idx]]
-    length = scale * values[idx]
+    length = data["scale"] * values[idx]
     direction = length * stress_ev[idx_new[idx], 0:2]  # 2D!
-    return Line(center + direction / 2, center - direction / 2)
+    radius = random_radius(data, rng)
+    return Line(center + direction / 2, center - direction / 2, radius)
 
 
 def load_optimization_data(filename):
@@ -99,15 +107,11 @@ def generate_initial_population(data, rng):
     num_fibers = rng.integers(
         data["min_num_fibers"], data["max_num_fibers"], size=data["population_size"]
     )
-    population = [
-        [random_fiber(data["x_bounds"], data["y_bounds"]) for i in range(num)]
-        for num in num_fibers
-    ]
+    population = [[random_fiber(data, rng) for _ in range(num)] for num in num_fibers]
     return population
 
 
 def crossover_single(parent1, parent2, rng):
-    rng = default_rng()
     cross_point = rng.integers(1, min(len(parent1), len(parent2)))
     # print("Crossover point: {}".format(cross_point))
     child1 = list(parent1[:cross_point]) + parent2[cross_point:]
@@ -139,9 +143,7 @@ def mutation(population, yaml_file_paths, data, rng):
             genome.append(
                 random_fiber_from_stress(
                     yaml_file,
-                    data["gauss_sigma"],
-                    data["scale"],
-                    data["fib_create_dist"],
+                    data,
                     rng,
                 )
             )
@@ -155,7 +157,7 @@ def mutation(population, yaml_file_paths, data, rng):
         # Change fibers
         rand = rng.uniform(size=len(genome))
         # print(rand)
-        var = data["fiber_mutation_stddev"] ** 2
+        var = data["fiber_mutation_translation_stddev"] ** 2
         cov = [[var, 0], [0, var]]
         prob = data["fiber_mutate_probability"]
         # print(rand < prob)
@@ -165,11 +167,15 @@ def mutation(population, yaml_file_paths, data, rng):
         if to_mutate.any():
             for idx in np.argwhere(to_mutate)[0]:
                 gene = genome[idx]
-                start = gene.start
-                start = rng.multivariate_normal(start, cov)
-                end = gene.end
-                end = rng.multivariate_normal(end, cov)
-                genome[idx] = Line(start, end)
+                center = rng.multivariate_normal(gene.center, cov)
+                length = rng.normal(gene.length, data["fiber_mutation_length_stddev"])
+                angle = rng.normal(
+                    gene.angle, data["fiber_mutation_rotation_stddev"] * np.pi / 180.0
+                )
+                radius = max(
+                    rng.normal(gene.radius, data["fiber_radius_stddev"]), MIN_RADIUS
+                )
+                genome[idx] = Line.from_center(center, length, angle, radius)
 
 
 def selection(population, scores, data, rng):
@@ -246,7 +252,7 @@ def selection(population, scores, data, rng):
     # print(selected_idx)
 
     # return population[selected_idx]
-    return [population[idx] for idx in selected_idx if idx]
+    return [population[idx] for idx in selected_idx if idx], selected_idx
 
     # idx = np.argsort(stresses)
     # print("Best genomes:")
@@ -283,15 +289,17 @@ def run_and_evaluate(executable, yaml_file_path, optimization_data):
             float((re.search(REGEX.format(kind=kind), output)).group(1))
             for kind in optimization_data["stress_eval_kind"]
         ]
-    except AttributeError:
-        print("Error evaluating regex expressions from output:")
+    except AttributeError as exp:
+        print("Error evaluating regex expressions:")
+        print(exp)
+        print("Output:")
         print(output)
         print("Regex expressions:")
         for kind in optimization_data["stress_eval_kind"]:
             print(REGEX.format(kind=kind))
         raise RuntimeError
 
-    merger = optimization_data["stress_eval_merge"]
+    merger = optimization_data.get("stress_eval_merge", "sum")
     if merger == "sum":
         return np.sum(matches)
     elif merger == "mult":
@@ -308,6 +316,7 @@ def genome_to_cfg(yaml_cfg, genome):
         Fiber(
             start=[fiber.start.item(i) for i in range(2)],
             end=[fiber.end.item(i) for i in range(2)],
+            radius=fiber.radius,
             **yaml_cfg["genetic_optimization"]["fibers"]
         )._asdict()
         for fiber in genome
