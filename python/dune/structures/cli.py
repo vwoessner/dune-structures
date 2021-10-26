@@ -3,6 +3,7 @@ import argparse
 import subprocess
 import logging
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import numpy as np
 from numpy.random import default_rng
 import pandas as pd
@@ -134,6 +135,8 @@ def genetic_opt(executable, input_file, logger, **kwargs):
 
     # Generate initial population
     population = generate_initial_population(optimization_data, rng)
+    population_old = None
+    scores_old = None
 
     for it in range(optimization_data["iterations"]):
         print("Iteration {}".format(it))
@@ -163,25 +166,56 @@ def genetic_opt(executable, input_file, logger, **kwargs):
             data.to_csv(file)
 
         # Selection
-        population, select = selection(population, scores, optimization_data, rng)
+        pop_to_select = population
+        scores_to_select = scores
+        if population_old is not None:
+            pop_to_select = population + population_old
+            scores_to_select = np.concatenate((scores, scores_old))
+        population, fitness, select = selection(
+            pop_to_select, scores_to_select, optimization_data, rng
+        )
+
+        # Retain population before crossover/mutation as "old"
+        population_old = population
+        scores_old = scores_to_select[select]
 
         # Visualize population
-        lengths, stresses = np.asarray(lengths), np.asarray(stresses)
-        plt.plot(lengths[~select], stresses[~select], "o", label="removed")
-        plt.plot(lengths[select], stresses[select], "o", label="selected")
+        lengths, stresses = scores_to_select[..., 0], scores_to_select[..., 1]
+        plt.plot(
+            lengths[~select],
+            stresses[~select],
+            "o",
+            label="removed",
+            markeredgecolor="r",
+            fillstyle="none",
+        )
+        norm = mcolors.Normalize(
+            np.amin(fitness) - 0.2 * np.ptp(fitness),
+            np.amax(fitness),
+        )
+        plt.scatter(
+            lengths[select],
+            stresses[select],
+            c=fitness,
+            cmap="Blues",
+            label="selected",
+            norm=norm,
+        )
         # plt.yscale("log")
-        plt.axhline(np.mean(stresses))
+        plt.axhline(np.mean(stresses[~select]), color="r")
+        plt.axhline(np.mean(stresses[select]), color="b")
         plt.title("Population after Iteration {}".format(it))
         plt.xlabel("Total Fiber Length [m]")
         plt.ylabel("Stress L2-Norm [Pa]")
         plt.legend()
-        plt.savefig(os.path.join(iter_dir, "eval.pdf"))
+        plt.savefig("population-{:03d}.pdf".format(it))
         plt.close()
 
         # Crossover, Mutation
-        population = crossover(population, optimization_data, rng)
+        population = crossover(population, fitness, optimization_data, rng)
         # print(population)
         # NOTE: Population was already changed, stress is outdated!
+        # NOTE: Maybe use mean stress?
         mutation(population, yaml_file_paths, optimization_data, rng)
 
         # Shuffle genomes

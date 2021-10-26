@@ -55,6 +55,9 @@ def random_fiber_from_stress(yaml_config_file, data, rng):
         directory, get_block_by_name(cfg, "visualization_0")["filename"] + ".vtu"
     )
 
+    # Select config sub-level
+    data_create = data["mutation"]["create"]
+
     # Load stresses
     points, stress_ev = load_stress_ev(vtk_output)
     points_mises, stress_mises = load_stress_mises(vtk_output)
@@ -70,9 +73,9 @@ def random_fiber_from_stress(yaml_config_file, data, rng):
         points_mises[..., 0:2],
         stress_mises,
         precision=20,
-        min_distance=data["fib_create_dist"],
+        min_distance=data_create["fib_create_dist"],
         filename=vtk_output,
-        filter_sigma=data["gauss_sigma"],
+        filter_sigma=data_create["gauss_sigma"],
     )
 
     # Find closest location of VTK values
@@ -91,7 +94,9 @@ def random_fiber_from_stress(yaml_config_file, data, rng):
 
     # Set Fiber
     center = points[idx_new[idx]]
-    length = rng.normal(data["scale_mean"], data["scale_stddev"]) * values[idx]
+    length = (
+        rng.normal(data_create["scale_mean"], data_create["scale_stddev"]) * values[idx]
+    )
     direction = length * stress_ev[idx_new[idx], 0:2]  # 2D!
     radius = random_radius(data, rng)
     return Line(center + direction / 2, center - direction / 2, radius)
@@ -114,29 +119,36 @@ def generate_initial_population(data, rng):
 def crossover_single(parent1, parent2, rng):
     cross_point = rng.integers(1, min(len(parent1), len(parent2)))
     # print("Crossover point: {}".format(cross_point))
-    child1 = list(parent1[:cross_point]) + parent2[cross_point:]
-    child2 = list(parent2[:cross_point]) + parent1[cross_point:]
+    child1 = list(parent1[:cross_point]) + list(parent2[cross_point:])
+    child2 = list(parent2[:cross_point]) + list(parent1[cross_point:])
     # rng.shuffle(child1)
     # rng.shuffle(child2)
     return [child1, child2]
 
 
-def crossover(population, data, rng):
+def crossover(population, fitness, data, rng):
+    # Normalize fitness
+    fitness = fitness / np.sum(fitness)
     new_pop = []
     while len(new_pop) < data["population_size"]:
-        select = rng.integers(0, len(population), size=2)
-        new_pop.extend(
-            crossover_single(population[select[0]], population[select[1]], rng)
-        )
+        pop1, pop2 = rng.choice(population, size=2, p=fitness, replace=False)
+        new_pop.extend(crossover_single(pop1, pop2, rng))
     return new_pop
 
 
 def mutation(population, yaml_file_paths, data, rng):
-    data_mutate = data["mutation"]
+    data_mutation = data["mutation"]
     for genome, yaml_file in zip(population, yaml_file_paths):
         rand = rng.uniform(size=2)
+        fiber_created = False
         if (
-            rand[0] < data_mutate["fiber_create_probability"]
+            rand[1] < data_mutation["fiber_delete_probability"]
+            and len(genome) > data["min_num_fibers"]
+        ):
+            # Delete random fiber
+            genome.pop(rng.integers(0, len(genome)))
+        if (
+            rand[0] < data_mutation["fiber_create_probability"]
             and len(genome) < data["max_num_fibers"]
         ):
             # Create fiber
@@ -144,27 +156,25 @@ def mutation(population, yaml_file_paths, data, rng):
             genome.append(
                 random_fiber_from_stress(
                     yaml_file,
-                    data_mutate["create"],
+                    data,
                     rng,
                 )
             )
-        if (
-            rand[1] < data_mutate["fiber_delete_probability"]
-            and len(genome) > data["min_num_fibers"]
-        ):
-            # Delete random fiber
-            genome.pop(rng.integers(0, len(genome)))
+            # Make sure created fibers are mutated (randomized)
+            fiber_created = True
 
         # Change fibers
         rand = rng.uniform(size=len(genome))
+        if fiber_created:
+            rand[-1] = 0.0
         # print(rand)
-        prob = data_mutate["fiber_mutate_probability"]
+        prob = data_mutation["fiber_mutate_probability"]
         # print(rand < prob)
         # print((rand < prob).nonzero())
         to_mutate = rand < prob
         # print(to_mutate)
 
-        data_mutate = data_mutate["mutate"]  # NOTE: Config level!
+        data_mutate = data_mutation["mutate"]
         var = data_mutate["translation_stddev"] ** 2
         cov = [[var, 0], [0, var]]
         if to_mutate.any():
@@ -209,18 +219,31 @@ def selection(population, scores, data, rng):
             distances[:, i] = crowding[idx_rev]
         return distances
 
+    def dominated_by_rank(idx, scores, ranks):
+        """Return the ranks of members by summing over dominated ranks"""
+        ret = np.zeros(idx.shape)
+        for i in range(len(idx)):
+            ret[i] = 1 + np.sum(ranks[np.all(scores < scores[idx[i]], axis=-1)])
+        return ret
+
     # Select Pareto fronts until selection size is reached
     # print(scores.shape)
-    selection_size = int(data["selection_ratio"] * len(population))
+    selection_size = int(data["population_size"])
     selected_idx = np.full(len(scores), False)
+    ranks = np.full(len(scores), 0)
+    # rank = 1
     while np.count_nonzero(selected_idx) < selection_size:
         # print(selected_idx.shape)
         reverse_idx = np.argwhere(~selected_idx)
         # print(reverse_idx.shape)
         last_pareto = pareto_front_indices(scores[~selected_idx])
         # print(last_pareto.shape)
-        selected_idx[reverse_idx[last_pareto]] = True
-        # print(selected_idx)
+        this_select = reverse_idx[last_pareto]
+        selected_idx[this_select] = True
+        ranks[this_select] = dominated_by_rank(this_select, scores, ranks)
+        # ranks[reverse_idx[last_pareto]] = rank
+        # rank = rank + 1
+        # print(ranks)
 
     # print(reverse_idx[last_pareto])
     # print(scores[reverse_idx[last_pareto]])
@@ -255,7 +278,11 @@ def selection(population, scores, data, rng):
     # print(selected_idx)
 
     # return population[selected_idx]
-    return [population[idx] for idx in selected_idx if idx], selected_idx
+    return (
+        [population[idx] for idx in selected_idx if idx],
+        1 / ranks[selected_idx],
+        selected_idx,
+    )
 
     # idx = np.argsort(stresses)
     # print("Best genomes:")
