@@ -27,6 +27,8 @@ from dune.structures.fibergrowth.genetic_opt import (
     evaluate_fiber_lengths,
 )
 
+from dune.structures.plotting.mean import plot_mean_displacement
+
 # TODO: Hardcoded path! Should be configured by CMake instead
 APP_PATH = "{}/../../../build-cmake/apps".format(os.path.dirname(__file__))
 
@@ -138,6 +140,9 @@ def genetic_opt(executable, input_file, logger, **kwargs):
     population_old = None
     scores_old = None
 
+    # List of dataframes for each iteration
+    data_iteration = []
+
     for it in range(optimization_data["iterations"]):
         print("Iteration {}".format(it))
         # Write YAML input files
@@ -153,17 +158,20 @@ def genetic_opt(executable, input_file, logger, **kwargs):
         lengths = evaluate_fiber_lengths(population, optimization_data)
         scores = np.column_stack((stresses, lengths))
 
-        # Write the data
+        # Store entire population for this round
         data = pd.DataFrame(
             {
-                "filepath": [os.path.basename(path) for path in yaml_file_paths],
+                "filepath": [os.path.abspath(path) for path in yaml_file_paths],
+                "iteration": it,
                 "stress": stresses,
                 "length": lengths,
             }
         )
-        data.sort_values(by="stress", inplace=True)
-        with open(os.path.join(iter_dir, "results.yml"), "w", newline="") as file:
-            data.to_csv(file)
+
+        # Fetch selected population from previous round for egalitarian selection
+        if it > 0:
+            data_prev = data_iteration[-1]
+            data = pd.concat([data, data_prev.loc[data_prev["selected"]]])
 
         # Selection
         pop_to_select = population
@@ -174,6 +182,16 @@ def genetic_opt(executable, input_file, logger, **kwargs):
         population, fitness, select = selection(
             pop_to_select, scores_to_select, optimization_data, rng
         )
+        data["fitness"] = fitness
+        data["selected"] = select
+        fitness = fitness[select]
+
+        # Write the data to a file
+        with open(os.path.join(iter_dir, "results.yml"), "w", newline="") as file:
+            data_sorted = data.sort_values(
+                by=["fitness", "stress"], ascending=[False, True]
+            )
+            data_sorted.to_csv(file)
 
         # Retain population before crossover/mutation as "old"
         population_old = population
@@ -221,6 +239,28 @@ def genetic_opt(executable, input_file, logger, **kwargs):
         # Shuffle genomes
         for genome in population:
             rng.shuffle(genome)
+
+        # Retain iteration data
+        data_iteration.append(data)
+
+        # Plot the mean of the 20% of best files
+        for data, outname in [
+            (data_sorted, "fittest"),
+            (data.sort_values("stress", ascending=True), "lowest"),
+        ]:
+            data = data.iloc[: int(data.shape[0] // 5)]
+            plot_yaml_paths = data["filepath"]
+            plot_vtk_paths = [
+                os.path.splitext(path)[0] + ".vtu" for path in plot_yaml_paths
+            ]
+            plot_mean_displacement(
+                plot_vtk_paths,
+                plot_yaml_paths,
+                "{}-{:03d}.pdf".format(outname, it),
+                displacement_dataset="Displacement Field_0_",
+                stress_dataset="vonmises_",
+                tri_subdiv=3,
+            )
 
     # Iterate:
     # Run simulations (parallel)
