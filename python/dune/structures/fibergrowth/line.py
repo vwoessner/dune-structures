@@ -120,6 +120,13 @@ class Line:
         end = center + delta
         return Line(start, end, radius)
 
+    def __str__(self):
+        return """Line\n
+            start: {}\n
+            end: {}\n
+            radius: {}
+            """.format(self.start, self.end, self.radius)
+
 
 class LineFunc:
     def __init__(self, start, end, absolute=False):
