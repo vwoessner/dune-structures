@@ -40,9 +40,26 @@ def random_radius(yaml_data, rng):
     )
 
 
+def fuzzy_bisect_until_inside(center, radius_vec, data, rng):
+    low, high = transpose_bounds(data["x_bounds"], data["y_bounds"])
+    scale_start, scale_end = 1.0, 1.0
+    start = center - radius_vec
+    end = center + radius_vec
+    while any((start < low) | (start > high)):
+        scale_start = scale_start * rng.uniform()
+        start = center - radius_vec * scale_start
+    while any((end < low) | (end > high)):
+        scale_end = scale_end * rng.uniform()
+        end = center - radius_vec * scale_end
+    return start, end
+
+
 def random_fiber(yaml_data, rng):
     low, high = transpose_bounds(yaml_data["x_bounds"], yaml_data["y_bounds"])
     start, end = rng.uniform(low, high, size=(2, 2))
+    dir_vec = (end - start) / 2
+    center = start + dir_vec
+    start, end = fuzzy_bisect_until_inside(center, dir_vec, yaml_data, rng)
     radius = random_radius(yaml_data, rng)
     return Line(start, end, radius)
 
@@ -99,7 +116,10 @@ def random_fiber_from_stress(yaml_config_file, data, rng):
     )
     direction = length * stress_ev[idx_new[idx], 0:2]  # 2D!
     radius = random_radius(data, rng)
-    return Line(center + direction / 2, center - direction / 2, radius)
+
+    # Clip ends
+    start, end = fuzzy_bisect_until_inside(center, direction / 2, data, rng)
+    return Line(start, end, radius)
 
 
 def load_optimization_data(filename):
@@ -180,15 +200,12 @@ def mutation(population, yaml_file_paths, data, rng):
         if to_mutate.any():
             for idx in np.argwhere(to_mutate)[0]:
                 gene = genome[idx]
-                center = rng.multivariate_normal(gene.center, cov)
-                length = rng.normal(gene.length, data_mutate["length_stddev"])
-                angle = rng.normal(
-                    gene.angle, data_mutate["rotation_stddev"] * np.pi / 180.0
-                )
                 radius = max(
                     rng.normal(gene.radius, data["fiber_radius_stddev"]), MIN_RADIUS
                 )
-                genome[idx] = Line.from_center(center, length, angle, radius)
+                start = rng.multivariate_normal(gene.start, cov)
+                end = rng.multivariate_normal(gene.end, cov)
+                genome[idx] = Line(start, end, radius)
 
 
 def selection(population, scores, data, rng):
@@ -223,14 +240,15 @@ def selection(population, scores, data, rng):
         """Return the ranks of members by summing over dominated ranks"""
         ret = np.zeros(idx.shape)
         for i in range(len(idx)):
-            ret[i] = 1 + np.sum(ranks[np.all(scores < scores[idx[i]], axis=-1)])
+            lower_ranks = ranks[np.all(scores < scores[idx[i]], axis=-1)]
+            ret[i] = 1 + np.sum(lower_ranks, where=np.isfinite(lower_ranks))
         return ret
 
     # Select Pareto fronts until selection size is reached
     # print(scores.shape)
     selection_size = int(data["population_size"])
     selected_idx = np.full(len(scores), False)
-    ranks = np.full(len(scores), 0)
+    ranks = np.full(len(scores), np.nan)
     # rank = 1
     while np.count_nonzero(selected_idx) < selection_size:
         # print(selected_idx.shape)
@@ -244,6 +262,8 @@ def selection(population, scores, data, rng):
         # ranks[reverse_idx[last_pareto]] = rank
         # rank = rank + 1
         # print(ranks)
+
+    # ranks = dominated_by_rank(np.full_like(selected_idx, True), scores, ranks)
 
     # print(reverse_idx[last_pareto])
     # print(scores[reverse_idx[last_pareto]])
@@ -280,7 +300,7 @@ def selection(population, scores, data, rng):
     # return population[selected_idx]
     return (
         [population[idx] for idx in selected_idx if idx],
-        1 / ranks[selected_idx],
+        1 / ranks,
         selected_idx,
     )
 
