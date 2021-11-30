@@ -23,12 +23,17 @@ setup(
         "ruamel.yaml",
         "scipy",
         "pandas",
+        "seaborn",
+        "meshio",
     ],
     entry_points={
         "console_scripts": [
             "generate_cell_mesh = dune.structures.gmsh:entrypoint_generate_mesh",
             "generate_tangential_derivatives = dune.structures.diffgeo:generate_tangential_derivatives",
             "structures = dune.structures.cli:cli",
+            "plot_histogram = dune.structures.plotting.histograms:entrypoint",
+            "plot_population = dune.structures.plotting.population:entrypoint",
+            "plot_mean = dune.structures.plotting.mean:entrypoint",
         ]
     },
 )

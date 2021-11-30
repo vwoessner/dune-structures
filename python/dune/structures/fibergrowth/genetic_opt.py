@@ -8,6 +8,9 @@ import multiprocessing as mp
 
 from ruamel.yaml import YAML
 
+import matplotlib.tri as mtri
+import meshio
+
 from .line import Line
 from .evaluate import (
     Fiber,
@@ -26,6 +29,7 @@ from .evaluate import (
 REGEX = r"stress {kind}: (-?[\d.]+e(?:\+|\-)?\d+)"
 
 MIN_RADIUS = 1e-4
+MIN_SCALE = 1e-3
 
 
 def transpose_bounds(x_bounds, y_bounds):
@@ -40,31 +44,60 @@ def random_radius(yaml_data, rng):
     )
 
 
-def fuzzy_bisect_until_inside(center, radius_vec, data, rng):
-    low, high = transpose_bounds(data["x_bounds"], data["y_bounds"])
-    scale_start, scale_end = 1.0, 1.0
+def get_mesh_triangulation(meshfile):
+    mesh = meshio.read(meshfile)
+    points = mesh.points
+    # NOTE: Meshio v3.3.1
+    connect = mesh.cells["triangle"]  # NOTE: Assuming triangles
+    return mtri.Triangulation(points[..., 0], points[..., 1], connect)
+
+
+def fuzzy_bisect_until_inside(center, radius_vec, data, rng, trifinder):
+    # low, high = transpose_bounds(data["x_bounds"], data["y_bounds"])
+    # scale_start, scale_end = 1.0, 1.0
+    # start = center - radius_vec
+    # end = center + radius_vec
+    # while any((start < low) | (start > high)):
+    #     scale_start = scale_start * rng.uniform()
+    #     start = center - radius_vec * scale_start
+    # while any((end < low) | (end > high)):
+    #     scale_end = scale_end * rng.uniform()
+    #     end = center - radius_vec * scale_end
     start = center - radius_vec
     end = center + radius_vec
-    while any((start < low) | (start > high)):
+    scale_start, scale_end = 1.0, 1.0
+    it = 0
+
+    while trifinder(center[0], center[1]) < 0:
+        center = start + radius_vec * rng.uniform(0.0, 2.0)
+        it = it + 1
+        if it > 9:
+            return None, None
+    while trifinder(start[0], start[1]) < 0:
         scale_start = scale_start * rng.uniform()
         start = center - radius_vec * scale_start
-    while any((end < low) | (end > high)):
+    while trifinder(end[0], end[1]) < 0:
         scale_end = scale_end * rng.uniform()
-        end = center - radius_vec * scale_end
+        end = center + radius_vec * scale_end
     return start, end
 
 
-def random_fiber(yaml_data, rng):
+def random_fiber(yaml_data, rng, trifinder):
     low, high = transpose_bounds(yaml_data["x_bounds"], yaml_data["y_bounds"])
-    start, end = rng.uniform(low, high, size=(2, 2))
-    dir_vec = (end - start) / 2
-    center = start + dir_vec
-    start, end = fuzzy_bisect_until_inside(center, dir_vec, yaml_data, rng)
+    start, end = None, None
+    while start is None and end is None:
+        start_prop, end_prop = rng.uniform(low, high, size=(2, 2))
+        dir_vec = (end_prop - start_prop) / 2
+        center = start_prop + dir_vec
+        start, end = fuzzy_bisect_until_inside(
+            center, dir_vec, yaml_data, rng, trifinder
+        )
     radius = random_radius(yaml_data, rng)
+    # print("Random fiber: ", start, end)
     return Line(start, end, radius)
 
 
-def random_fiber_from_stress(yaml_config_file, data, rng):
+def random_fiber_from_stress(yaml_config_file, data, rng, trifinder):
     # Load VTK
     directory = os.path.dirname(yaml_config_file)
     cfg = load_yaml_config(yaml_config_file)
@@ -112,13 +145,17 @@ def random_fiber_from_stress(yaml_config_file, data, rng):
     # Set Fiber
     center = points[idx_new[idx]]
     length = (
-        rng.normal(data_create["scale_mean"], data_create["scale_stddev"]) * values[idx]
+        max(
+            rng.normal(data_create["scale_mean"], data_create["scale_stddev"]),
+            MIN_SCALE,
+        )
+        * values[idx]
     )
     direction = length * stress_ev[idx_new[idx], 0:2]  # 2D!
     radius = random_radius(data, rng)
 
     # Clip ends
-    start, end = fuzzy_bisect_until_inside(center, direction / 2, data, rng)
+    start, end = fuzzy_bisect_until_inside(center, direction / 2, data, rng, trifinder)
     return Line(start, end, radius)
 
 
@@ -128,12 +165,16 @@ def load_optimization_data(filename):
         return yaml.load(file)
 
 
-def generate_initial_population(data, rng):
+def fill_random_population(population, data, rng, trifinder):
     num_fibers = rng.integers(
-        data["min_num_fibers"], data["max_num_fibers"], size=data["population_size"]
+        data["min_num_fibers"],
+        data["max_num_fibers"],
+        size=data["population_size"] - len(population),
     )
-    population = [[random_fiber(data, rng) for _ in range(num)] for num in num_fibers]
-    return population
+    # print("Filling population with {} random genomes".format(len(num_fibers)))
+    population.extend(
+        [[random_fiber(data, rng, trifinder) for _ in range(num)] for num in num_fibers]
+    )
 
 
 def crossover_single(parent1, parent2, rng):
@@ -150,13 +191,13 @@ def crossover(population, fitness, data, rng):
     # Normalize fitness
     fitness = fitness / np.sum(fitness)
     new_pop = []
-    while len(new_pop) < data["population_size"]:
+    while len(new_pop) < data["population_size"] * data["crossover_ratio"]:
         pop1, pop2 = rng.choice(population, size=2, p=fitness, replace=False)
         new_pop.extend(crossover_single(pop1, pop2, rng))
     return new_pop
 
 
-def mutation(population, yaml_file_paths, data, rng):
+def mutation(population, yaml_file_paths, data, rng, trifinder):
     data_mutation = data["mutation"]
     for genome, yaml_file in zip(population, yaml_file_paths):
         rand = rng.uniform(size=2)
@@ -172,16 +213,13 @@ def mutation(population, yaml_file_paths, data, rng):
             and len(genome) < data["max_num_fibers"]
         ):
             # Create fiber
-            # genome.append(random_fiber(data["x_bounds"], data["y_bounds"]))
-            genome.append(
-                random_fiber_from_stress(
-                    yaml_file,
-                    data,
-                    rng,
-                )
-            )
-            # Make sure created fibers are mutated (randomized)
-            fiber_created = True
+            if rng.uniform() < data_mutation["create"]["random_fiber_probability"]:
+                genome.append(random_fiber(data, rng, trifinder))
+            else:
+                genome.append(random_fiber_from_stress(yaml_file, data, rng, trifinder))
+                # Make sure that deterministically created fibers are mutated
+                # (randomized)
+                fiber_created = True
 
         # Change fibers
         rand = rng.uniform(size=len(genome))
@@ -246,7 +284,7 @@ def selection(population, scores, data, rng):
 
     # Select Pareto fronts until selection size is reached
     # print(scores.shape)
-    selection_size = int(data["population_size"])
+    selection_size = int(data["population_size"] * data["selection_ratio"])
     selected_idx = np.full(len(scores), False)
     ranks = np.full(len(scores), np.nan)
     # rank = 1
@@ -314,6 +352,13 @@ def selection(population, scores, data, rng):
 
 def evaluate_fiber_lengths(population, data):
     return [np.sum([fiber.length for fiber in genome]) for genome in population]
+
+
+def evaluate_fiber_volumes(population, data):
+    return [
+        np.sum([fiber.length * np.pi * fiber.radius ** 2 for fiber in genome])
+        for genome in population
+    ]
 
 
 def run_and_evaluate_parallel(

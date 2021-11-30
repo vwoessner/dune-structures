@@ -1,4 +1,5 @@
 import os
+import glob
 import argparse
 import subprocess
 import logging
@@ -18,16 +19,19 @@ from dune.structures.fibergrowth.evaluate import (
 )
 
 from dune.structures.fibergrowth.genetic_opt import (
-    generate_initial_population,
+    fill_random_population,
     write_population_cfgs,
     run_and_evaluate_parallel,
     selection,
     crossover,
     mutation,
     evaluate_fiber_lengths,
+    evaluate_fiber_volumes,
+    get_mesh_triangulation,
 )
 
 from dune.structures.plotting.mean import plot_mean_displacement
+from dune.structures.plotting.population import plot_population
 
 # TODO: Hardcoded path! Should be configured by CMake instead
 APP_PATH = "{}/../../../build-cmake/apps".format(os.path.dirname(__file__))
@@ -135,8 +139,15 @@ def genetic_opt(executable, input_file, logger, **kwargs):
     # Fetch the RNG
     rng = default_rng(optimization_data["seed"])
 
+    # Load the mesh triangulation (for position information)
+    tri = get_mesh_triangulation(
+        yaml_input["solver"]["grid"]["filename"].removeprefix("../")
+    )
+    trifinder = tri.get_trifinder()
+
     # Generate initial population
-    population = generate_initial_population(optimization_data, rng)
+    population = []
+    fill_random_population(population, optimization_data, rng, trifinder)
     population_old = None
     scores_old = None
 
@@ -155,7 +166,7 @@ def genetic_opt(executable, input_file, logger, **kwargs):
         stresses = run_and_evaluate_parallel(
             exe, yaml_file_paths, optimization_data, processes=8
         )
-        lengths = evaluate_fiber_lengths(population, optimization_data)
+        lengths = evaluate_fiber_volumes(population, optimization_data)
         scores = np.column_stack((stresses, lengths))
 
         # Store entire population for this round
@@ -187,7 +198,7 @@ def genetic_opt(executable, input_file, logger, **kwargs):
         fitness = fitness[select]
 
         # Write the data to a file
-        with open(os.path.join(iter_dir, "results.yml"), "w", newline="") as file:
+        with open(os.path.join(iter_dir, "results.csv"), "w", newline="") as file:
             data_sorted = data.sort_values(
                 by=["fitness", "stress"], ascending=[False, True]
             )
@@ -197,44 +208,13 @@ def genetic_opt(executable, input_file, logger, **kwargs):
         population_old = population
         scores_old = scores_to_select[select]
 
-        # Visualize population
-        lengths, stresses = scores_to_select[..., 0], scores_to_select[..., 1]
-        plt.plot(
-            lengths[~select],
-            stresses[~select],
-            "o",
-            label="removed",
-            markeredgecolor="r",
-            fillstyle="none",
-        )
-        norm = mcolors.Normalize(
-            np.amin(fitness) - 0.2 * np.ptp(fitness),
-            np.amax(fitness),
-        )
-        plt.scatter(
-            lengths[select],
-            stresses[select],
-            c=fitness,
-            cmap="Blues",
-            label="selected",
-            norm=norm,
-        )
-        # plt.yscale("log")
-        plt.axhline(np.mean(stresses[~select]), color="r")
-        plt.axhline(np.mean(stresses[select]), color="b")
-        plt.title("Population after Iteration {}".format(it))
-        plt.xlabel("Total Fiber Length [m]")
-        plt.ylabel("Stress L2-Norm [Pa]")
-        plt.legend()
-        plt.savefig("population-{:03d}.pdf".format(it))
-        plt.close()
-
         # Crossover, Mutation
         population = crossover(population, fitness, optimization_data, rng)
         # print(population)
         # NOTE: Population was already changed, stress is outdated!
         # NOTE: Maybe use mean stress?
-        mutation(population, yaml_file_paths, optimization_data, rng)
+        mutation(population, yaml_file_paths, optimization_data, rng, trifinder)
+        fill_random_population(population, optimization_data, rng, trifinder)
 
         # Shuffle genomes
         for genome in population:
@@ -243,13 +223,19 @@ def genetic_opt(executable, input_file, logger, **kwargs):
         # Retain iteration data
         data_iteration.append(data)
 
-        # Plot the mean of the 20% of best files
-        for data, outname in [
+        # Plot population
+        plot_population(
+            data, it, os.path.join(input_dir, "population-{:03d}.pdf".format(it))
+        )
+
+        # Plot the mean of the 10% of best files
+        for data_plot, outname in [
             (data_sorted, "fittest"),
-            (data.sort_values("stress", ascending=True), "lowest"),
+            (data.sort_values("stress", ascending=True), "stress-low"),
+            (data.sort_values("length", ascending=True), "fiber-low"),
         ]:
-            data = data.iloc[: int(data.shape[0] // 5)]
-            plot_yaml_paths = data["filepath"]
+            data_plot = data_plot.iloc[: int(data_plot.shape[0] // 10)]
+            plot_yaml_paths = data_plot["filepath"]
             plot_vtk_paths = [
                 os.path.splitext(path)[0] + ".vtu" for path in plot_yaml_paths
             ]
@@ -257,10 +243,18 @@ def genetic_opt(executable, input_file, logger, **kwargs):
                 plot_vtk_paths,
                 plot_yaml_paths,
                 "{}-{:03d}.pdf".format(outname, it),
-                displacement_dataset="Displacement Field_0_",
-                stress_dataset="vonmises_",
-                tri_subdiv=3,
             )
+
+        # Clean up VTK files of removed genes (only from this iteration)
+        if optimization_data["remove_vtk_files"]:
+            for file in data["filepath"].loc[
+                ~data["selected"] & (data["iteration"] == it)
+            ]:
+                os.remove(os.path.splitext(file)[0] + ".vtu")
+
+    # print("Deleting VTK output files...")
+    # for file in glob.iglob(os.path.join(input_dir, "*/*.vtu")):
+    #     os.remove(file)
 
     # Iterate:
     # Run simulations (parallel)

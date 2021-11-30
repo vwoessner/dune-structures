@@ -5,29 +5,25 @@ import matplotlib.tri as mtri
 import matplotlib.ticker as mticker
 import numpy as np
 
-from ruamel.yaml import YAML
-
 from ..vtk import VTKVertexReader
 from ..fibergrowth.evaluate import Fiber
 
-
-def load_yaml_config(filename):
-    with open(filename, "r") as file:
-        yaml = YAML(typ="safe")
-        return yaml.load(file)
+from ._utils import load_iteration_results, load_fibers
 
 
-def get_block_by_name_recursive(yaml_node, blockname):
-    for block in yaml_node:
-        if block["_blockname"] == blockname:
-            return block
-        elif "blocks" in block:
-            return get_block_by_name_recursive(block["blocks"], blockname)
-    return None
+def get_filepaths_to_plot(df, sample_size):
+    yaml_paths = df["filepath"].iloc[:sample_size]
+    vtk_paths = [os.path.splitext(path)[0] + ".vtu" for path in yaml_paths]
+    return yaml_paths, vtk_paths
 
 
 def plot_mean_displacement(
-    vtk_files, yaml_cfg_files, outfile, displacement_dataset, stress_dataset, tri_subdiv
+    vtk_files,
+    yaml_cfg_files,
+    outfile,
+    displacement_dataset="Displacement Field_0_",
+    stress_dataset="vonmises_",
+    tri_subdiv=3,
 ):
     """Plot the mean of a set of simulation outputs.
 
@@ -59,26 +55,18 @@ def plot_mean_displacement(
         stress_mean, subdiv=tri_subdiv, triinterpolator=stress_interp
     )
 
-    # Collect fiber data
-    def fetch_fibers(yaml_file_path):
-        cfg = load_yaml_config(yaml_file_path)
-        return [
-            fiber
-            for fiber in get_block_by_name_recursive(
-                cfg["solver"]["blocks"], "linearsolver_0"
-            )["operator"]["reinforced_operator"]["fibres"]
-        ]
-
     # Single list of all fibers
-    fibers = sum([fetch_fibers(file) for file in yaml_cfg_files], start=[])
+    fibers = sum([load_fibers(file) for file in yaml_cfg_files], start=[])
 
     # Create figure
-    fig, ax = plt.subplots(1, 1, constrained_layout=True)
+    fig, ax = plt.subplots(1, 1, constrained_layout=True, dpi=300)
     ax.grid(True, zorder=-10)
     locator = mticker.MaxNLocator()
 
     # Plot stress and grid
-    cb_data = ax.tricontourf(tri_ref, stress_ref, locator=locator, zorder=2)
+    cb_data = ax.tricontourf(
+        tri_ref, stress_ref, locator=locator, zorder=2, cmap="YlOrRd"
+    )
     # ax.triplot(tri, "-", linewidth=0.5, color="k", markersize=1.0, zorder=3)
 
     # Plot fibers
@@ -94,15 +82,69 @@ def plot_mean_displacement(
 
     # Colorbar
     cb = plt.colorbar(cb_data, ax=ax, orientation="vertical")
-    cb.set_label(r"Von Mises Stress $\sigma_v / \mathrm{Pa}$")
+    cb.set_label(r"Von Mises Stress $[\mathrm{Pa}]$")
 
     # Figure aesthetics
     ax.set_aspect("equal", anchor="C", adjustable="datalim")
-    ax.set_xlabel(r"Extension $x / \mathrm{m}$")
-    ax.set_ylabel(r"Extension $y / \mathrm{m}$")
+    ax.set_xlabel(r"Extension $[\mathrm{\mu m}]$")
+    ax.set_ylabel(r"Extension $[\mathrm{\mu m}]$")
 
     # Save file
     if not os.path.splitext(outfile)[1]:
         outfile += ".pdf"
     fig.savefig(outfile)
     plt.close(fig)
+
+
+def entrypoint():
+    # Parse arguments
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="DUNE STRUCTURES Population Mean Plot CLI"
+    )
+    parser.add_argument(
+        "root_dir",
+        type=os.path.realpath,
+        help="Root directory of the optimization algorithm output",
+    )
+    parser.add_argument(
+        "--extension",
+        "-e",
+        type=str,
+        help="Output file extension (without dot)",
+        default="pdf",
+    )
+    parser.add_argument(
+        "--sample-size",
+        "-n",
+        type=int,
+        help="Number of samples taken to compute the mean",
+        default=20,
+    )
+    # parser.add_argument("--plot-fittest", "-f", action="store_true")
+    # parser.add_argument("--plot-lowest-stress", "-s", action="store_true")
+    # parser.add_argument("--plot-lowest-fiber", "-l", action="store_true")
+    args = parser.parse_args()
+
+    # Load data
+    print("Loading CSV data...")
+    results = load_iteration_results(args.root_dir)
+
+    # Plot population means
+    print("Plotting means for {} iterations...".format(len(results)))
+    for i, df in enumerate(results):
+        for data_plot, outname in [
+            (df.sort_values(["fitness", "stress"], ascending=[False, True]), "fittest"),
+            (df.sort_values("stress", ascending=True), "stress-low"),
+            (df.sort_values("length", ascending=True), "fiber-low"),
+        ]:
+            yaml_paths, vtk_paths = get_filepaths_to_plot(data_plot, args.sample_size)
+            plot_mean_displacement(
+                vtk_paths,
+                yaml_paths,
+                os.path.join(
+                    args.root_dir,
+                    "{}-{:03d}.{}".format(outname, i, args.extension),
+                ),
+            )
