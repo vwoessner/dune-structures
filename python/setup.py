@@ -33,7 +33,8 @@ setup(
             "structures = dune.structures.cli:cli",
             "plot_histogram = dune.structures.plotting.histograms:entrypoint",
             "plot_population = dune.structures.plotting.population:entrypoint",
-            "plot_mean = dune.structures.plotting.mean:entrypoint",
+            "plot_mean = dune.structures.plotting.displacement:entrypoint_mean",
+            "plot_displacement = dune.structures.plotting.displacement:entrypoint_single",
         ]
     },
 )
