@@ -10,7 +10,9 @@
 #include <dune/structures/vonmises.hh>
 
 #include <dune/pdelab/gridfunctionspace/vectorgridfunctionspace.hh>
+
 #include <dune/pdelab/test/l2norm.hh>
+#include <dune/structures/lxnorm.hh>
 
 #include <filesystem>
 #include <memory>
@@ -119,8 +121,8 @@ public:
   VonMisesStressVisualizationBlock(Context& ctx, const YAML::Node& config)
     : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
     , continuous(config["continuous"].as<bool>())
-    , report_l2(config["report_l2"].as<bool>())
     , report_inf(config["report_inf"].as<bool>())
+    , report_lx(config["report_norm"].as<int>())
   {
   }
 
@@ -204,9 +206,14 @@ public:
       }
     }
 
-    if (report_l2)
+    if (report_lx > 0)
     {
-      std::cout << std::scientific << "stress l2: " << l2norm(stress, 2)
+      using DisplField = Dune::PDELab::VectorDiscreteGridFunction<
+        typename Traits::GridFunctionSpace,
+        typename Traits::Vector>;
+      auto displ_field = std::make_shared<DisplField>(*gfs, *vector);
+      std::cout << std::scientific << "stress lx: "
+                << lxnorm_trf(stress, displ_field, report_lx, 2)
                 << std::defaultfloat << std::endl;
     }
   }
@@ -222,11 +229,11 @@ public:
                    "    default: false                                  \n"
                    "    meta:                                           \n"
                    "      title: Use Continuous Interpolation           \n"
-                   "  report_l2:                                        \n"
-                   "    type: boolean                                   \n"
-                   "    default: false                                  \n"
+                   "  report_norm:                                      \n"
+                   "    type: integer                                   \n"
+                   "    default: 0                                      \n"
                    "    meta:                                           \n"
-                   "      title: Report the global L2 norm of the stress\n"
+                   "      title: Report the global LX norm of the stress\n"
                    "  report_inf:                                       \n"
                    "    type: boolean                                   \n"
                    "    default: false                                  \n"
@@ -237,7 +244,8 @@ public:
 
 private:
   Material material;
-  bool continuous, report_l2, report_inf;
+  bool continuous, report_inf;
+  int report_lx;
 
   /// Report the infinity norm of a backend vector to the terminal
   template<class BackendVector>
