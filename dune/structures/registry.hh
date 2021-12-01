@@ -23,6 +23,7 @@ auto registerStructuresBlocks = [](auto& ctx) {
   ctx.template registerBlock<PhysicalEntityVisualizationBlock>("vis_physical");
   ctx.template registerBlock<VonMisesStressVisualizationBlock>("vis_vonmises");
   ctx.template registerBlock<StressEVVisualizationBlock>("vis_stress");
+  ctx.template registerBlock<StrainEnergyDensityVisualizationBlock>("vis_energy");
 };
 
 #endif

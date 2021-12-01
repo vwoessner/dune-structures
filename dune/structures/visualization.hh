@@ -5,9 +5,10 @@
 #include <dune/blocklab/blocks/enableif.hh>
 #include <dune/blocklab/blocks/visualization.hh>
 #include <dune/blocklab/utilities/yaml.hh>
+#include <dune/structures/gridfunctionadapters/strainenergydensity.hh>
+#include <dune/structures/gridfunctionadapters/stress.hh>
+#include <dune/structures/gridfunctionadapters/vonmises.hh>
 #include <dune/structures/material.hh>
-#include <dune/structures/stress.hh>
-#include <dune/structures/vonmises.hh>
 
 #include <dune/pdelab/gridfunctionspace/vectorgridfunctionspace.hh>
 
@@ -16,8 +17,19 @@
 
 #include <filesystem>
 #include <memory>
+#include <string_view>
 #include <variant>
 #include <vector>
+
+/// Report the infinity norm of a backend vector to the terminal
+template<class BackendVector>
+void
+report_inf_to_cout(const std::shared_ptr<BackendVector> vec,
+                   std::string_view name)
+{
+  std::cout << std::scientific << name << " inf: " << vec->infinity_norm()
+            << std::defaultfloat << std::endl;
+}
 
 template<typename P, typename V>
 class PhysicalEntityVisualizationBlock : public Dune::BlockLab::BlockBase<P, V>
@@ -87,6 +99,126 @@ public:
                    "category: visualization                             \n");
     return data;
   }
+};
+
+template<typename P,
+         typename V,
+         std::size_t i,
+         typename enabled = Dune::BlockLab::disabled>
+class StrainEnergyDensityVisualizationBlock
+  : public Dune::BlockLab::DisabledBlock<P, V, i>
+{
+public:
+  template<typename Context>
+  StrainEnergyDensityVisualizationBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::DisabledBlock<P, V, i>(ctx, config)
+  {
+  }
+};
+
+template<typename P, typename V, std::size_t i>
+class StrainEnergyDensityVisualizationBlock<
+  P,
+  V,
+  i,
+  Dune::BlockLab::enableBlock<Dune::BlockLab::isDimPower<P, V, i>()>>
+  : public Dune::BlockLab::BlockBase<P, V, i>
+{
+public:
+  using Traits = Dune::BlockLab::BlockTraits<P, V, i>;
+  using Material =
+    std::shared_ptr<ElasticMaterialBase<typename Traits::EntitySet, double>>;
+
+  template<typename Context>
+  StrainEnergyDensityVisualizationBlock(Context& ctx, const YAML::Node& config)
+    : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
+    , report_inf(config["report_inf"].as<bool>())
+    , report_lx(config["report_norm"].as<int>())
+  {
+  }
+
+  virtual ~StrainEnergyDensityVisualizationBlock() = default;
+
+  virtual void update_parameter(std::string name,
+                                typename Traits::Parameter param) override
+  {
+    if (name == "material")
+      material = std::get<Material>(param);
+  }
+
+  virtual void apply() override
+  {
+    auto vector = this->solver->template getVector<i>();
+    auto es = vector->gridFunctionSpace().entitySet();
+    auto gfs = vector->gridFunctionSpaceStorage();
+    gfs->ordering();
+
+    // A grid function for the stress
+    StrainEnergyDensityFunction<typename Traits::Vector> energy(*vector,
+                                                                material);
+
+    // Interpolate the stress into a grid function
+    using P1FEM =
+      Dune::PDELab::PkLocalFiniteElementMap<typename Traits::EntitySet,
+                                            double,
+                                            typename Traits::Range,
+                                            1>;
+    auto p1fem = std::make_shared<P1FEM>(es);
+    using P1GFS =
+      Dune::PDELab::GridFunctionSpace<typename Traits::EntitySet,
+                                      P1FEM,
+                                      Dune::PDELab::NoConstraints,
+                                      typename Traits::VectorBackend>;
+    auto p1gfs = std::make_shared<P1GFS>(es, p1fem);
+    using StressVector =
+      Dune::PDELab::Backend::Vector<P1GFS, typename Traits::ctype>;
+    auto energy_container = std::make_shared<StressVector>(p1gfs);
+
+    Dune::PDELab::interpolate(energy, *p1gfs, *energy_container);
+    std::dynamic_pointer_cast<Dune::BlockLab::VisualizationBlock<P, V>>(
+      this->parent)
+      ->add_dataset(energy_container, "strain_energy_density");
+
+    if (report_inf)
+    {
+      report_inf_to_cout(energy_container, "energy");
+    }
+
+    if (report_lx > 0)
+    {
+      using DisplField = Dune::PDELab::VectorDiscreteGridFunction<
+        typename Traits::GridFunctionSpace,
+        typename Traits::Vector>;
+      auto displ_field = std::make_shared<DisplField>(*gfs, *vector);
+      std::cout << std::scientific << "energy lx: "
+                << lxnorm_trf(energy, displ_field, report_lx, 2)
+                << std::defaultfloat << std::endl;
+    }
+  }
+
+  static std::vector<std::string> blockData()
+  {
+    auto data = Dune::BlockLab::BlockBase<P, V, i>::blockData();
+    data.push_back("title: Strain Energy Density Visualization          \n"
+                   "category: visualization                             \n"
+                   "schema:                                             \n"
+                   "  report_norm:                                      \n"
+                   "    type: integer                                   \n"
+                   "    default: 0                                      \n"
+                   "    meta:                                           \n"
+                   "      title: Report the global LX norm of the stress\n"
+                   "  report_inf:                                       \n"
+                   "    type: boolean                                   \n"
+                   "    default: false                                  \n"
+                   "    meta:                                           \n"
+                   "      title: Report the infinity norm of the stress \n");
+    return data;
+  }
+
+private:
+  Material material;
+  bool report_inf;
+  int report_lx;
 };
 
 template<typename P,
@@ -172,7 +304,7 @@ public:
 
       if (report_inf)
       {
-        report_inf_to_cout(stress_container);
+        report_inf_to_cout(stress_container, "stress");
       }
     }
     else
@@ -202,7 +334,7 @@ public:
 
       if (report_inf)
       {
-        report_inf_to_cout(stress_container);
+        report_inf_to_cout(stress_container, "stress");
       }
     }
 
@@ -246,14 +378,6 @@ private:
   Material material;
   bool continuous, report_inf;
   int report_lx;
-
-  /// Report the infinity norm of a backend vector to the terminal
-  template<class BackendVector>
-  void report_inf_to_cout(const std::shared_ptr<BackendVector> vec)
-  {
-    std::cout << std::scientific << "stress inf: " << vec->infinity_norm()
-              << std::defaultfloat << std::endl;
-  }
 };
 
 template<typename P, typename V>
