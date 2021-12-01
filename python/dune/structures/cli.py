@@ -30,7 +30,7 @@ from dune.structures.fibergrowth.genetic_opt import (
     get_mesh_triangulation,
 )
 
-from dune.structures.plotting.mean import plot_mean_displacement
+from dune.structures.plotting.displacement import plot_mean_displacement
 from dune.structures.plotting.population import plot_population
 
 # TODO: Hardcoded path! Should be configured by CMake instead
