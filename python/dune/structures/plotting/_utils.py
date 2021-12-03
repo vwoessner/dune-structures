@@ -35,9 +35,10 @@ def load_iteration_results(root_dir, results_file="results.csv"):
 def load_fibers(yaml_file_path):
     """Load the fiber information from a run config file"""
     cfg = load_yaml_config(yaml_file_path)
-    return [
-        fiber
-        for fiber in get_block_by_name_recursive(
-            cfg["solver"]["blocks"], "linearsolver_0"
-        )["operator"]["reinforced_operator"]["fibres"]
-    ]
+    fiber_block = get_block_by_name_recursive(
+        cfg["solver"]["blocks"], "linearsolver_0"
+    )["operator"]["reinforced_operator"]["fibres"]
+    if fiber_block is not None:
+        return [fiber for fiber in fiber_block]
+    else:
+        return []

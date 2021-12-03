@@ -44,6 +44,7 @@ def plot_displacement(
     outfile,
     tri_subdiv=3,
     plot_grid=True,
+    fiber_alpha=1.0,
 ):
     # Triangulate, interpolate, and refine
     points_displ = points + displacement
@@ -73,7 +74,7 @@ def plot_displacement(
         y_vals = np.linspace(fiber["start"][1], fiber["end"][1], 100)
         x_vals_displ = x_vals + displ_interp_x(x_vals, y_vals)
         y_vals_displ = y_vals + displ_interp_y(x_vals, y_vals)
-        ax.plot(x_vals_displ, y_vals_displ, color="k", zorder=5, alpha=0.1)
+        ax.plot(x_vals_displ, y_vals_displ, color="k", zorder=5, alpha=fiber_alpha)
 
     # Colorbar
     cb = plt.colorbar(cb_data, ax=ax, orientation="vertical")
@@ -127,6 +128,7 @@ def plot_mean_displacement(
         outfile,
         tri_subdiv,
         plot_grid=False,
+        fiber_alpha=0.1,
     )
 
 
