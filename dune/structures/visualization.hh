@@ -133,7 +133,7 @@ public:
   StrainEnergyDensityVisualizationBlock(Context& ctx, const YAML::Node& config)
     : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
     , report_inf(config["report_inf"].as<bool>())
-    , report_lx(config["report_norm"].as<int>())
+    , report_lx(config["report_norm"].as<std::vector<int>>())
   {
   }
 
@@ -184,15 +184,15 @@ public:
       report_inf_to_cout(energy_container, "energy");
     }
 
-    if (report_lx > 0)
+    for (auto norm : report_lx)
     {
       using DisplField = Dune::PDELab::VectorDiscreteGridFunction<
         typename Traits::GridFunctionSpace,
         typename Traits::Vector>;
       auto displ_field = std::make_shared<DisplField>(*gfs, *vector);
-      std::cout << std::scientific << "energy lx: "
-                << lxnorm_trf(energy, displ_field, report_lx, 2)
-                << std::defaultfloat << std::endl;
+      std::cout << std::scientific << "energy l" << std::to_string(norm) << ": "
+                << lxnorm_trf(energy, displ_field, norm, 2) << std::defaultfloat
+                << std::endl;
     }
   }
 
@@ -203,8 +203,10 @@ public:
                    "category: visualization                             \n"
                    "schema:                                             \n"
                    "  report_norm:                                      \n"
-                   "    type: integer                                   \n"
-                   "    default: 0                                      \n"
+                   "    type: list                                      \n"
+                   "    default: []                                     \n"
+                   "    schema:                                         \n"
+                   "      type: integer                                 \n"
                    "    meta:                                           \n"
                    "      title: Report the global LX norm of the stress\n"
                    "  report_inf:                                       \n"
@@ -218,7 +220,7 @@ public:
 private:
   Material material;
   bool report_inf;
-  int report_lx;
+  std::vector<int> report_lx;
 };
 
 template<typename P,
@@ -254,7 +256,7 @@ public:
     : Dune::BlockLab::BlockBase<P, V, i>(ctx, config)
     , continuous(config["continuous"].as<bool>())
     , report_inf(config["report_inf"].as<bool>())
-    , report_lx(config["report_norm"].as<int>())
+    , report_lx(config["report_norm"].as<std::vector<int>>())
   {
   }
 
@@ -338,15 +340,15 @@ public:
       }
     }
 
-    if (report_lx > 0)
+    for (auto norm : report_lx)
     {
       using DisplField = Dune::PDELab::VectorDiscreteGridFunction<
         typename Traits::GridFunctionSpace,
         typename Traits::Vector>;
       auto displ_field = std::make_shared<DisplField>(*gfs, *vector);
-      std::cout << std::scientific << "stress lx: "
-                << lxnorm_trf(stress, displ_field, report_lx, 2)
-                << std::defaultfloat << std::endl;
+      std::cout << std::scientific << "stress l" << std::to_string(norm) << ": "
+                << lxnorm_trf(stress, displ_field, norm, 2) << std::defaultfloat
+                << std::endl;
     }
   }
 
@@ -362,8 +364,10 @@ public:
                    "    meta:                                           \n"
                    "      title: Use Continuous Interpolation           \n"
                    "  report_norm:                                      \n"
-                   "    type: integer                                   \n"
-                   "    default: 0                                      \n"
+                   "    type: list                                      \n"
+                   "    default: []                                     \n"
+                   "    schema:                                         \n"
+                   "      type: integer                                 \n"
                    "    meta:                                           \n"
                    "      title: Report the global LX norm of the stress\n"
                    "  report_inf:                                       \n"
@@ -377,7 +381,7 @@ public:
 private:
   Material material;
   bool continuous, report_inf;
-  int report_lx;
+  std::vector<int> report_lx;
 };
 
 template<typename P, typename V>
