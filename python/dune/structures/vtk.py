@@ -22,7 +22,7 @@ class VTKUnstructuredGridReader:
 
 
 class VTKVertexReader(VTKUnstructuredGridReader, Mapping):
-    def __init__(self, filepath):
+    def __init__(self, filepath, ensure_anticlockwise_points=False):
         # Load the grid
         super().__init__(filepath)
 
@@ -41,14 +41,32 @@ class VTKVertexReader(VTKUnstructuredGridReader, Mapping):
             [
                 connect_array.GetTuple(idx)
                 for idx in range(cell_array.GetNumberOfConnectivityIds())
-            ]
+            ],
+            dtype=int,
         )[self._unique_idx_inv]
+
+        # Print offsets
+        # offsets = cell_array.GetOffsetsArray()
+        # print([offsets.GetTuple(idx) for idx in range(cell_array.GetNumberOfOffsets())])
 
         # NOTE: Assuming triangles!
         self._connectivity = np.reshape(self._connectivity, (-1, 3))
 
+        # Order connectivity data
+        if ensure_anticlockwise_points:
+            for idx in range(self._connectivity.shape[0]):
+                idx_sort = np.argsort(
+                    self._center_arc(self._points[self._connectivity[idx]])
+                )
+                self._connectivity[idx] = self._connectivity[idx, idx_sort]
+
         # Prepare access to data
         self._point_data = self._grid.GetPointData()
+
+    def _center_arc(self, coordinates):
+        center = np.mean(coordinates, axis=0)
+        rad_vec = coordinates - center
+        return np.arctan2(rad_vec[..., 1], rad_vec[..., 0])
 
     def __len__(self):
         return self._point_data.GetNumberOfArrays()
