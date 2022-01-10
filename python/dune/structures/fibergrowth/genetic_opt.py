@@ -82,6 +82,41 @@ def fuzzy_bisect_until_inside(center, radius_vec, data, rng, trifinder):
     return start, end
 
 
+def clamp_to_geometry_bounds(center, radius_vec, data, rng, trifinder):
+    """Extend or contract the fiber such that it ends close to the mesh boundary"""
+    # Do not accept center outside geometry
+    while trifinder(center[0], center[1]) < 0:
+        return None, None
+
+    # Find start/end positions
+    start = center - radius_vec
+    end = center + radius_vec
+    scale_start, scale_end = 1.0, 1.0
+
+    # Extend until outside
+    while trifinder(start[0], start[1]) >= 0:
+        scale_start = scale_start * 2
+        start = center - radius_vec * scale_start
+    while trifinder(end[0], end[1]) >= 0:
+        scale_end = scale_end * 2
+        end = center + radius_vec * scale_end
+
+    def bisect(begin, center, iterations):
+        """Bisect for a fixed number of iterations."""
+        bisect_far = begin
+        bisect_near = center
+        mid = np.mean([bisect_far, bisect_near], axis=0)
+        for _ in range(iterations):
+            if trifinder(mid[0], mid[1]) < 0:  # Outside
+                bisect_far = mid
+            else:  # Inside
+                bisect_near = mid
+            mid = np.mean([bisect_far, bisect_near], axis=0)
+        return mid
+
+    return bisect(start, center, 5), bisect(end, center, 5)
+
+
 def random_fiber(yaml_data, rng, trifinder):
     low, high = transpose_bounds(yaml_data["x_bounds"], yaml_data["y_bounds"])
     start, end = None, None
@@ -89,7 +124,7 @@ def random_fiber(yaml_data, rng, trifinder):
         start_prop, end_prop = rng.uniform(low, high, size=(2, 2))
         dir_vec = (end_prop - start_prop) / 2
         center = start_prop + dir_vec
-        start, end = fuzzy_bisect_until_inside(
+        start, end = clamp_to_geometry_bounds(
             center, dir_vec, yaml_data, rng, trifinder
         )
     radius = random_radius(yaml_data, rng)
@@ -155,7 +190,7 @@ def random_fiber_from_stress(yaml_config_file, data, rng, trifinder):
     radius = random_radius(data, rng)
 
     # Clip ends
-    start, end = fuzzy_bisect_until_inside(center, direction / 2, data, rng, trifinder)
+    start, end = clamp_to_geometry_bounds(center, direction / 2, data, rng, trifinder)
     return Line(start, end, radius)
 
 
