@@ -48,8 +48,25 @@ def get_mesh_triangulation(meshfile):
     mesh = meshio.read(meshfile)
     points = mesh.points
     # NOTE: Meshio v3.3.1
-    connect = mesh.cells["triangle"]  # NOTE: Assuming triangles
-    return mtri.Triangulation(points[..., 0], points[..., 1], connect)
+    # NOTE: Assuming triangles
+    connect = mesh.cells["triangle"]
+    media = mesh.cell_data["triangle"]["gmsh:physical"]
+    return mtri.Triangulation(points[..., 0], points[..., 1], connect), media
+
+
+def verify_fiber_medium_exclusion(
+    start, end, excluded_media, media, trifinder, prec=100
+):
+    if start is None or end is None:
+        return False
+    x_points = np.linspace(start[0], end[0], prec)
+    y_points = np.linspace(start[1], end[1], prec)
+    cells = trifinder(x_points, y_points)
+    fiber_media = media[cells]
+    for m in fiber_media:
+        if m in excluded_media:
+            return False
+    return True
 
 
 def fuzzy_bisect_until_inside(center, radius_vec, data, rng, trifinder):
@@ -117,7 +134,7 @@ def clamp_to_geometry_bounds(center, radius_vec, data, rng, trifinder):
     return bisect(start, center, 5), bisect(end, center, 5)
 
 
-def random_fiber(yaml_data, rng, trifinder):
+def random_fiber(yaml_data, rng, trifinder, media):
     low, high = transpose_bounds(yaml_data["x_bounds"], yaml_data["y_bounds"])
     start, end = None, None
     while start is None and end is None:
@@ -127,12 +144,16 @@ def random_fiber(yaml_data, rng, trifinder):
         start, end = clamp_to_geometry_bounds(
             center, dir_vec, yaml_data, rng, trifinder
         )
+        if not verify_fiber_medium_exclusion(
+            start, end, yaml_data["excluded_media"], media, trifinder
+        ):
+            start, end = None, None
     radius = random_radius(yaml_data, rng)
     # print("Random fiber: ", start, end)
     return Line(start, end, radius)
 
 
-def random_fiber_from_stress(yaml_config_file, data, rng, trifinder):
+def random_fiber_from_stress(yaml_config_file, data, rng, trifinder, media):
     # Load VTK
     directory = os.path.dirname(yaml_config_file)
     cfg = load_yaml_config(yaml_config_file)
@@ -170,28 +191,48 @@ def random_fiber_from_stress(yaml_config_file, data, rng, trifinder):
         idx_new.append(np.argmin(distances))
 
     # Random selection with magnitude as weight
-    idx = rng.choice(
+    indices_select = rng.choice(
         list(range(len(idx_new))),
+        size=len(idx_new),
         p=np.sqrt(values) / np.sum(np.sqrt(values)),  # Scaling!
         replace=False,
         shuffle=False,
     )
 
-    # Set Fiber
-    center = points[idx_new[idx]]
-    length = (
-        max(
-            rng.normal(data_create["scale_mean"], data_create["scale_stddev"]),
-            MIN_SCALE,
+    for idx in indices_select:
+        # Set Fiber
+        center = points[idx_new[idx]]
+        length = (
+            max(
+                rng.normal(data_create["scale_mean"], data_create["scale_stddev"]),
+                MIN_SCALE,
+            )
+            * values[idx]
         )
-        * values[idx]
-    )
-    direction = length * stress_ev[idx_new[idx], 0:2]  # 2D!
-    radius = random_radius(data, rng)
+        direction = length * stress_ev[idx_new[idx], 0:2]  # 2D!
+        radius = random_radius(data, rng)
 
-    # Clip ends
-    start, end = clamp_to_geometry_bounds(center, direction / 2, data, rng, trifinder)
-    return Line(start, end, radius)
+        # Clip ends
+        start, end = clamp_to_geometry_bounds(
+            center, direction / 2, data, rng, trifinder
+        )
+
+        # Check media traversal
+        if verify_fiber_medium_exclusion(
+            start, end, data["excluded_media"], media, trifinder
+        ):
+            break
+
+    if idx == indices_select[-1] and not verify_fiber_medium_exclusion(
+        start, end, data["excluded_media"], media, trifinder
+    ):
+        print(
+            "Falling back to random fiber generation after stress-based generation failed!"
+        )
+        return random_fiber(data, rng, trifinder, media)
+
+    else:
+        return Line(start, end, radius)
 
 
 def load_optimization_data(filename):
@@ -200,7 +241,7 @@ def load_optimization_data(filename):
         return yaml.load(file)
 
 
-def fill_random_population(population, data, rng, trifinder):
+def fill_random_population(population, data, rng, trifinder, media):
     num_fibers = rng.integers(
         data["min_num_fibers"],
         data["max_num_fibers"],
@@ -208,7 +249,10 @@ def fill_random_population(population, data, rng, trifinder):
     )
     # print("Filling population with {} random genomes".format(len(num_fibers)))
     population.extend(
-        [[random_fiber(data, rng, trifinder) for _ in range(num)] for num in num_fibers]
+        [
+            [random_fiber(data, rng, trifinder, media) for _ in range(num)]
+            for num in num_fibers
+        ]
     )
 
 
@@ -232,7 +276,7 @@ def crossover(population, fitness, data, rng):
     return new_pop
 
 
-def mutation(population, yaml_file_paths, data, rng, trifinder):
+def mutation(population, yaml_file_paths, data, rng, trifinder, media):
     data_mutation = data["mutation"]
     for genome, yaml_file in zip(population, yaml_file_paths):
         rand = rng.uniform(size=2)
@@ -249,9 +293,11 @@ def mutation(population, yaml_file_paths, data, rng, trifinder):
         ):
             # Create fiber
             if rng.uniform() < data_mutation["create"]["random_fiber_probability"]:
-                genome.append(random_fiber(data, rng, trifinder))
+                genome.append(random_fiber(data, rng, trifinder, media))
             else:
-                genome.append(random_fiber_from_stress(yaml_file, data, rng, trifinder))
+                genome.append(
+                    random_fiber_from_stress(yaml_file, data, rng, trifinder, media)
+                )
                 # Make sure that deterministically created fibers are mutated
                 # (randomized)
                 fiber_created = True
@@ -451,9 +497,17 @@ def genome_to_cfg(yaml_cfg, genome):
         )._asdict()
         for fiber in genome
     ]
+    try:
+        default_fibers = list(
+            get_block_by_name(yaml_cfg, "linearsolver_0")["operator"][
+                "reinforced_operator"
+            ]["fibres"]
+        )
+    except TypeError:
+        default_fibers = []
     get_block_by_name(yaml_cfg, "linearsolver_0")["operator"]["reinforced_operator"][
         "fibres"
-    ] = fibers
+    ] = (default_fibers + fibers)
 
 
 def write_population_cfgs(directory, filename_base, default_yaml_cfg, population):

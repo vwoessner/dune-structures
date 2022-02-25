@@ -140,14 +140,14 @@ def genetic_opt(executable, input_file, logger, **kwargs):
     rng = default_rng(optimization_data["seed"])
 
     # Load the mesh triangulation (for position information)
-    tri = get_mesh_triangulation(
+    tri, media = get_mesh_triangulation(
         yaml_input["solver"]["grid"]["filename"].removeprefix("../")
     )
     trifinder = tri.get_trifinder()
 
     # Generate initial population
     population = []
-    fill_random_population(population, optimization_data, rng, trifinder)
+    fill_random_population(population, optimization_data, rng, trifinder, media)
     population_old = None
     scores_old = None
 
@@ -213,8 +213,8 @@ def genetic_opt(executable, input_file, logger, **kwargs):
         # print(population)
         # NOTE: Population was already changed, stress is outdated!
         # NOTE: Maybe use mean stress?
-        mutation(population, yaml_file_paths, optimization_data, rng, trifinder)
-        fill_random_population(population, optimization_data, rng, trifinder)
+        mutation(population, yaml_file_paths, optimization_data, rng, trifinder, media)
+        fill_random_population(population, optimization_data, rng, trifinder, media)
 
         # Shuffle genomes
         for genome in population:

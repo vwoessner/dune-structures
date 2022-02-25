@@ -9,14 +9,9 @@ import numpy as np
 from ..vtk import VTKVertexReader
 from ..fibergrowth.evaluate import Fiber
 
-from ._utils import load_iteration_results, load_fibers
+from ._utils import load_iteration_results, load_fibers, get_filepaths_to_plot
 
-
-def get_filepaths_to_plot(df, sample_size):
-    yaml_paths = df["filepath"].iloc[:sample_size]
-    vtk_paths = [os.path.splitext(path)[0] + ".vtu" for path in yaml_paths]
-    return yaml_paths, vtk_paths
-
+# plt.style.use('dark_background')
 
 def load_data(
     vtk_file,
@@ -64,7 +59,9 @@ def plot_displacement(
         tri_ref, stress_ref, locator=locator, zorder=2, cmap="YlOrRd"
     )
     if plot_grid:
-        ax.triplot(tri, "-", linewidth=0.5, color="k", markersize=1.0, zorder=3)
+        ax.triplot(
+            tri, "-", linewidth=0.5, color="k", markersize=1.0, zorder=3, alpha=0.8
+        )
 
     tri = mtri.Triangulation(points[..., 0], points[..., 1], connectivity)
     displ_interp_x = mtri.LinearTriInterpolator(tri, displacement[..., 0])
@@ -161,6 +158,7 @@ def entrypoint_single():
     )
     parser.add_argument(
         "--yaml-input-file",
+        "-i",
         help="Input file of simulation containing fiber location data",
         type=os.path.realpath,
     )
@@ -199,7 +197,7 @@ def entrypoint_single():
                 # Manipulate stored arguments
                 args.input_file = file
                 args.yaml_input_file = filepath + ".yml"
-                args.output_file = filepath + ".pdf"
+                args.output_file = filepath + ".png"
                 plot_displacement(
                     outfile=args.output_file,
                     tri_subdiv=args.contour_ref,

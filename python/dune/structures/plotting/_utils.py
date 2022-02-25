@@ -5,6 +5,12 @@ from ruamel.yaml import YAML
 import pandas as pd
 
 
+def get_filepaths_to_plot(df, sample_size):
+    yaml_paths = df["filepath"].iloc[:sample_size]
+    vtk_paths = [os.path.splitext(path)[0] + ".vtu" for path in yaml_paths]
+    return yaml_paths, vtk_paths
+
+
 def load_yaml_config(filename):
     with open(filename, "r") as file:
         yaml = YAML(typ="safe")
@@ -32,13 +38,13 @@ def load_iteration_results(root_dir, results_file="results.csv"):
     ]
 
 
-def load_fibers(yaml_file_path):
+def load_fibers(yaml_file_path, ignore_first=0):
     """Load the fiber information from a run config file"""
     cfg = load_yaml_config(yaml_file_path)
     fiber_block = get_block_by_name_recursive(
         cfg["solver"]["blocks"], "linearsolver_0"
     )["operator"]["reinforced_operator"]["fibres"]
     if fiber_block is not None:
-        return [fiber for fiber in fiber_block]
+        return [fiber for fiber in fiber_block[ignore_first:]]
     else:
         return []
