@@ -35,6 +35,7 @@ setup(
             "plot_population = dune.structures.plotting.population:entrypoint",
             "plot_mean = dune.structures.plotting.displacement:entrypoint_mean",
             "plot_displacement = dune.structures.plotting.displacement:entrypoint_single",
+            "plot_density = dune.structures.plotting.density:entrypoint",
         ]
     },
 )
