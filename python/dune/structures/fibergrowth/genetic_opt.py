@@ -134,6 +134,24 @@ def clamp_to_geometry_bounds(center, radius_vec, data, rng, trifinder):
     return bisect(start, center, 5), bisect(end, center, 5)
 
 
+def random_default_fibers(yaml_data, rng):
+    return [
+        Line(
+            fiber["start"],
+            fiber["end"],
+            radius=max(
+                rng.normal(
+                    fiber.get("radius", yaml_data["fiber_radius_mean"]),
+                    yaml_data["fiber_radius_stddev"],
+                ),
+                MIN_RADIUS,
+            ),
+            default=fiber.get("default", True),
+        )
+        for fiber in yaml_data["default_fibers"]
+    ]
+
+
 def random_fiber(yaml_data, rng, trifinder, media):
     low, high = transpose_bounds(yaml_data["x_bounds"], yaml_data["y_bounds"])
     start, end = None, None
@@ -250,13 +268,18 @@ def fill_random_population(population, data, rng, trifinder, media):
     # print("Filling population with {} random genomes".format(len(num_fibers)))
     population.extend(
         [
-            [random_fiber(data, rng, trifinder, media) for _ in range(num)]
+            random_default_fibers(data, rng)
+            + [random_fiber(data, rng, trifinder, media) for _ in range(num)]
             for num in num_fibers
         ]
     )
 
 
 def crossover_single(parent1, parent2, rng):
+    # Split off default fibers, creating new lists
+    # parent1 = [fib for fib in parent1 if not fib.get("default", False)]
+    # parent2 = [fib for fib in parent2 if not fib.get("default", False)]
+
     cross_point = rng.integers(1, min(len(parent1), len(parent2)))
     # print("Crossover point: {}".format(cross_point))
     child1 = list(parent1[:cross_point]) + list(parent2[cross_point:])
@@ -279,17 +302,19 @@ def crossover(population, fitness, data, rng):
 def mutation(population, yaml_file_paths, data, rng, trifinder, media):
     data_mutation = data["mutation"]
     for genome, yaml_file in zip(population, yaml_file_paths):
+        genome_stripped = [fiber for fiber in genome if not fiber.default]
         rand = rng.uniform(size=2)
         fiber_created = False
         if (
             rand[1] < data_mutation["fiber_delete_probability"]
-            and len(genome) > data["min_num_fibers"]
+            and len(genome_stripped) > data["min_num_fibers"]
         ):
             # Delete random fiber
-            genome.pop(rng.integers(0, len(genome)))
+            idx = rng.integers(0, len(genome_stripped))
+            genome.remove(genome_stripped[idx])
         if (
             rand[0] < data_mutation["fiber_create_probability"]
-            and len(genome) < data["max_num_fibers"]
+            and len(genome_stripped) < data["max_num_fibers"]
         ):
             # Create fiber
             if rng.uniform() < data_mutation["create"]["random_fiber_probability"]:
@@ -322,9 +347,12 @@ def mutation(population, yaml_file_paths, data, rng, trifinder, media):
                 radius = max(
                     rng.normal(gene.radius, data["fiber_radius_stddev"]), MIN_RADIUS
                 )
-                start = rng.multivariate_normal(gene.start, cov)
-                end = rng.multivariate_normal(gene.end, cov)
-                genome[idx] = Line(start, end, radius)
+                if not gene.default:
+                    start = rng.multivariate_normal(gene.start, cov)
+                    end = rng.multivariate_normal(gene.end, cov)
+                else:
+                    start, end = gene.start, gene.end
+                genome[idx] = Line(start, end, radius, gene.default)
 
 
 def selection(population, scores, data, rng):
@@ -493,21 +521,22 @@ def genome_to_cfg(yaml_cfg, genome):
             start=[fiber.start.item(i) for i in range(2)],
             end=[fiber.end.item(i) for i in range(2)],
             radius=fiber.radius,
+            default=fiber.default,
             **yaml_cfg["genetic_optimization"]["fibers"]
         )._asdict()
         for fiber in genome
     ]
-    try:
-        default_fibers = list(
-            get_block_by_name(yaml_cfg, "linearsolver_0")["operator"][
-                "reinforced_operator"
-            ]["fibres"]
-        )
-    except TypeError:
-        default_fibers = []
+    # try:
+    #     default_fibers = list(
+    #         get_block_by_name(yaml_cfg, "linearsolver_0")["operator"][
+    #             "reinforced_operator"
+    #         ]["fibres"]
+    #     )
+    # except TypeError:
+    #     default_fibers = []
     get_block_by_name(yaml_cfg, "linearsolver_0")["operator"]["reinforced_operator"][
         "fibres"
-    ] = (default_fibers + fibers)
+    ] = fibers
 
 
 def write_population_cfgs(directory, filename_base, default_yaml_cfg, population):

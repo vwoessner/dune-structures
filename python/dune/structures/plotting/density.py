@@ -42,7 +42,7 @@ def plot_fiber_density(
     trifinder = tri.get_trifinder()
 
     # Compute fiber density for every triangle
-    density = np.zeros((len(connect)), dtype=np.int64)
+    density = np.zeros((len(connect)), dtype=np.float64)
     for fiber in fibers:
         # Store all triangles this fiber crosses
         x_vals = np.linspace(fiber["start"][0], fiber["end"][0], prec)
@@ -50,13 +50,13 @@ def plot_fiber_density(
         triangles = set(trifinder(x_vals, y_vals))
         triangles.discard(-1)
         triangles = list(triangles)
-        density[triangles] = density[triangles] + 1
+        # density[triangles] = density[triangles] + 1
+        density[triangles] = density[triangles] + fiber["radius"] ** 2
     density = np.true_divide(density, np.max(density), dtype=np.float64)
 
     # Create Polygon collection
     polys = mcol.PolyCollection(
-        [points_displ[c] for c in connect], closed=False, cmap="viridis",
-        zorder=3
+        [points_displ[c] for c in connect], closed=False, cmap="viridis", zorder=3
     )
     polys.set_array(density)
 
@@ -153,5 +153,5 @@ def entrypoint():
                     outdir,
                     "{}-{:03d}.{}".format(outname, i, args.extension),
                 ),
-                prec=args.precision
+                prec=args.precision,
             )

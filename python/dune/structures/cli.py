@@ -217,8 +217,12 @@ def genetic_opt(executable, input_file, logger, **kwargs):
         fill_random_population(population, optimization_data, rng, trifinder, media)
 
         # Shuffle genomes
-        for genome in population:
-            rng.shuffle(genome)
+        for idx, genome in enumerate(population):
+            # Exclude default fibers from shuffling, and place default fibers first
+            default_fibers = [fiber for fiber in genome if fiber.default]
+            other_fibers = [fiber for fiber in genome if not fiber.default]
+            rng.shuffle(other_fibers)
+            population[idx] = default_fibers + other_fibers
 
         # Retain iteration data
         data_iteration.append(data)

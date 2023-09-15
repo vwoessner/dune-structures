@@ -16,7 +16,11 @@ from dune.structures import VTKVertexReader, VTKCellReader
 from dune.structures.fibergrowth.line import Line, three_line_integral, angle_between
 
 
-Fiber = namedtuple("Fiber", ["start", "end", "radius", "youngs_modulus", "prestress"])
+Fiber = namedtuple(
+    "Fiber",
+    ["start", "end", "radius", "youngs_modulus", "prestress", "default"],
+    defaults=[False],
+)
 
 
 def get_block_by_name(yaml_data, blockname):

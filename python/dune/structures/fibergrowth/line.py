@@ -62,7 +62,7 @@ def three_line_integral(line_ref, line1, line2):
 
 
 class Line:
-    def __init__(self, start, end, radius):
+    def __init__(self, start, end, radius, default=False):
         start = np.array(start)
         end = np.array(end)
         if start.shape != end.shape:
@@ -76,6 +76,7 @@ class Line:
 
         self.start = start
         self.end = end
+        self.default = default
 
         self.radius = float(radius)
         if self.radius < 0:
