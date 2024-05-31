@@ -1,1 +1,2 @@
 add_subdirectory(solversteps)
+add_subdirectory(gridfunctionadapters)
