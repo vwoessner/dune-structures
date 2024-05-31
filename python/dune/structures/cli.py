@@ -34,7 +34,7 @@ from dune.structures.plotting.displacement import plot_mean_displacement
 from dune.structures.plotting.population import plot_population
 
 # TODO: Hardcoded path! Should be configured by CMake instead
-APP_PATH = "{}/../../../../../release-build-fibergrowth/dune-structures/apps".format(os.path.dirname(__file__))
+APP_PATH = "{}/../../../../../../dune-structures/apps".format(os.path.dirname(__file__))
 
 
 
