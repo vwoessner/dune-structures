@@ -129,7 +129,7 @@ class LinearMaterial(InfinitesimalStrainBaseMaterialLaw):
 
     def strain_energy(self, u):
         epsilon = self.infinitesimal_strain(u)
-        mu, lmbda = self.ufl_parameters(u)
+        lmbda, mu = self.ufl_parameters(u)
         return 0.5 * lmbda * (tr(epsilon) ** 2) + mu * tr(epsilon * epsilon)
 
 
@@ -144,7 +144,7 @@ class StVenantKirchhoffMaterial(CauchyGreenStrainBasedMaterialLaw):
 
     def strain_energy(self, u):
         E = self.cauchy_green_strain(u)
-        mu, lmbda = self.ufl_parameters(u)
+        lmbda, mu = self.ufl_parameters(u)
         return 0.5 * lmbda * (tr(E) ** 2) + mu * tr(dot(E, E))
 
 
@@ -166,7 +166,7 @@ class NeoHookeanMaterial(IsochoricCauchyGreenInvariantBasedMaterialLaw):
     # It should be removed once the base class IsochoricCauchyGreenInvariantBasedMaterialLaw
     # is operational...
     def cauchy_stress(self, u):
-        mu, lmbda = self.ufl_parameters(u)
+        lmbda, mu = self.ufl_parameters(u)
         F = self.deformation_gradient(u)
         B = self.left_cauchy_green(u)
         J = det(F)

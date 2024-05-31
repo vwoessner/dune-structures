@@ -88,15 +88,25 @@ public:
       sum += stress[i][i] * stress[i][i];
     }
     // Off-diagonal
-    for (int i = 0; i < dim; ++i)
-    {
-      int j = i + 1;
-      if (i == dim - 1)
-        j = 0;
+	if (dim == 2)
+	{
+		sum += 3 * stress[0][1] * stress[0][1] - stress[0][0] * stress[1][1];
+	}
+	else if (dim == 3)
+	{
+		for (int i = 0; i < dim; ++i)
+		{
+		  int j = i + 1;
+		  if (i == dim - 1)
+			j = 0;
 
-      sum += 3 * stress[i][j] * stress[i][j] - stress[i][i] * stress[j][j];
-    }
-
+		  sum += 3 * stress[i][j] * stress[i][j] - stress[i][i] * stress[j][j];
+		}
+	}
+	else
+	{
+		std::cout << "Von mises stress makes no sense in the given dimension";
+	}
     y = std::sqrt(sum);
   }
 

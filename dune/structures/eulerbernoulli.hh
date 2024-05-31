@@ -155,11 +155,17 @@ public:
   void compute_grid_intersection()
   {
     fibre_intersections.resize(fibre_parametrizations.size());
-    std::transform(
-      fibre_parametrizations.begin(),
-      fibre_parametrizations.end(),
-      fibre_intersections.begin(),
-      [this](auto f) { return compute_grid_fibre_intersection(this->gv, f); });
+    std::transform(fibre_parametrizations.begin(),
+                   fibre_parametrizations.end(),
+                   fibre_intersections.begin(),
+                   [this](auto f)
+                   { return compute_grid_fibre_intersection(this->gv, f); });
+  }
+
+  auto get_fiber_data() const
+  {
+    return std::tie(
+      fiber_parameters, fibre_intersections, fibre_parametrizations);
   }
 
   template<typename EG, typename LFSU, typename X, typename LFSV, typename R>
@@ -274,7 +280,7 @@ public:
         // Extract physical parameters of the fibre
         const auto& fiber_param = fiber_parameters[fibindex];
         const auto E = fiber_param.youngs_modulus;
-        const auto d = fiber_param.radius;
+        const auto d = fiber_param.radius * 2.0;
         const auto prestress = fiber_param.prestress;
         const auto A = d;
         const auto I = (d * d * d) / 12.0;
@@ -553,7 +559,7 @@ public:
       // Extract physical parameter of the fibre
       const auto& fiber_param = fiber_parameters[fibindex];
       const auto E = fiber_param.youngs_modulus;
-      const auto d = fiber_param.radius;
+      const auto d = fiber_param.radius * 2.0;
       const auto I = (d * d * d) / 12.0;
 
       // Compute the penalty factor
@@ -992,6 +998,11 @@ public:
                               std::shared_ptr<CVEC> traction)
   {
     bulkoperator.setCoefficientTraction(gfs, traction);
+  }
+
+  const EulerBernoulli2DLocalOperator<GFS, FGFS>& get_fiber_operator() const
+  {
+    return fibreoperator;
   }
 
   virtual void alpha_volume(const EG& eg,

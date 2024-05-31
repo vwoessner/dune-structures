@@ -19,6 +19,10 @@
  * In theory we could code-generate this in order to specify
  * it exactly once, but I do not see much value in that right now.
  */
+ 
+/* I (Valentin) changed the lame paramter conversion to the plane stress approx. in the 2D case.
+ * The height is harcoded to 1 \mu m.
+ */
 std::map<std::string, int> law_to_index = { { "linear", 0 },
                                             { "stvenantkirchhoff", 1 },
                                             { "neohookean", 2 },
@@ -34,7 +38,7 @@ std::map<std::string, std::map<int, std::string>> param_to_index = {
 
 template<typename T>
 T
-lookup_with_conversion(const YAML::Node& params, std::string name)
+lookup_with_conversion(const YAML::Node& params, std::string name, const int dim)
 {
   if (params[name])
     return params[name].as<T>();
@@ -44,9 +48,17 @@ lookup_with_conversion(const YAML::Node& params, std::string name)
   {
     T young = params["youngs_modulus"].as<T>();
     T pr = params["poisson_ratio"].as<T>();
-
-    lame1 = (pr * young) / ((1.0 + pr) * (1.0 - 2.0 * pr));
-    lame2 = young / (2.0 * (1.0 + pr));
+	if (dim == 2)
+	{
+		const double height = 1.0;
+		lame1 = (height * pr * young) / (1.0 - pr * pr);
+		lame2 = (height * young) / (2.0 * (1.0 + pr));
+	}
+	else
+	{
+		lame1 = (pr * young) / ((1.0 + pr) * (1.0 - 2.0 * pr));
+		lame2 = young / (2.0 * (1.0 + pr));
+	}
   }
   else
   {
@@ -126,7 +138,7 @@ public:
     parameters.resize(paramnamemap.size());
 
     for (auto [index, name] : paramnamemap)
-      parameters[index] = lookup_with_conversion<T>(params, name);
+      parameters[index] = lookup_with_conversion<T>(params, name, dim);
   }
 
   virtual T parameter(const Entity& e, const Coord& x, int i) const override
