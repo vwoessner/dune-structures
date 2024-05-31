@@ -301,6 +301,13 @@ def cell_geometry_2d(geo, config):
             size = pad_to_3_vector(config.get("size", [1.0, 1.0]))
             lowerleft = pad_to_3_vector(config.get("lowerleft", -0.5 * size))
             return geo.add_rectangle(lowerleft, size[0], size[1])
+        elif shape == "scheiwe":
+            size = pad_to_3_vector(config.get("size", [1.0, 1.0]))
+            points = []
+            for number in ["point1","point2","point3","point4","point5","point6"]:
+                point = pad_to_3_vector(config.get(number, size))
+                points.append(point)
+            return geo.add_polygon(points)
         else:
             raise NotImplementedError
 
@@ -326,11 +333,17 @@ def cell_geometry_2d(geo, config):
             start = pad_to_3_vector(fconfig.get("start", [-1.0, 0.0]))
             end = pad_to_3_vector(fconfig.get("end", [2.0, 0.0]))
             radius = as_float(fconfig.get("radius", 0.1))
-            orientation = end - start
-
-            # TODO: Rotation of non-axis aligned fibres
-            start = start - pad_to_3_vector([0, radius])
-            fibre = geo.add_rectangle(start, np.linalg.norm(orientation), 2 * radius)
+            
+            # my implementation for non-axis-aligned fibers
+            delta_y = end[1]-start[1]
+            delta_x = end[0]-start[0]
+            alpha = np.arctan2(delta_y,delta_x)
+            start_bottom = start + pad_to_3_vector([np.sin(alpha)*radius, -np.cos(alpha)*radius])
+            start_top = start - pad_to_3_vector([np.sin(alpha)*radius, -np.cos(alpha)*radius])
+            end_bottom = end + pad_to_3_vector([np.sin(alpha)*radius, -np.cos(alpha)*radius])
+            end_top = end - pad_to_3_vector([np.sin(alpha)*radius, -np.cos(alpha)*radius])
+            points = [start_top, start_bottom, end_bottom, end_top]
+            fibre = geo.add_polygon(points)
         else:
             raise NotImplementedError("Fibre shape '{}' not known".format(shape))
 
