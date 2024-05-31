@@ -34,7 +34,8 @@ from dune.structures.plotting.displacement import plot_mean_displacement
 from dune.structures.plotting.population import plot_population
 
 # TODO: Hardcoded path! Should be configured by CMake instead
-APP_PATH = "{}/../../../build-cmake/apps".format(os.path.dirname(__file__))
+APP_PATH = "{}/../../../../../release-build-fibergrowth/dune-structures/apps".format(os.path.dirname(__file__))
+
 
 
 def run(executable, input_file, logger, log_file=None, **kwargs):
@@ -164,7 +165,7 @@ def genetic_opt(executable, input_file, logger, **kwargs):
 
         # Run and evaluate
         stresses = run_and_evaluate_parallel(
-            exe, yaml_file_paths, optimization_data, processes=8
+            exe, yaml_file_paths, optimization_data, processes=4
         )
         lengths = evaluate_fiber_volumes(population, optimization_data)
         scores = np.column_stack((stresses, lengths))
