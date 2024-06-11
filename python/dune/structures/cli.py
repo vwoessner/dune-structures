@@ -25,13 +25,18 @@ from dune.structures.fibergrowth.genetic_opt import (
     selection,
     crossover,
     mutation,
-    evaluate_fiber_lengths,
-    evaluate_fiber_volumes,
+    evaluate_fiber_lengths, # wird nicht genutzt
+    evaluate_fiber_volumes, # als "length" gespeichert
     get_mesh_triangulation,
 )
 
-from dune.structures.plotting.displacement import plot_mean_displacement
+from dune.structures.plotting.displacement import plot_mean_displacement, plot_displacement # my include
 from dune.structures.plotting.population import plot_population
+
+# My includes
+from dune.structures.vtk import VTKVertexReader
+from dune.structures.plotting._utils import load_iteration_results, load_fibers, get_filepaths_to_plot
+
 
 # TODO: Hardcoded path! Should be configured by CMake instead
 APP_PATH = "{}/../../../../../../dune-structures/apps".format(os.path.dirname(__file__))
@@ -232,7 +237,7 @@ def genetic_opt(executable, input_file, logger, **kwargs):
         plot_population(
             data, it, os.path.join(input_dir, "population-{:03d}.pdf".format(it))
         )
-
+        """
         # Plot the mean of the 10% of best files
         for data_plot, outname in [
             (data_sorted, "fittest"),
@@ -249,7 +254,35 @@ def genetic_opt(executable, input_file, logger, **kwargs):
                 plot_yaml_paths,
                 "{}-{:03d}.pdf".format(outname, it),
             )
+        """
+        ######################################################## My try
+        """
+        data_plot = data_sorted
+        outname = "fittest"
+        data_plot = data_plot.iloc[0]
+        plot_yaml_paths = data_plot["filepath"]
+        plot_vtk_paths = os.path.splitext(plot_yaml_paths)[0] + ".vtu"
 
+        displacement_dataset = "Displacement Field_0_"
+        stress_dataset = "vonmises_"
+        vtk_reader = VTKVertexReader(plot_vtk_paths)
+        displacement = vtk_reader[displacement_dataset]
+        stress = vtk_reader[stress_dataset]
+        fibers = load_fibers(plot_yaml_paths)
+
+        plot_displacement(
+            vtk_reader.points,
+            vtk_reader.connectivity,
+            displacement,
+            stress,
+            fibers,
+            "{}-{:03d}.pdf".format(outname, it),
+            tri_subdiv=1,
+            plot_grid=False,
+            fiber_alpha=0.1,
+        )
+        """
+        
         # Clean up VTK files of removed genes (only from this iteration)
         if optimization_data["remove_vtk_files"]:
             for file in data["filepath"].loc[

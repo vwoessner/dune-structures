@@ -109,9 +109,12 @@ def load_stress_ev(filename, dataset="stress_ev_1_"):
 
 
 def load_stress_mises(filename, dataset="vonmises_"):
-    vtkfile = VTKVertexReader(filename)
-
-    return vtkfile.points, vtkfile[dataset]
+    try:
+        vtkfile = VTKVertexReader(filename)
+        return vtkfile.points, vtkfile[dataset]
+    except:
+        vtkfile = VTKCellReader(filename)
+        return vtkfile.cell_centers, vtkfile[dataset]
 
 
 def recombine_fibers(fibers, max_distance, max_angle, **kwargs):

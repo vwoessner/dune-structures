@@ -135,21 +135,24 @@ def clamp_to_geometry_bounds(center, radius_vec, data, rng, trifinder):
 
 
 def random_default_fibers(yaml_data, rng):
-    return [
-        Line(
-            fiber["start"],
-            fiber["end"],
-            radius=max(
-                rng.normal(
-                    fiber.get("radius", yaml_data["fiber_radius_mean"]),
-                    yaml_data["fiber_radius_stddev"],
+    if yaml_data["default"] == True:
+        return [
+            Line(
+                fiber["start"],
+                fiber["end"],
+                radius=max(
+                    rng.normal(
+                        fiber.get("radius", yaml_data["fiber_radius_mean"]),
+                        yaml_data["fiber_radius_stddev"],
+                    ),
+                    MIN_RADIUS,
                 ),
-                MIN_RADIUS,
-            ),
-            default=fiber.get("default", True),
-        )
-        for fiber in yaml_data["default_fibers"]
-    ]
+                default=fiber.get("default", True),
+            )
+            for fiber in yaml_data["default_fibers"]
+        ]
+    else:
+        return []
 
 
 def random_fiber(yaml_data, rng, trifinder, media):
@@ -465,7 +468,8 @@ def evaluate_fiber_lengths(population, data):
 
 def evaluate_fiber_volumes(population, data):
     return [
-        np.sum([fiber.length * np.pi * fiber.radius ** 2 for fiber in genome])
+        np.sum([fiber.length * 2.0 * fiber.radius for fiber in genome])
+        #np.sum([fiber.length * np.pi * fiber.radius ** 2 for fiber in genome])
         for genome in population
     ]
 

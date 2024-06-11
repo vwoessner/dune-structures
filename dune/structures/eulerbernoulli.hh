@@ -282,8 +282,8 @@ public:
         const auto E = fiber_param.youngs_modulus;
         const auto d = fiber_param.radius * 2.0; //diameter
         const auto prestress = fiber_param.prestress;
-        const auto A = 3.1415926 * d / 4.0;
-        const auto I = 3.1415926 * (d * d *d) / 64.0;
+        const auto A = d;
+        const auto I = (d * d * d) / 12.0;
 
         // The needed tangential derivative quantities. These expressions are
         // generated using the generate_tangential_derivatives Python script.
@@ -560,7 +560,7 @@ public:
       const auto& fiber_param = fiber_parameters[fibindex];
       const auto E = fiber_param.youngs_modulus;
       const auto d = fiber_param.radius * 2.0;
-	  const auto I = 3.1415926 * (d * d *d) / 64.0;
+      const auto I = (d * d * d) / 12.0;
 
       // Compute the penalty factor
       const auto h_F = std::min(cellgeo_s.volume(), cellgeo_n.volume())

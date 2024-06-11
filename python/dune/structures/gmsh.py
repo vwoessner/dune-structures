@@ -308,6 +308,10 @@ def cell_geometry_2d(geo, config):
                 point = pad_to_3_vector(config.get(number, size))
                 points.append(point)
             return geo.add_polygon(points)
+        elif shape == "circle":
+            center = pad_to_3_vector(config.get("center", [0.0, 0.0]))
+            radius = as_float(config.get("radius", 1.0))
+            return geo.add_disk(x0=center, radius0=radius)
         else:
             raise NotImplementedError
 
@@ -320,44 +324,57 @@ def cell_geometry_2d(geo, config):
     # Add the cytoplasma
     cytoconfig = config.get("cytoplasm", {})
     cyto = add_shape(cytoconfig)
+    
+    
+    # Maybe add a nucleus
+    nucleusconfig = config.get("nucleus", {"enabled": False})
+    if nucleusconfig.get("enabled", False):
+        # Add the nucleus shape and intersect it with the cytoplasma
+        nucleus = add_shape(nucleusconfig)
+        nucleus = geo.boolean_intersection(
+            [cyto, nucleus], delete_first=False, delete_other=True
+        )
+
+        add_material(nucleus, nucleusconfig)
 
     # Maybe add some fibres
     fibres = []
     fibreconfig = config.get("fibres", {})
-    for i, fconfig in enumerate(fibreconfig):
-        fibre = None
-        # For compatibility with 3d we accept "cylinder" as a shape, although we are dealing
-        # with rectangles of course. Makes sense in our setting though.
-        shape = fconfig.get("shape", "cylinder")
-        if shape in ["cylinder", "rectangle"]:
-            start = pad_to_3_vector(fconfig.get("start", [-1.0, 0.0]))
-            end = pad_to_3_vector(fconfig.get("end", [2.0, 0.0]))
-            radius = as_float(fconfig.get("radius", 0.1))
-            
-            # my implementation for non-axis-aligned fibers
-            delta_y = end[1]-start[1]
-            delta_x = end[0]-start[0]
-            alpha = np.arctan2(delta_y,delta_x)
-            start_bottom = start + pad_to_3_vector([np.sin(alpha)*radius, -np.cos(alpha)*radius])
-            start_top = start - pad_to_3_vector([np.sin(alpha)*radius, -np.cos(alpha)*radius])
-            end_bottom = end + pad_to_3_vector([np.sin(alpha)*radius, -np.cos(alpha)*radius])
-            end_top = end - pad_to_3_vector([np.sin(alpha)*radius, -np.cos(alpha)*radius])
-            points = [start_top, start_bottom, end_bottom, end_top]
-            fibre = geo.add_polygon(points)
-        else:
-            raise NotImplementedError("Fibre shape '{}' not known".format(shape))
+    if fibreconfig is not None:
+        for i, fconfig in enumerate(fibreconfig):
+            fibre = None
+            # For compatibility with 3d we accept "cylinder" as a shape, although we are dealing
+            # with rectangles of course. Makes sense in our setting though.
+            shape = fconfig.get("shape", "cylinder")
+            if shape in ["cylinder", "rectangle"]:
+                start = pad_to_3_vector(fconfig.get("start", [-1.0, 0.0]))
+                end = pad_to_3_vector(fconfig.get("end", [2.0, 0.0]))
+                radius = as_float(fconfig.get("radius", 0.1))
+                
+                # my implementation for non-axis-aligned fibers
+                delta_y = end[1]-start[1]
+                delta_x = end[0]-start[0]
+                alpha = np.arctan2(delta_y,delta_x)
+                start_bottom = start + pad_to_3_vector([np.sin(alpha)*radius, -np.cos(alpha)*radius])
+                start_top = start - pad_to_3_vector([np.sin(alpha)*radius, -np.cos(alpha)*radius])
+                end_bottom = end + pad_to_3_vector([np.sin(alpha)*radius, -np.cos(alpha)*radius])
+                end_top = end - pad_to_3_vector([np.sin(alpha)*radius, -np.cos(alpha)*radius])
+                points = [start_top, start_bottom, end_bottom, end_top]
+                fibre = geo.add_polygon(points)
+            else:
+                raise NotImplementedError("Fibre shape '{}' not known".format(shape))
 
-        # And intersect it with the cytoplasma
-        assert fibre is not None
-        fibre = geo.boolean_intersection(
-            [cyto, fibre], delete_first=False, delete_other=True
-        )
+            # And intersect it with the cytoplasma
+            assert fibre is not None
+            fibre = geo.boolean_intersection(
+                [cyto, fibre], delete_first=False, delete_other=True
+            )
 
-        # Add physical information to this fibre
-        add_material(fibre, fconfig)
+            # Add physical information to this fibre
+            add_material(fibre, fconfig)
 
-        # Store the fibre object for later
-        fibres.append(fibre)
+            # Store the fibre object for later
+            fibres.append(fibre)
 
     # Implement mesh widths
     geo.add_raw_code(
@@ -365,22 +382,52 @@ def cell_geometry_2d(geo, config):
             cytoconfig.get("meshwidth", 0.1)
         )
     )
-    for i, fconfig in enumerate(fibreconfig):
-        meshwidth = as_float(fconfig.get("meshwidth", 0.02))
+    
+    
+    if nucleusconfig.get("enabled", False):
         geo.add_raw_code(
-            "Characteristic Length{{ PointsOf{{ Surface{{{}}}; }} }} = {};".format(
-                fibres[i].id, meshwidth
+            "Characteristic Length{{ PointsOf{{ Surface{{:}}; }} }} = {};".format(
+                 nucleusconfig.get("meshwidth", 0.1)
             )
         )
-
+    
+        
+        
+    if fibreconfig is not None:
+        for i, fconfig in enumerate(fibreconfig):
+            meshwidth = as_float(fconfig.get("meshwidth", 0.02))
+            geo.add_raw_code(
+                "Characteristic Length{{ PointsOf{{ Surface{{{}}}; }} }} = {};".format(
+                    fibres[i].id, meshwidth
+                )
+            )
+    
+    
     # The cytoplasma is defined by the outer shape minus all inclusions
-    cyto = geo.boolean_fragments([cyto], fibres, delete_other=False)
-    add_material(cyto, cytoconfig)
+    cytogeos = [cyto]
+    if nucleusconfig.get("enabled", False):
+        cytogeos.append(nucleus)
+        if fibreconfig is not None:
+            # The cytoplasma is defined by the outer shape minus all inclusions
+            cyto = geo.boolean_fragments(cytogeos, fibres, delete_other=False)
+            add_material(cyto, cytoconfig)
+        else:
+            cyto = geo.boolean_fragments([cyto], [nucleus], delete_other=False)
+            add_material(cyto, cytoconfig)
+    else:
+        if fibreconfig is not None:
+            # The cytoplasma is defined by the outer shape minus all inclusions
+            cyto = geo.boolean_fragments(cytogeos, fibres, delete_other=False)
+            add_material(cyto, cytoconfig)
+        else: # no nucleus and no fibers
+            cyto = geo.boolean_intersection([cyto, cyto], delete_other=True)
+            add_material(cyto, cytoconfig)
+        
 
     # Add the collected physical group information
     for physical, geos in material_to_geo.items():
         geo.add_physical(geos, physical)
-
+    
     # Apply a global scaling to the resulting mesh
     geo.add_raw_code(
         "Mesh.ScalingFactor = {};".format(as_float(config.get("scaling", 1.0)))

@@ -98,6 +98,8 @@ def plot_population(df_iteration, iteration, outfile, limits=None):
     )
 
     # Colorbar
+    ax.set_xlim(0.0, 80)                                                   ############################# x-lim im stress hard-gecoded
+    ax.set_ylim(3000, 11000)                                                 ############################# y-lim im stress hard-gecoded
     cb = fig.colorbar(cb_data, ax=ax)
     cb.set_label("Relative Fitness")
     cb.ax.set_ylim(bottom=fitness.min())  # Do this in case limits are not set
@@ -108,7 +110,7 @@ def plot_population(df_iteration, iteration, outfile, limits=None):
 
     # Aesthetics
     ax.set_title("Population after Iteration {}".format(iteration))
-    ax.set_xlabel(r"Total Fiber Volume $[\mathrm{\mu m^3}]$")
+    ax.set_xlabel(r"Total Fiber Volume $[\mathrm{\mu m^2}]$")
     ax.set_ylabel("Stress L1-Norm [pPa]")
     loc = "upper right" if limits is not None else "best"
     ax.legend(
