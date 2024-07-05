@@ -22,9 +22,6 @@
 #include "operators/quasistatic_mass_2d_operator.hh"
 #include "operators/quasistatic_mass_2d_p2_operator.hh"
 
-// The coupled operators
-#include "operators/elasticity_2d_p2_operator_coupled.hh"
-#include "operators/quasistatic_mass_2d_p2_operator_coupled.hh"
 
 template<typename GFS, int dim, typename FEM, typename FGFS, typename TGFS>
 struct OperatorSwitchImpl
@@ -85,19 +82,6 @@ struct OperatorSwitchImpl<
 {
   using Elasticity = Elasticity2DP2Operator<GFS, GFS, FGFS, TGFS>;
   using Mass = QuasiStaticMass2DP2Operator<GFS, GFS>;
-};
-
-// My new operator_coupled
-template<typename GFS, typename ES, typename R, typename FGFS, typename TGFS>
-struct OperatorSwitchImpl<
-  GFS,
-  2,
-  Dune::PDELab::PkLocalFiniteElementMap<ES, double, R, 2>,
-  FGFS,
-  TGFS>
-{
-  using Elasticity = Elasticity2DP2OperatorCoupled<GFS, GFS, FGFS, TGFS>;
-  using Mass = QuasiStaticMass2DP2OperatorCoupled<GFS, GFS>;
 };
 
 template<typename P,

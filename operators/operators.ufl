@@ -19,6 +19,3 @@ mass_2d = quasistatic_mass_form(degree=1, dim=2)
 
 r_2d_p2 = elasticity_form([LinearMaterial()], degree=2, dim=2)
 mass_2d_p2 = quasistatic_mass_form(degree=2, dim=2)
-
-r_2d_p2_coupled = elasticity_form_coupled([LinearMaterial()], degree=2, dim=2)
-mass_2d_p2_coupled = quasistatic_mass_form_coupled(degree=2, dim=2)
