@@ -2,26 +2,6 @@ This module contains the source code for the simulation of single cell mechanics
 
 # Installing the software
 
-There is two principal ways to use this software: As dockerized applications or by building it from source. The former is recommended if you intend to *run* simulations, the latter is necessary if you want to *develop* your own simulators.
-
-## Dockerized setup
-
-The dockerized setup runs with only minimal requirements on the host machine:
-
-* Docker (e.g. installed by following [these instructions from Docker](https://docs.docker.com/install/linux/docker-ce/debian/#install-using-the-repository)).
-* docker-compose (available from the same repository)
-
-These two commands will spin up the dune-structures frontend:
-
-```
-wget https://gitlab.dune-project.org/dominic/dune-structures/-/raw/master/docker-compose.yml
-docker-compose up
-```
-
-You can now head to `0.0.0.0:5000` in your browser and use the visual programming frontend.
-
-## Full installation
-
 This is not an installation guide, but merely documents the specific requirements of dune-structures.
 It assumes that you know how to build a Dune software stack.
 
