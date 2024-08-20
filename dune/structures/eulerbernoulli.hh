@@ -933,12 +933,6 @@ public:
       if (it == fibintersection.element_fibre_intersections.end())
         continue;
 
-      // TODO: Here, there should be a check whether the fiber is actually
-      //       reaching the boundary. This is a rather minor edge case, as
-      //       it is only relevant if the fiber reaches the boundary cell,
-      //       but does not intersect the boundary face. This is not yet
-      //       implemented.
-
       // Extract some necessary information
       auto fibre = fibre_parametrizations[fibindex];
       auto isgeo = ig.geometry();
