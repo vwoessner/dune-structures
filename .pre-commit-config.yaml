@@ -1,0 +1,33 @@
+repos:
+- repo: https://github.com/psf/black
+  rev: 24.4.2
+  hooks:
+  - id: black      # Run Black - the uncompromising Python code formatter
+
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.6.0
+  hooks:
+  - id: end-of-file-fixer      # Ensure existence of newline characters at file ends
+  - id: check-yaml      # Make sure that contained YAML files are well-formed
+  - id: trailing-whitespace      # Trim trailing whitespace of all sorts
+  - id: check-added-large-files      # Apply a file size limit of 500kB
+  - id: mixed-line-ending      # Ensure consistent line endings
+
+- repo: https://github.com/cheshirekow/cmake-format-precommit
+  rev: v0.6.13
+  hooks:
+  - id: cmake-format      # Apply formatting to CMake files
+    additional_dependencies:
+    - pyyaml
+  - id: cmake-lint      # Apply linting to CMake files
+
+- repo: https://github.com/pre-commit/mirrors-clang-format
+  rev: v18.1.5
+  hooks:
+  - id: clang-format      # Format C++ code with Clang-Format - automatically applying the changes
+    types_or: [c++, c, c#, cuda, objective-c]
+
+- repo: https://github.com/pecigonzalo/pre-commit-shfmt
+  rev: v2.2.0
+  hooks:
+  - id: shell-fmt-go      # Format Bash scripts
