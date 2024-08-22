@@ -22,6 +22,7 @@ solver:
           -
             group: 0
             model: linear
+            plane-stress-approx: false
             poisson_ratio: 0.3333
             youngs_modulus: 300
       - _type: interpolation
@@ -46,7 +47,7 @@ solver:
                 end:
                   - 4.5
                   - 0.501
-                radius: 0.1
+                radius: 0.05
                 start:
                   - -0.5
                   - 0.501

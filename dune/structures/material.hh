@@ -48,10 +48,11 @@ lookup_with_conversion(const YAML::Node& params, std::string name, const int dim
   {
     T young = params["youngs_modulus"].as<T>();
     T pr = params["poisson_ratio"].as<T>();
-	if (dim == 2)
+    bool planestressapprox = params["plane-stress-approx"].as<bool>(true);
+	if (dim == 2 && planestressapprox)
 	{
 		const double height = 1.0;
-		lame1 = (height * pr * young) / (1.0 - pr * pr);
+		lame1 = (height * pr * young) / (1.0 - pr*pr);
 		lame2 = (height * young) / (2.0 * (1.0 + pr));
 	}
 	else
