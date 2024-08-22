@@ -935,6 +935,7 @@ public:
 
       // Extract some necessary information
       auto fibre = fibre_parametrizations[fibindex];
+      const auto& fiber_param = fiber_parameters[fibindex];
       auto isgeo = ig.geometry();
       using namespace Dune::Indices;
       auto child_0 = child(lfsu, _0);
@@ -956,6 +957,11 @@ public:
 
       // There was no actual intersection here.
       if (!tpos.has_value())
+        continue;
+
+      // Check whether we are on the left boundary of the cantilever
+      // TODO: How do we generalize this????
+      if (ig.geometry().center()[0] > 1e-8)
         continue;
 
       if (verbose)
@@ -995,8 +1001,165 @@ public:
 
       // The tangential vector for the curve
       auto t = fibre->tangent(tpos.value());
+      const auto normal =
+        ig.unitOuterNormal(ig.geometry().local(fibre->eval(tpos.value())));
+      const double flip_factor = t * normal < 0.0 ? -1.0 : 1.0;
 
-      // TODO: Actual accumulation!
+      const auto E = fiber_param.youngs_modulus;
+      const auto d = fiber_param.radius * 2.0; // diameter
+      const auto A = d;
+      const auto I = (d * d * d) / 12.0;
+
+      // Compute the penalty factor
+      const auto h_F = cellgeo.volume() / ig.geometry().volume();
+      const auto penalty = beta / h_F;
+
+      auto dtun =
+        (t[0] * (jit[1][1] * d1u[1][1] + jit[1][0] * d1u[1][0])
+         + (jit[1][1] * d1u[0][1] + jit[1][0] * d1u[0][0]) * (-1) * t[1])
+          * t[1]
+        + (t[0] * (jit[0][1] * d1u[1][1] + jit[0][0] * d1u[1][0])
+           + (jit[0][1] * d1u[0][1] + jit[0][0] * d1u[0][0]) * (-1) * t[1])
+            * t[0];
+      auto dt2un =
+        ((t[0]
+            * (jit[1][1] * (jit[1][1] * d2u[1][1][1] + jit[1][0] * d2u[1][1][0])
+               + jit[1][0]
+                   * (jit[1][1] * d2u[1][0][1] + jit[1][0] * d2u[1][0][0]))
+          + (jit[1][1] * (jit[1][1] * d2u[0][1][1] + jit[1][0] * d2u[0][1][0])
+             + jit[1][0]
+                 * (jit[1][1] * d2u[0][0][1] + jit[1][0] * d2u[0][0][0]))
+              * (-1) * t[1])
+           * t[1]
+         + (t[0]
+              * (jit[0][1]
+                   * (jit[1][1] * d2u[1][1][1] + jit[1][0] * d2u[1][1][0])
+                 + jit[0][0]
+                     * (jit[1][1] * d2u[1][0][1] + jit[1][0] * d2u[1][0][0]))
+            + (jit[0][1] * (jit[1][1] * d2u[0][1][1] + jit[1][0] * d2u[0][1][0])
+               + jit[0][0]
+                   * (jit[1][1] * d2u[0][0][1] + jit[1][0] * d2u[0][0][0]))
+                * (-1) * t[1])
+             * t[0])
+          * t[1]
+        + ((t[0]
+              * (jit[1][1]
+                   * (jit[0][1] * d2u[1][1][1] + jit[0][0] * d2u[1][1][0])
+                 + jit[1][0]
+                     * (jit[0][1] * d2u[1][0][1] + jit[0][0] * d2u[1][0][0]))
+            + (jit[1][1] * (jit[0][1] * d2u[0][1][1] + jit[0][0] * d2u[0][1][0])
+               + jit[1][0]
+                   * (jit[0][1] * d2u[0][0][1] + jit[0][0] * d2u[0][0][0]))
+                * (-1) * t[1])
+             * t[1]
+           + (t[0]
+                * (jit[0][1]
+                     * (jit[0][1] * d2u[1][1][1] + jit[0][0] * d2u[1][1][0])
+                   + jit[0][0]
+                       * (jit[0][1] * d2u[1][0][1] + jit[0][0] * d2u[1][0][0]))
+              + (jit[0][1]
+                   * (jit[0][1] * d2u[0][1][1] + jit[0][0] * d2u[0][1][0])
+                 + jit[0][0]
+                     * (jit[0][1] * d2u[0][0][1] + jit[0][0] * d2u[0][0][0]))
+                  * (-1) * t[1])
+               * t[0])
+            * t[0];
+
+      for (std::size_t i = 0; i < child_0.size(); ++i)
+      {
+        auto dtvn_0 = t[1]
+                        * (jit[1][1] * basis.jacobian(i, 1)
+                           + jit[1][0] * basis.jacobian(i, 0))
+                        * (-1) * t[1]
+                      + t[0]
+                          * (jit[0][1] * basis.jacobian(i, 1)
+                             + jit[0][0] * basis.jacobian(i, 0))
+                          * (-1) * t[1];
+        auto dtvn_1 = t[1] * t[0]
+                        * (jit[1][1] * basis.jacobian(i, 1)
+                           + jit[1][0] * basis.jacobian(i, 0))
+                      + t[0] * t[0]
+                          * (jit[0][1] * basis.jacobian(i, 1)
+                             + jit[0][0] * basis.jacobian(i, 0));
+        auto dt2vn_0 = (t[1]
+                          * (jit[1][1]
+                               * (jit[1][1] * basis.hessian(i, 1, 1)
+                                  + jit[1][0] * basis.hessian(i, 1, 0))
+                             + jit[1][0]
+                                 * (jit[1][1] * basis.hessian(i, 0, 1)
+                                    + jit[1][0] * basis.hessian(i, 0, 0)))
+                          * (-1) * t[1]
+                        + t[0]
+                            * (jit[0][1]
+                                 * (jit[1][1] * basis.hessian(i, 1, 1)
+                                    + jit[1][0] * basis.hessian(i, 1, 0))
+                               + jit[0][0]
+                                   * (jit[1][1] * basis.hessian(i, 0, 1)
+                                      + jit[1][0] * basis.hessian(i, 0, 0)))
+                            * (-1) * t[1])
+                         * t[1]
+                       + (t[1]
+                            * (jit[1][1]
+                                 * (jit[0][1] * basis.hessian(i, 1, 1)
+                                    + jit[0][0] * basis.hessian(i, 1, 0))
+                               + jit[1][0]
+                                   * (jit[0][1] * basis.hessian(i, 0, 1)
+                                      + jit[0][0] * basis.hessian(i, 0, 0)))
+                            * (-1) * t[1]
+                          + t[0]
+                              * (jit[0][1]
+                                   * (jit[0][1] * basis.hessian(i, 1, 1)
+                                      + jit[0][0] * basis.hessian(i, 1, 0))
+                                 + jit[0][0]
+                                     * (jit[0][1] * basis.hessian(i, 0, 1)
+                                        + jit[0][0] * basis.hessian(i, 0, 0)))
+                              * (-1) * t[1])
+                           * t[0];
+        auto dt2vn_1 = (t[1] * t[0]
+                          * (jit[1][1]
+                               * (jit[1][1] * basis.hessian(i, 1, 1)
+                                  + jit[1][0] * basis.hessian(i, 1, 0))
+                             + jit[1][0]
+                                 * (jit[1][1] * basis.hessian(i, 0, 1)
+                                    + jit[1][0] * basis.hessian(i, 0, 0)))
+                        + t[0] * t[0]
+                            * (jit[0][1]
+                                 * (jit[1][1] * basis.hessian(i, 1, 1)
+                                    + jit[1][0] * basis.hessian(i, 1, 0))
+                               + jit[0][0]
+                                   * (jit[1][1] * basis.hessian(i, 0, 1)
+                                      + jit[1][0] * basis.hessian(i, 0, 0))))
+                         * t[1]
+                       + (t[1] * t[0]
+                            * (jit[1][1]
+                                 * (jit[0][1] * basis.hessian(i, 1, 1)
+                                    + jit[0][0] * basis.hessian(i, 1, 0))
+                               + jit[1][0]
+                                   * (jit[0][1] * basis.hessian(i, 0, 1)
+                                      + jit[0][0] * basis.hessian(i, 0, 0)))
+                          + t[0] * t[0]
+                              * (jit[0][1]
+                                   * (jit[0][1] * basis.hessian(i, 1, 1)
+                                      + jit[0][0] * basis.hessian(i, 1, 0))
+                                 + jit[0][0]
+                                     * (jit[0][1] * basis.hessian(i, 0, 1)
+                                        + jit[0][0] * basis.hessian(i, 0, 0))))
+                           * t[0];
+
+        r.accumulate(lfsu.child(0),
+                     i,
+                     -E * I
+                       * (-flip_factor * dt2un * dtvn_0
+                          + flip_factor * dt2vn_0 * dtun
+                          + penalty * dtun * dtvn_0));
+
+        r.accumulate(lfsu.child(1),
+                     i,
+                     -E * I
+                       * (-flip_factor * dt2un * dtvn_1
+                          + flip_factor * dt2vn_1 * dtun
+                          + penalty * dtun * dtvn_1));
+      }
     }
   }
 
