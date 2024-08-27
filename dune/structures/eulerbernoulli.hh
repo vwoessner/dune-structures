@@ -282,10 +282,10 @@ public:
 
         // Evaluate the body force vector
         Dune::FieldVector<double, 2> force(0.0);
-        for (std::size_t k = 0; k < 2; ++k)
-          for (std::size_t i = 0; i < child_0.size(); ++i)
-            force[k] += local_coefficient_force_vector(lfsv.child(k), i)
-                        * basis.function(i);
+        //for (std::size_t k = 0; k < 2; ++k)
+        //  for (std::size_t i = 0; i < child_0.size(); ++i)
+        //    force[k] += local_coefficient_force_vector(lfsv.child(k), i)
+        //                * basis.function(i);
 
         // Extract physical parameters of the fibre
         const auto& fiber_param = fiber_parameters[fibindex];
@@ -960,9 +960,20 @@ public:
         continue;
 
       // Check whether we are on the left boundary of the cantilever
-      // TODO: How do we generalize this????
-      if (ig.geometry().center()[0] > 1e-8)
+      // TODO: How do we generalize this???
+	  if (ig.geometry().center()[0]>1e-8)
+		continue;
+	
+      
+	  /* D-BC for scheiwe.msh on six corners
+      if (!(((ig.geometry().center()[0]-0.0)*(ig.geometry().center()[0]-0.0)+(ig.geometry().center()[1]-0.0)*(ig.geometry().center()[1]-0.0)<1.0) ||
+   	      ((ig.geometry().center()[0]-10.0)*(ig.geometry().center()[0]-10.0)+(ig.geometry().center()[1]-0.0)*(ig.geometry().center()[1]-0.0)<1.0) ||
+          ((ig.geometry().center()[0]-15.0)*(ig.geometry().center()[0]-15.0)+(ig.geometry().center()[0]-8.6605)*(ig.geometry().center()[0]-8.6605)<1.0) || 
+		  ((ig.geometry().center()[0]-10.0)*(ig.geometry().center()[0]-10.0)+(ig.geometry().center()[1]-17.321)*(ig.geometry().center()[1]-17.321)<1.0) || 
+		  ((ig.geometry().center()[0]-0.0)*(ig.geometry().center()[0]-0.0)+(ig.geometry().center()[1]-17.321)*(ig.geometry().center()[1]-17.321)<1.0) ||
+		  ((ig.geometry().center()[0]+5.0)*(ig.geometry().center()[0]+5.0)+(ig.geometry().center()[1]-8.6605)*(ig.geometry().center()[1]-8.6605)<1.0)))
         continue;
+	  */
 
       if (verbose)
         std::cout << "Boundary intersection at " << fibre->eval(tpos.value())
