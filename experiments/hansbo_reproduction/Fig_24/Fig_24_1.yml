@@ -1,0 +1,95 @@
+# Run with structured2d_p2 via structured UGGrid
+solver:
+    vectors:
+      - Displacement Field_0
+      - Body Force_0
+      - Traction Force_0
+    grid:
+      N:
+        - 40
+        - 10
+      lowerleft:
+        - 0
+        - 0
+      refinement: 0
+      upperright:
+        - 4
+        - 1
+      _blockname: grid_0
+    blocks:
+        - 
+            _type: material
+            _blockname: material_0
+            materials:
+                - 
+                    group: 0
+                    model: linear
+                    plane-stress-approx: false
+                    poisson_ratio: 0.3333
+                    youngs_modulus: 300
+                    prestress:
+                        type: isotropic
+                        scale: 0
+                  
+        # Displacement for Dirichlet-BC
+        - 
+            _type: interpolation
+            _blockname: interpolation_0
+            functions: 0, 0
+            vector: 0
+        # Bodý Force
+        - 
+            _type: interpolation
+            _blockname: interpolation_1
+            functions: 100, 0
+            vector: 1
+        # Traction Force for Neumann-BC
+        - 
+            _type: interpolation
+            _blockname: interpolation_2
+            functions: 0, 0
+            vector: 2
+        # Dirichlet-BC: if true, then interpolation_0, else Neumann-BC (i.e. either force free or prescribed by interpolation_1)
+        - 
+            _type: constraints
+            _blockname: constraints_0
+            functions: x < 1e-8
+            vector: 0
+          
+        # Solver: bulk elasticity or fiber-reinforced  
+        - 
+            _type: linearsolver
+            _blockname: linearsolver_0
+            operator:
+                elasticity: # for resolved approach
+                    _blockname: elasticity_0                                    
+                    vector: 0
+            vector: 0
+        
+        # Visualization
+        - 
+            _type: visualization
+            _blockname: visualization_0
+            blocks:
+            # Displacement
+            - 
+                _type: vis_vector
+                _blockname: vis_vector_0
+                vector: 0
+            # von-Mises stress
+            - 
+                _type: vis_vonmises
+                _blockname: vis_vonmises_0
+                continuous: true
+                #report_inf: true
+                #report_norm: [1, 2]
+                vector: 0
+
+            filename: fig_23_1
+            instationary: false
+            intervals: 1
+            path: vtk
+
+
+            
+        

@@ -1,3 +1,4 @@
+# Run with structured2d_p2 via structured UGGrid
 solver:
     vectors:
       - Displacement Field_0
@@ -25,6 +26,9 @@ solver:
             plane-stress-approx: false
             poisson_ratio: 0.3333
             youngs_modulus: 300
+            prestress:
+                type: isotropic
+                scale: 0
       - _type: interpolation
         _blockname: interpolation_0
         functions: 0
@@ -40,8 +44,31 @@ solver:
       - _type: linearsolver
         _blockname: linearsolver_0
         operator:
-          elasticity:
-            _blockname: elasticity_0
+          reinforced_operator:
+            _blockname: reinforced_operator_0
+            enable_boundary: true # add bending terms at Dirichlet Boundary: hard-coded in eulerbernoulli.hh !!!
+            verbose: true # show details on fiber cutting background mesh
+            fibres:
+              -
+                end:
+                  - 4.5
+                  - 0.249
+                radius: 0.05
+                start:
+                  - -0.5
+                  - 0.249
+                youngs_modulus: 1e4
+                prestress: 0
+              -
+                end:
+                  - 4.5
+                  - 0.7501
+                radius: 0.05
+                start:
+                  - -0.5
+                  - 0.7501
+                youngs_modulus: 1e4
+                prestress: 0
             vector: 0
         vector: 0
       - _type: visualization
@@ -54,7 +81,14 @@ solver:
             _blockname: vis_vonmises_0
             continuous: true
             vector: 0
-        filename: fig24_1
+          - _type: vis_stress
+            _blockname: vis_stress_0
+            vector: 0
+          - _type: vis_stress
+            _blockname: vis_stress_1
+            vector: 0
+            index: 0
+        filename: fig_23_2_eb
         instationary: false
         intervals: 1
         path: vtk
