@@ -19,7 +19,7 @@ dune-structures requires the following Dune modules:
 * [dune-pdelab](https://gitlab.dune-project.org/pdelab/dune-pdelab.git)
 * [dune-testtools](https://gitlab.dune-project.org/quality/dune-testtools.git)
 * [dune-uggrid](https://gitlab.dune-project.org/staging/dune-uggrid.git)
-* [dune-codegen](https://gitlab.dune-project.org/extensions/dune-codegen.git)
+* [dune-codegen](https://gitlab.dune-project.org/extensions/dune-codegen.git) release >= 2.8
 * [dune-blocklab](https://gitlab.dune-project.org/dominic/dune-blocklab.git)
 
 Note that `dune-codegen` requires special care in setup. It needs to
@@ -31,7 +31,7 @@ Similarly, `dune-blocklab` and `dune-structures` need to be cloned recursively.
 Currently, the latest versions (master) of all Dune modules are necessary.
 Furthermore, dune-structures requires the following external packages:
 
-* A Python interpreter >= 3.6 (e.g. Debian packages `python3-dev`)
+* A Python interpreter >= 3.6 and <= 3.8 (e.g. Debian packages `python3-dev`)
 * pip (e.g. the Debian package `python3-pip`)
 * MuParser (e.g. the Debian package `libmuparser-dev`)
 * Gmsh (e.g. Debian packages `gmsh`)
