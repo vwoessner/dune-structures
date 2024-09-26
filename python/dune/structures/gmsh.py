@@ -301,11 +301,11 @@ def cell_geometry_2d(geo, config):
             size = pad_to_3_vector(config.get("size", [1.0, 1.0]))
             lowerleft = pad_to_3_vector(config.get("lowerleft", -0.5 * size))
             return geo.add_rectangle(lowerleft, size[0], size[1])
-        elif shape == "scheiwe":
-            size = pad_to_3_vector(config.get("size", [1.0, 1.0]))
+        elif shape == "polygon":
+            number_of_corners = config.get("number_of_corners")
             points = []
-            for number in ["point1","point2","point3","point4","point5","point6"]:
-                point = pad_to_3_vector(config.get(number, size))
+            for number in np.arange(1,number_of_corners+1):
+                point = pad_to_3_vector(config.get("point"+str(number)))
                 points.append(point)
             return geo.add_polygon(points)
         elif shape == "circle":

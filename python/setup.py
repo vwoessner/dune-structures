@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name="dune.structures",
@@ -9,9 +9,10 @@ setup(
     description="Cell mechanics simulation tools for the STRUCTURES project",
     author="Dominic Kempf <dominic.kempf@iwr.uni-heidelberg.de>",
     url="https://gitlab.dune-project.org/dominic/dune-structures.git",
-    packages=[
-        "dune.structures",
-    ],
+    #packages=[
+    #    "dune.structures",
+    #],
+    packages=find_packages("."),
     install_requires=[
         "dune.codegen",
         "pyaml",
@@ -24,7 +25,7 @@ setup(
         "scipy",
         "pandas",
         "seaborn",
-        "meshio",
+        "scikit-image",
     ],
     entry_points={
         "console_scripts": [
