@@ -147,7 +147,8 @@ def genetic_opt(executable, input_file, logger, **kwargs):
 
     # Load the mesh triangulation (for position information)
     tri, media = get_mesh_triangulation(
-        yaml_input["solver"]["grid"]["filename"].removeprefix("../")
+        #yaml_input["solver"]["grid"]["filename"].removeprefix("../") # only available since python 3.9
+        yaml_input["solver"]["grid"]["filename"][3:]
     )
     trifinder = tri.get_trifinder()
 
@@ -233,10 +234,10 @@ def genetic_opt(executable, input_file, logger, **kwargs):
         # Retain iteration data
         data_iteration.append(data)
 
-        # Plot population
-        plot_population(
-            data, it, os.path.join(input_dir, "population-{:03d}.pdf".format(it))
-        )
+        ## Plot population
+        #plot_population(
+        #    data, it, os.path.join(input_dir, "population-{:03d}.pdf".format(it))
+        #)
         """
         # Plot the mean of the 10% of best files
         for data_plot, outname in [
